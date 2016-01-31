@@ -1,0 +1,6 @@
+[submodule "lib/sdsl"]
+	path = lib/sdsl
+	url = git@github.com:tsnorri/sdsl-lite.git
+[submodule "lib/phf"]
+	path = lib/phf
+	url = git@github.com:tsnorri/phf.git
