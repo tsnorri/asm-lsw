@@ -351,13 +351,13 @@ namespace asm_lsw {
 		
 		// Section 3.1, Lemma 17.
 		static void construct_hl_hr(
-									cst_type const &cst,
-									core_endpoints_type const &ce,
-									lcp_rmq_type const &lcp_rmq,
-									cst_type::node_type const u,
-									cst_type::size_type const log2n,
-									h_u_type &hl,
-									h_u_type &hr)
+			cst_type const &cst,
+			core_endpoints_type const &ce,
+			lcp_rmq_type const &lcp_rmq,
+			cst_type::node_type const u,
+			cst_type::size_type const log2n,
+			h_u_type &hl,
+			h_u_type &hr)
 		{
 			auto const v(ce.find_open(u));					// Core path beginning.
 			auto const k(cst.lb(u));						// Left bound (leftmost leaf index) in SA.
@@ -417,8 +417,8 @@ namespace asm_lsw {
 		static bool find_pattern_occurrence(
 			csa_type const &csa,
 			pattern_type::size_type const pat1_len,
-			f_type::value_type const st,
-			f_type::value_type const ed,
+			csa_type::size_type const st,
+			csa_type::size_type const ed,
 			csa_type::size_type const lb,
 			csa_type::size_type const rb,
 			csa_type::size_type &i
@@ -433,10 +433,13 @@ namespace asm_lsw {
 			auto const val(isa[isa_idx]);
 			
 			// Tail recursion.
-			if (val < st)
-				return find_pattern_occurrence(csa, pat1_len, st, ed, mid, rb, i);
-			else if (ed < val)
-				return find_pattern_occurrence(csa, pat1_len, st, ed, lb, mid, i);
+			// The first case prevents overflow for mid - 1.
+			if (st != val && lb == mid)
+				return false;
+			else if (st < val)
+				return find_pattern_occurrence(csa, pat1_len, st, ed, lb, mid - 1, i);
+			else if (val < ed)
+				return find_pattern_occurrence(csa, pat1_len, st, ed, 1 + mid, rb, i);
 			else
 			{
 				i = mid;
@@ -445,39 +448,172 @@ namespace asm_lsw {
 		}
 		
 		
-		static void find_range_in_h(
-			h_type const &h,
-			h_u_type const &hu,
-			cst_type::size_type const k,
+		// Find SA index i s.t. |lcp(i, k)| = |P₁| + q + 1 using binary search.
+		static bool find_node_ilr_bin(
+			lcp_rmq_type const &lcp_rmq,
+			csa_type::size_type const k,
 			cst_type::size_type const r_len,
-			h_u_type::value_type &l,
-			h_u_type::value_type &r
+			csa_type::size_type const l,
+			csa_type::size_type const r,
+			csa_type::size_type &i
 		)
 		{
-			h_u_type::leaf_iterator it;
-			if (hu.find_predecessor(r_len, it, true))
+			if (r < l)
+				return false;
+
+			auto const mid (l + r) / 2;
+			auto const res(lcp_rmq(mid, k));
+
+			// Tail recursion.
+			// The first case prevents overflow for mid - 1.
+			if (res != r_len && l == mid)
+				return false;
+			if (res < r_len)
+				return find_node_ilr_bin(lcp_rmq, k, r_len, 1 + mid, r, i);
+			else if (r_len < res)
+				return find_node_ilr_bin(lcp_rmq, k, r_len, l, mid - 1, i);
+			else
 			{
-				l = hu.dereference(it);
-				if (hu.find_successor(r_len, it, true))
-					r = hu.dereference(it);
-				else
-					r = l + h.diff;
+				i = mid;
+				return true;
 			}
-			else if (hu.find_successor(r_len, it, true));
+		}
+
+
+		// Lemma 19 case 3 (with v being a core node).
+		// Find a suitable range in H_u s.t. either 
+		//  |lcp(j - log₂²n, k)| ≤ r_len ≤ |lcp(j, k)| or
+		//  |lcp(j, k)| ≤ r_len ≤ |lcp(j + log₂²n, k)|
+		// Then use the range to search for a suitable node.
+		static bool find_node_ilr(
+			lcp_rmq_type const &lcp_rmq,
+			h_type const &h,
+			h_pair const &hx,
+			csa_type::size_type const k,
+			cst_type::size_type const r_len	// cst.depth returns size_type.
+			csa_type::size_type &i
+		)
+		{
+			csa_type::size_type l(0), r(0);
+			h_u_type::leaf_iterator it;
+
+			// Try i^l.
+			if (hx.l.find_successor(r_len, it, true))
 			{
-				r = hu.dereference(it);
+				r = hx.l.dereference(it);
+				assert(r >= h.diff);
 				l = r - h.diff;
+				if (l <= r_len && find_node_ilr_bin(lcp_rmq, r_len, l, r, i))
+					return true;
+			}
+
+			// Try i^r.
+			if (hx.r.find_predecessor(r_len, it, true))
+			{
+				l = hx.r.dereference(it);
+				r = l + h.diff;
+				if (r_len <= r && find_node_ilr_bin(lcp_rmq, r_len, l, r, i))
+					return true;
+			}
+
+			// Try i^l again with another range.
+			assert(k >= h.diff);
+			l = k - h.diff;
+			r = k + h.diff;
+			if (find_node_i_bin(lcp_rmq, r_len, l, r))
+				return true;			
+
+			return false;
+		}
+
+
+		// Use Lemma 11.
+		static void extend_range(
+			cst_type const &cst,
+			pattern_type::size_type const pat1_len,
+			csa_type::size_type const st,
+			csa_type::size_type const ed,
+			csa_type::size_type &left,
+			csa_type::size_type &right
+		)
+		{
+			auto const &csa(cst.csa);
+			auto const &isa(csa.isa);
+
+			while (st <= isa[csa[left] + pat1_len + 1])
+				--left;
+
+			while (isa[csa[right] + pat1_len + 1] <= ed)
+				++right;
+		}
+
+
+		// Lemma 19 (with v being a side node).
+		static bool tree_search_side_node(
+			cst_type const &cst,
+			gamma_v_type const &gamma_v,
+			cst_type::node_type const u,
+			cst_type::node_type const v,
+			csa_type::size_type const st,
+			csa_type::size_type const ed,
+			csa_type::size_type &i
+		)
+		{
+			// v is a side node.
+			auto const &csa(cst.csa);
+			auto const pat1_len(cst.depth(u));
+			auto const v_le(cst.lb(v));
+			auto const v_ri(cst.rb(v));
+
+			if (0 == gamma_v.size())
+			{
+				// Case 1.
+				if (find_pattern_occurrence(csa, pat1_len, st, ed, v_le, v_ri, i))
+					return true;
 			}
 			else
 			{
-				l = k - h.diff;
-				r = k + diff;
+				// Find an i s.t. st ≤ i ≤ ed by allowing equality and checking the upper bound.
+				decltype(gamma_v)::const_subtree_iterator it;
+				if (gamma_v.find_successor(st, it, true) && *it <= ed)
+				{
+					// Case 2.
+					// Get i from ISA[SA[i] + |P₁| + 1].
+					auto const isa_val(*it);
+					auto const isa_idx(csa[val]);
+					auto const sa_val(isa_idx - pat1_len - 1);
+					auto const sa_idx(csa.isa[sa_val]);
+					i = sa_idx;
+					return true;
+				}
+				else
+				{
+					// Case 3.
+					// Extend the range slightly if possible.
+					decltype(gamma_v)::const_subtree_iterator a_it, b_it;
+					csa_type::size_type a(st), b(ed);
+					
+					if (gamma_v.find_predecessor(st, a_it))
+						a = *a_it;
+					
+					if (gamma_v.find_successor(ed, b_it))
+						b = *b_it;
+					
+					// If extending was not possible, stop.
+					if (st == a && ed == b)
+						return false;
+					
+					if (find_pattern_occurrence(csa, pat1_len, a, b, v_le, v_ri, i))
+						return true;
+				}
 			}
+
+			return false;
 		}
 		
 		
 		// Lemma 19.
-		static void tree_search(
+		static bool tree_search(
 			cst_type const &cst,
 			gamma_type const &gamma,
 			core_endpoints_type const &core_endpoints,
@@ -485,9 +621,11 @@ namespace asm_lsw {
 			h_type const &h,
 			cst_type::node_type const u,
 			cst_type::node_type const core_path_beginning,
-			cst_type::char_type c,
-			f_type::value_type const st,
-			f_type::value_type const ed
+			cst_type::char_type const c,
+			csa_type::size_type const st,
+			csa_type::size_type const ed,
+			csa_type::size_type &left,
+			csa_type::size_type &right
 		)
 		{
 			cst_type::size_type pos(0);
@@ -495,7 +633,7 @@ namespace asm_lsw {
 			
 			// Check if found.
 			if (cst.root() == v)
-				return;
+				return false;
 			
 			csa_type::size_type i(0);
 			
@@ -514,7 +652,12 @@ namespace asm_lsw {
 					auto const v_le(cst.lb(v));
 					auto const v_ri(cst.rb(v));
 					if (!find_pattern_occurrence(cst.csa, pat1_len, st, ed, v_le, v_ri, i))
-						return;
+						return false;
+
+					left = i;
+					right = i;
+					extend_range(cst, pat1_len, st, ed, left, right);
+					return true;
 				}
 				else
 				{
@@ -522,12 +665,15 @@ namespace asm_lsw {
 					auto const &isa(csa.isa);
 					auto const k(cst.id(x));
 					auto const q(lcp_rmq(isa[csa[k] + pat1_len + 1], st));
-					auto const pat2_len(/* FIXME: write me. */);
+					auto const pat2_len(lcp_rmq(st, ed));
 					if (q >= pat2_len)
 					{
 						// Case 2.
 						// x corresponds to a suffix with P as its prefix.
-						i = k;
+						left = k;
+						right = k;
+						extend_range(cst, pat1_len, st, ed, left, right);
+						return true;
 					}
 					else
 					{
@@ -535,68 +681,55 @@ namespace asm_lsw {
 						// Since x is a core leaf node, we have (some of) the indices
 						// of the suitable lcp values stored in hx.l and hx.r.
 						auto const r_len(pat1_len + q + 1);
-						h_u_type::value_type jll{0}, jlr{0}, jrl{0}, jrr{0};
-
-						find_range_in_h(h, hx.l, k, r_len, jll, jlr);
-						find_range_in_h(h, hx.r, k, r_len, jrl, jrr);
+						csa_type::size_type ilr(0);
+						if (!find_leaf_i(lcp_rmq, h, hx, k, r_len, ilr))
+							return false;
 						
-						// FIXME: complete me.
+						// XXX Paper requires O(t_SA) time complexity for LCA but cst_sada gives O(rr_enclose).
+						auto const leaf(cst.inv_id(ilr));
+						auto const r(cst.lca(leaf, x));
+
+						// Check if r has P₂ as a prefix.
+						auto const lb(cst.lb(r)), rb(cst.rb(r));
+						if (st <= lb && rb <= ed)
+						{
+							left = lb;
+							right = rb;
+							return true;
+						}
+						else
+						{
+							// Incomplete match, check all the side edges.
+							auto const children(cst.children(r));
+							for (auto const child : children)
+							{
+								auto const &gamma_v(gamma.find(child));
+								if (gamma.cend() != gamma_v &&
+									tree_search_side_node(cst, gamma_v, r, child, st, ed, i))
+								{
+									left = i;
+									rigth = i;
+									extend_range(cst, pat1_len, st, ed, left, right);
+									return true;
+								}
+							}
+						}
+
+						return false;
 					}
-				}
-				
-				// FIXME: complete me.
+				}				
+			}
+			else if (tree_search_side_node(cst, gamma_v, u, v, st, ed, i))
+			{
+				left = i;
+				right = i;
+				extend_range(cst, pat1_len, st, ed, left, right);
+				return true;
 			}
 			else
 			{
-				// v is a side node.
-				auto const pat1_len(cst.depth(u));
-				auto const v_le(cst.lb(v));
-				auto const v_ri(cst.rb(v));
-
-				if (0 == gamma_v.size())
-				{
-					// Case 1.
-					if (!find_pattern_occurrence(cst.csa, pat1_len, st, ed, v_le, v_ri, i))
-						return;
-				}
-				else
-				{
-					// Find an i s.t. st ≤ i ≤ ed by allowing equality and checking the upper bound.
-					decltype(gamma_v)::const_subtree_iterator it;
-					if (gamma_v.find_successor(st, it, true) && *it <= ed)
-					{
-						// Case 2.
-						// Get i from ISA[SA[i] + |P₁| + 1].
-						auto const isa_val(*it);
-						auto const isa_idx(csa[val]);
-						auto const sa_val(isa_idx - pat1_len - 1);
-						auto const sa_idx(csa.isa[sa_val]);
-						i = sa_idx;
-					}
-					else
-					{
-						// Case 3.
-						// Extend the range slightly if possible.
-						decltype(gamma_v)::const_subtree_iterator a_it, b_it;
-						f_type::value_type a(st), b(ed);
-						
-						if (gamma_v.find_predecessor(st, a_it))
-							a = *a_it;
-						
-						if (gamma_v.find_successor(ed, b_it))
-							b = *b_it;
-						
-						// If extending was not possible, stop.
-						if (st == a && ed == b)
-							return;
-						
-						if (!find_pattern_occurrence(cst.csa, pat1_len, a, b, v_le, v_ri, i))
-							return;
-					}
-				}
+				return false;
 			}
-			
-			// FIXME: complete me.
 		}
 		
 		
