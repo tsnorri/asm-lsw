@@ -1,2 +1,5 @@
 local.mk
 *.o
+
+asm-lsw/smoke-test/*.cc
+asm-lsw/smoke-test/Makefile
