@@ -11,7 +11,10 @@ ls -1 ../include/asm_lsw | while read x
 do
 	b="${x%.*}"
 	include="#include <asm_lsw/${x}>"
-	echo "${include}" > "${b}.cc"
+	if [ ! -e "${b}.cc" ]
+	then
+		echo "${include}" > "${b}.cc"
+	fi
 	echo "${include}" >> "all.cc"
 	echo -n " ${b}.o" >> "${target}"
 done
