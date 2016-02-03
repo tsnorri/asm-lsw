@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo "include ../../local.mk" > Makefile
-echo "include ../../common.mk" >> Makefile
-echo -n "all:" >> Makefile
+target=tests.mk
+
+echo "include ../../local.mk" > "${target}"
+echo "include ../../common.mk" >> "${target}"
+echo -n "all:" >> "${target}"
 rm -f all.cc
 
 ls -1 ../include/asm_lsw | while read x
@@ -11,9 +13,9 @@ do
 	include="#include <asm_lsw/${x}>"
 	echo "${include}" > "${b}.cc"
 	echo "${include}" >> "all.cc"
-	echo -n " ${b}.o" >> Makefile
+	echo -n " ${b}.o" >> "${target}"
 done
 
-echo " all.o" >> Makefile
+echo " all.o" >> "${target}"
 
-printf "\n\nclean:\n\t\$(RM) *.cc *.o Makefile" >> Makefile
+printf "\n\nclean:\n\t\$(RM) *.cc *.o ${target}" >> "${target}"

@@ -2,4 +2,4 @@ local.mk
 *.o
 
 asm-lsw/smoke-test/*.cc
-asm-lsw/smoke-test/Makefile
+asm-lsw/smoke-test/tests.mk
