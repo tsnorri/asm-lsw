@@ -20,8 +20,10 @@
 
 #include <asm_lsw/map_adaptor.hh>
 #include <asm_lsw/y_fast_trie_helper.hh>
+#include <boost/format.hpp>
 #include <cassert>
 #include <cstdint>
+#include <iostream>
 #include <type_traits>
 
 
@@ -334,25 +336,26 @@ namespace asm_lsw {
 	template <typename t_spec>
 	void y_fast_trie_base <t_spec>::print() const
 	{
-		fprintf(stderr, "Representatives (%lx):\n", m_reps.size());
+		std::cerr << boost::format("Representatives (%02x):\n\t") % m_reps.size();
 		for (auto it(m_reps.cbegin()), end(m_reps.cend()); it != end; ++it)
 		{
-			uint64_t const key(it->first);
-			fprintf(stderr, "%llx, ", key);
+			auto const key(it->first);
+			std::cerr << std::hex << +key << " ";
 		}
-		fprintf(stderr, "\n");
+
+		std::cerr << "\n";
 		
-		fprintf(stderr, "Subtrees (%lx):\n", m_subtrees.size());
+		std::cerr << boost::format("Subtrees (%02x):\n") % m_subtrees.size();
 		for (auto st_it(m_subtrees.cbegin()), st_end(m_subtrees.cend()); st_it != st_end; ++st_it)
 		{
-			uint64_t const key(st_it->first);
-			fprintf(stderr, "\t%llx: ", key);
+			auto const key(st_it->first);
+			std::cerr << boost::format("\t%02x: ") % (+key);
 			for (auto it(st_it->second.cbegin()), end(st_it->second.cend()); it != end; ++it)
 			{
-				uint64_t const val(*it);
-				fprintf(stderr, "%llx, ", val);
+				auto const val(*it);
+				std::cerr << boost::format("%02x ") % (+val);
 			}
-			fprintf(stderr, "\n");
+			std::cerr << "\n";
 		}
 	}
 }
