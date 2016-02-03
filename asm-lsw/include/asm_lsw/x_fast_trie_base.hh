@@ -20,6 +20,7 @@
 
 #include <asm_lsw/map_adaptors.hh>
 #include <asm_lsw/x_fast_trie_helper.hh>
+#include <boost/format.hpp>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -29,7 +30,7 @@
 
 namespace asm_lsw {
 	
-	// TODO: for t_value equal to or larger than some threshold (e.g. pointer size, unsigned long long), use a specialization that stores pointers in node_val and leaf_link?
+	// TODO: for t_key or t_value equal to or larger than some threshold (e.g. pointer size, unsigned long long), use a specialization that stores pointers in node_val and leaf_link?
 
 	template <typename t_spec>
 	class x_fast_trie_base
@@ -374,55 +375,57 @@ namespace asm_lsw {
 	template <typename t_spec>
 	void x_fast_trie_base <t_spec>::print() const
 	{
-		fprintf(stderr, "LSS:\n[level]: key [0x1 & key]: left (d if descendant) right (d if descendant)\n");
+		std::cerr << "LSS:\n[level]: key [0x1 & key]: left (d if descendant) right (d if descendant)\n";
+
 		{
 			auto size(m_lss.size());
 			decltype(size) i(0);
 			for (auto lss_it(m_lss.crbegin()), lss_end(m_lss.crend()); lss_it != lss_end; ++lss_it)
 			{
-				fprintf(stderr, "\t[%2lu]:", size - i - 1);
+				std::cerr << boost::format("\t[%02x]:") % (size - i - 1);
 				for (auto node_it(lss_it->cbegin()), node_end(lss_it->cend()); node_it != node_end; ++node_it)
 				{
 					// In case of the PHF map adaptor, node_it->first points to the
 					// first item in the pair (which is the key as expected),
 					// not the vector index.
-					uint64_t key(node_it->first);
-					uint64_t left(node_it->second[0].key());
-					uint64_t right(node_it->second[1].key());
-					bool l_is_descendant(node_it->second[0].is_descendant());
-					bool r_is_descendant(node_it->second[1].is_descendant());
-					fprintf(stderr, " (%2llx [%2llx]: %2llx", key, 0x1 & key, left);
+					auto const key(node_it->first);
+					auto const left(node_it->second[0].key());
+					auto const right(node_it->second[1].key());
+					bool const l_is_descendant(node_it->second[0].is_descendant());
+					bool const r_is_descendant(node_it->second[1].is_descendant());
+					std::cerr << boost::format(" (%02x [%02x]: %02x") % (+key) % (+(0x1 & key)) % (+left);
 					if (l_is_descendant)
-						fprintf(stderr, " (d)");
+						std::cerr << " (d) ";
 					else
-						fprintf(stderr, "    ");
-					fprintf(stderr, ", %2llx", right);
+						std::cerr << "     ";
+
+					std::cerr << boost::format("%02x") % (+right);
 					if (r_is_descendant)
-						fprintf(stderr, " (d)");
+						std::cerr << " (d) ";
 					else
-						fprintf(stderr, "    ");
-					fprintf(stderr, ")");
+						std::cerr << "     ";
+					std::cerr << ")";
 				}
-				
-				fprintf(stderr, "\n");
+	
+				std::cerr << "\n";
 				++i;
 			}
 		}
 		
-		fprintf(stderr, "Leaves:\n");
+		std::cerr << "Leaves:\n";
 		{
 			for (auto it(m_leaf_links.cbegin()), end(m_leaf_links.cend()); it != end; ++it)
 			{
-				uint64_t key(it->first);
-				uint64_t prev(it->second.prev);
-				uint64_t next(it->second.next);
-				fprintf(stderr, "\t(%llx: %llx %llx)\n", key, prev, next);
+				auto const key(it->first);
+				auto const prev(it->second.prev);
+				auto const next(it->second.next);
+				std::cerr << boost::format("\t(%02x: %02x %02x)\n") % (+key) % (+prev) % (+next);
 			}
 		}
 		
 		{
-			uint64_t min(m_min);
-			fprintf(stderr, "Min leaf: %llx\n", min);
+			auto const min(m_min);
+			std::cerr << boost::format("Min leaf: %02x\n") % (+min);
 		}
 	}
 }
