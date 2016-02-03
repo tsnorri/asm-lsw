@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_BP_SUPPORT_SPARSE_HH
 #define ASM_LSW_BP_SUPPORT_SPARSE_HH
 
+#include <asm_lsw/util.hh>
 #include <cstdint>
 #include <cstdio>
 #include <sdsl/bp_support.hpp>
@@ -49,8 +50,8 @@ namespace asm_lsw {
 		bp_support_sparse_base &operator=(bp_support_sparse_base const &) & = default;
 		bp_support_sparse_base &operator=(bp_support_sparse_base &&) & = default;
 		
-		decltype(m_bp) const bp() const { return m_bp; }
-		decltype(m_mask) const mask() const { return m_mask; }
+		decltype(m_bp) const &bp() const { return m_bp; }
+		decltype(m_mask) const &mask() const { return m_mask; }
 	};
 	
 	
@@ -72,8 +73,6 @@ namespace asm_lsw {
 		typedef bp_support_sparse_base<t_vector>	base_class;
 		typedef typename base_class::bp_type		bp_type;
 		typedef typename t_bps::size_type			size_type;
-		typedef typename t_bps::rank_type			rank_type;
-		typedef typename t_bps::select_type			select_type;
 		
 	protected:
 		// Container for rank and select support.
@@ -152,6 +151,7 @@ namespace asm_lsw {
 		template <typename t_input_vector>
 		bp_support_sparse(t_input_vector const &bps_seq);
 		
+		decltype(m_bps) const &bps() const { return m_bps; }
 		auto to_bp_idx(size_type const i) const -> typename bp_type::size_type;
 		size_type to_sparse_idx(typename bp_type::size_type const idx) const;
 		size_type find_open(size_type i) const;
@@ -173,7 +173,7 @@ namespace asm_lsw {
 		typedef typename std::underlying_type<input_value>::type input_value_u;
 		
 		auto const len(dst.size());
-		for (std::remove_const_t<decltype(len)> i(0); i < len; ++i)
+		for (remove_c_t<decltype(len)> i(0); i < len; ++i)
 		{
 			input_value value(input_value::Space);
 			switch (src[i])
