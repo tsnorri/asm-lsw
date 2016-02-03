@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_Y_FAST_TRIE_HH
 #define ASM_LSW_Y_FAST_TRIE_HH
 
+#include <asm_lsw/util.hh>
 #include <asm_lsw/y_fast_trie_base.hh>
 #include <unordered_map>
 
@@ -51,6 +52,9 @@ namespace asm_lsw {
 		typedef typename base_class::subtree_map subtree_map;
 		
 	protected:
+		key_type m_max_value{std::numeric_limits <key_type>::max()};
+
+	protected:
 		void check_merge_subtree(typename subtree_map::map_type::iterator &st_it);
 		void split_subtree(typename subtree_map::map_type::iterator &st_it);
 		typename subtree_map::iterator find_subtree(key_type const key);
@@ -62,6 +66,7 @@ namespace asm_lsw {
 		y_fast_trie(y_fast_trie &&) = default;
 		y_fast_trie &operator=(y_fast_trie const &) & = default;
 		y_fast_trie &operator=(y_fast_trie &&) & = default;
+		y_fast_trie(key_type const max_value): m_max_value(max_value) {}
 		
 		// Conditionally enable either.
 		// (Return type of the first one is void == std::enable_if<...>::type.)
@@ -111,7 +116,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	void y_fast_trie <t_key, t_value>::check_subtree_size(typename subtree_map::iterator st_it)
 	{
-		auto const log2M(std::numeric_limits <key_type>::digits);
+		auto const log2M(std::log2(m_max_value));
 		auto const size(st_it->second.size());
 		if (2 * log2M < size)
 			split_subtree(st_it);
@@ -124,6 +129,8 @@ namespace asm_lsw {
 	typename std::enable_if<std::is_void<T>::value, void>::type
 	y_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
+		assert(key <= m_max_value);
+
 		if (0 == this->m_reps.size())
 		{
 			this->m_reps.insert(key);
@@ -143,6 +150,8 @@ namespace asm_lsw {
 	template <typename T>
 	void y_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val)
 	{
+		assert(key <= m_max_value);
+
 		if (0 == this->m_reps.size())
 		{
 			this->m_reps.insert(key);
@@ -195,7 +204,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	void y_fast_trie <t_key, t_value>::check_merge_subtree(typename subtree_map::map_type::iterator &st_it)
 	{
-		auto const log2M(std::numeric_limits <key_type>::digits);
+		auto const log2M(std::log2(m_max_value));
 		auto &tree(st_it->second);
 		if (! (tree.size() < log2M / 4))
 			return;
@@ -238,9 +247,9 @@ namespace asm_lsw {
 		swap(t1, st_it->second);
 		subtree_iterator hint(t2.begin());
 
-		auto const log2M(std::numeric_limits <key_type>::digits);
+		auto const log2M(std::log2(m_max_value));
 		auto it(t1.cbegin());
-		for (typename std::remove_const_t<decltype(log2M)> i(0); i < log2M; ++i)
+		for (remove_c_t<decltype(log2M)> i(0); i < log2M; ++i)
 		{
 			hint = t2.emplace_hint(hint, *it);
 			++it;
