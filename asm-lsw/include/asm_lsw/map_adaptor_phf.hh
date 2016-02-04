@@ -288,7 +288,7 @@ namespace asm_lsw {
 		{
 			auto const key(it.first);
 			auto const hash(PHF::hash(&this->m_phf.get(), key));
-			auto val(std::make_pair(key, std::move(it.second)));
+			auto val(std::make_pair(key, std::move(it.second))); // FIXME: needs to take the key for it.second in case of a set-type container.
 			
 			assert(!this->m_used_indices[hash]);
 			this->m_vector[hash] = std::move(val);
