@@ -4,6 +4,7 @@ target=tests.mk
 
 echo "include ../../local.mk" > "${target}"
 echo "include ../../common.mk" >> "${target}"
+echo ".PHONY: all clean" >> "${target}"
 echo -n "all:" >> "${target}"
 rm -f all.cc
 
