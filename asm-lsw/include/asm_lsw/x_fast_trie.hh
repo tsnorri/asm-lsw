@@ -26,7 +26,7 @@ namespace asm_lsw {
 	
 	template <typename t_key, typename t_value>
 	using x_fast_trie_spec = x_fast_trie_base_spec <t_key, t_value, std::unordered_map, map_adaptor>;
-	
+
 	
 	template <typename t_key, typename t_value = void>
 	class x_fast_trie : public x_fast_trie_base <x_fast_trie_spec <t_key, t_value>>
@@ -36,7 +36,7 @@ namespace asm_lsw {
 		typedef typename base_class::size_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::node node;
-		typedef typename base_class::node_val node_val;
+		typedef typename base_class::node_value node_value;
 
 	public:
 		typedef typename base_class::key_type key_type;
@@ -197,18 +197,18 @@ namespace asm_lsw {
 			if (find_node(key, level - 1, node_it))
 			{
 				node &node(node_it->second);
-				node[next_branch] = node_val(nlk, false);
+				node[next_branch] = node_value(nlk, false);
 				if (node[other_branch].is_descendant())
 				{
 					auto desc(node[other_branch].key());
-					node[other_branch] = node_val(other_branch ? std::max(desc, key) : std::min(desc, key), true);
+					node[other_branch] = node_value(other_branch ? std::max(desc, key) : std::min(desc, key), true);
 				}
 			}
 			else
 			{
 				node node;
-				node[next_branch] = node_val(nlk, false);
-				node[other_branch] = node_val(key, true);
+				node[next_branch] = node_value(nlk, false);
+				node[other_branch] = node_value(key, true);
 				level_idx_type lss_idx(level - 1);
 				this->m_lss[lss_idx].map().emplace(lk, std::move(node));
 			}
@@ -248,7 +248,7 @@ namespace asm_lsw {
 				this->m_lss[i].map().erase(node_it);
 			else
 			{
-				node[target_branch] = node_val(target_branch ? prev : next, true);
+				node[target_branch] = node_value(target_branch ? prev : next, true);
 				break;
 			}
 			
@@ -266,7 +266,7 @@ namespace asm_lsw {
 			key_type const other_branch(!target_branch);
 
 			if (node[other_branch].is_descendant())
-				node[other_branch] = node_val(other_branch ? prev : next, true);
+				node[other_branch] = node_value(other_branch ? prev : next, true);
 			
 			++i;
 		}

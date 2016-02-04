@@ -56,7 +56,7 @@ namespace asm_lsw {
 		template <typename t_map_key, typename t_map_value>
 		using map_adaptor_type = t_map_adaptor <map_type, t_map_key, t_map_value>;	// Hash map adaptor. Parameters are map type, key type and value type.
 		
-		typedef t_x_fast_trie <t_key, t_value> trie_type;							// Representative trie type.
+		typedef t_x_fast_trie <t_key, void> trie_type;								// Representative trie type.
 		
 		// Subtree type.
 		typedef typename y_fast_trie_subtree_trait<key_type, value_type>::subtree_type subtree_type;
@@ -64,12 +64,24 @@ namespace asm_lsw {
 
 	
 	template <typename t_key, typename t_value>
-	struct y_fast_trie_access_subtree_it
+	struct y_fast_trie_trait
 	{
+		typedef t_key key_type;
 		typedef t_value value_type;
+
+		constexpr bool has_value() const
+		{
+			return true;
+		}
 		
 		template <typename t_iterator>
-		t_value operator()(t_iterator it)
+		key_type key(t_iterator it) const
+		{
+			return it->first;
+		}
+
+		template <typename t_iterator>
+		value_type const &value(t_iterator it) const
 		{
 			return it->second;
 		}
@@ -77,12 +89,24 @@ namespace asm_lsw {
 	
 	
 	template <typename t_key>
-	struct y_fast_trie_access_subtree_it <t_key, void>
+	struct y_fast_trie_trait <t_key, void>
 	{
+		typedef t_key key_type;
 		typedef t_key value_type;
 		
+		constexpr bool has_value() const
+		{
+			return false;
+		}
+
 		template <typename t_iterator>
-		t_key operator()(t_iterator it)
+		key_type key(t_iterator it)
+		{
+			return *it;
+		}
+
+		template <typename t_iterator>
+		value_type const &value(t_iterator it)
 		{
 			return *it;
 		}

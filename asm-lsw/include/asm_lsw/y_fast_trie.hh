@@ -52,7 +52,7 @@ namespace asm_lsw {
 		typedef typename base_class::subtree_map subtree_map;
 		
 	protected:
-		key_type m_max_value{std::numeric_limits <key_type>::max()};
+		key_type m_max_key{std::numeric_limits <key_type>::max()};
 
 	protected:
 		void check_merge_subtree(typename subtree_map::map_type::iterator &st_it);
@@ -66,7 +66,7 @@ namespace asm_lsw {
 		y_fast_trie(y_fast_trie &&) = default;
 		y_fast_trie &operator=(y_fast_trie const &) & = default;
 		y_fast_trie &operator=(y_fast_trie &&) & = default;
-		y_fast_trie(key_type const max_value): m_max_value(max_value) {}
+		y_fast_trie(key_type const max_key): m_max_key(max_key) {}
 		
 		// Conditionally enable either.
 		// (Return type of the first one is void == std::enable_if<...>::type.)
@@ -75,7 +75,7 @@ namespace asm_lsw {
 		insert(key_type const key);
 		
 		template <typename T = value_type>
-		void insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val);
+		void insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val);
 
 		bool erase(key_type const key);
 		
@@ -116,7 +116,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	void y_fast_trie <t_key, t_value>::check_subtree_size(typename subtree_map::iterator st_it)
 	{
-		auto const log2M(std::log2(m_max_value));
+		auto const log2M(std::log2(m_max_key));
 		auto const size(st_it->second.size());
 		if (2 * log2M < size)
 			split_subtree(st_it);
@@ -129,7 +129,8 @@ namespace asm_lsw {
 	typename std::enable_if<std::is_void<T>::value, void>::type
 	y_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
-		assert(key <= m_max_value);
+		assert(key <= m_max_key);
+		++this->m_size;
 
 		if (0 == this->m_reps.size())
 		{
@@ -148,14 +149,18 @@ namespace asm_lsw {
 	// FIXME: check this.
 	template <typename t_key, typename t_value>
 	template <typename T>
-	void y_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val)
+	void y_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val) // FIXME: making a copy of val.
 	{
-		assert(key <= m_max_value);
+		assert(key <= m_max_key);
+		++this->m_size;
 
 		if (0 == this->m_reps.size())
 		{
 			this->m_reps.insert(key);
-			this->m_subtrees.map().emplace(key, std::make_pair(key, val));
+			this->m_subtrees.map().emplace(
+				key,
+				std::move(subtree{{key, std::move(val)}})
+			);
 			return;
 		}
 		
@@ -181,16 +186,20 @@ namespace asm_lsw {
 			auto st_it(this->m_subtrees.find(k1));
 			if (st_it->second.erase(key))
 			{
+				--this->m_size;
 				check_merge_subtree(st_it);
 				return true;
 			}
 		}
 		
+		// FIXME shouldn't be needed.
 		if (k2 != k1)
 		{
 			auto st_it(this->m_subtrees.find(k2));
 			if (st_it->second.erase(key))
 			{
+				assert(0);
+				--this->m_size;
 				check_merge_subtree(st_it);
 				return true;
 			}
@@ -204,7 +213,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	void y_fast_trie <t_key, t_value>::check_merge_subtree(typename subtree_map::map_type::iterator &st_it)
 	{
-		auto const log2M(std::log2(m_max_value));
+		auto const log2M(std::log2(m_max_key));
 		auto &tree(st_it->second);
 		if (! (tree.size() < log2M / 4))
 			return;
@@ -247,7 +256,7 @@ namespace asm_lsw {
 		swap(t1, st_it->second);
 		subtree_iterator hint(t2.begin());
 
-		auto const log2M(std::log2(m_max_value));
+		auto const log2M(std::log2(m_max_key));
 		auto it(t1.cbegin());
 		for (remove_c_t<decltype(log2M)> i(0); i < log2M; ++i)
 		{
@@ -255,15 +264,16 @@ namespace asm_lsw {
 			++it;
 		}
 		t1.erase(t1.cbegin(), it);
-		
+
 		// Choose new representatives and store the trees.
-		auto const t1_rep(*(t1.cbegin()));
-		auto const t2_rep(*(t2.cbegin()));
-		
+		auto const t1_rep(this->iterator_key(t1.cbegin()));
+		auto const t2_rep(this->iterator_key(t2.cbegin()));
+
+		// In this class, subtree_map's map_type has non-hashed keys.
 		this->m_reps.erase(st_it->first);
 		this->m_reps.insert(t1_rep);
 		this->m_reps.insert(t2_rep);
-
+		
 		auto &map(this->m_subtrees.map());
 		if (! (t1_rep == st_it->first || t2_rep == st_it->first))
 			map.erase(st_it);

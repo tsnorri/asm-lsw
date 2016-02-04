@@ -63,7 +63,7 @@ namespace asm_lsw {
 		y_fast_trie_compact &operator=(y_fast_trie_compact &&) & = default;
 		
 		explicit y_fast_trie_compact(y_fast_trie <key_type, value_type> &other):
-			base_class(other.m_reps, other.m_subtrees.map())
+			base_class(other.m_reps, other.m_subtrees.map(), other.m_size)
 		{
 		}
 	};

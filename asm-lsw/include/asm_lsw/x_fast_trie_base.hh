@@ -30,7 +30,7 @@
 
 namespace asm_lsw {
 	
-	// TODO: for t_key or t_value equal to or larger than some threshold (e.g. pointer size, unsigned long long), use a specialization that stores pointers in node_val and leaf_link?
+	// TODO: for t_key or t_value equal to or larger than some threshold (e.g. pointer size, unsigned long long), use a specialization that stores pointers in node_value and leaf_link?
 
 	template <typename t_spec>
 	class x_fast_trie_base
@@ -46,10 +46,10 @@ namespace asm_lsw {
 		static int const s_levels{std::numeric_limits <key_type>::digits};
 
 	protected:
-		typedef typename x_fast_trie_trait <key_type, value_type>::node_val node_val;
-		typedef typename x_fast_trie_trait <key_type, value_type>::node node;
+		typedef x_fast_trie_node_value <key_type> node_value;
+		typedef std::array <node_value, 2> node;
 		typedef x_fast_trie_leaf_link <key_type, value_type> leaf_link;
-		typedef x_fast_trie_access_leaf_it<key_type, value_type> access_leaf_it;
+		typedef x_fast_trie_trait<key_type, value_type> trait;
 		typedef typename t_spec::template map_adaptor_type <key_type, node> level_map;
 		typedef typename t_spec::template map_adaptor_type <key_type, leaf_link> leaf_link_map;
 		typedef std::array <level_map, s_levels> lss;
@@ -137,9 +137,10 @@ namespace asm_lsw {
 		void find_lowest_ancestor(key_type const key, typename level_map::const_iterator &it, level_idx_type &level) const;
 		bool find_node(key_type const key, level_idx_type const level, typename level_map::const_iterator &node) const;
 		
-		typename access_leaf_it::value_type const dereference(leaf_iterator const &it) const { access_leaf_it acc; return acc(it); };
-		typename access_leaf_it::value_type const dereference(const_leaf_iterator const &it) const { access_leaf_it acc; return acc(it); };
-		
+		typename trait::key_type const iterator_key(leaf_iterator const &it) const { trait t; return t.key(it); };
+		typename trait::key_type const iterator_key(const_leaf_iterator const &it) const { trait t; return t.key(it); };		
+		typename trait::value_type const &iterator_value(const_leaf_iterator const &it) const { trait t; return t.value(it); };
+
 		void print() const;
 	};
 	
@@ -278,7 +279,7 @@ namespace asm_lsw {
 		find_lowest_ancestor(trie, key, it, level);
 		
 		key_type const next_branch(0x1 & (key >> level));
-		node_val const &node(it->second[next_branch]);
+		node_value const &node(it->second[next_branch]);
 		
 		assert(1 == level || node.is_descendant());
 		

@@ -35,44 +35,39 @@ namespace asm_lsw {
 		typedef t_value value_type;													// Trie value type.
 
 		template <typename ... Args>
-		using map_type = t_map <Args ...>;											// Hash map type.
+		using map_type = t_map <Args ...>;											// Hash set / map type.
 		
 		template <typename t_map_key, typename t_map_value>
 		using map_adaptor_type = t_map_adaptor <map_type, t_map_key, t_map_value>;	// Hash map adaptor. Parameters are map type, key type and value type.
 	};
-	
-	
-	template <typename t_key, typename t_value>
-	class x_fast_trie_trait
+
+
+	// FIXME: used by the base class.
+	template <typename t_key>
+	class x_fast_trie_node_value
 	{
 	protected:
 		typedef t_key key_type;
-		typedef t_value value_type;
+
+	protected:
+		key_type m_key;			// Key of the child node in LSS.
+		bool m_is_descendant;	// If true, points to m_leaf_links.
 		
 	public:
-		class node_val
-		{
-		protected:
-			key_type m_key;			// Key of the child node in LSS.
-			bool m_is_descendant;	// If true, points to m_leaf_links.
-			
-		public:
-			node_val(): node_val(0, false) {};
-			
-			node_val(key_type key, bool is_descendant):
-				m_key(key),
-				m_is_descendant(is_descendant)
-			{
-			}
-			
-			key_type key() const { return m_key; }
-			bool is_descendant() const { return m_is_descendant; }
-		};
+		x_fast_trie_node_value(): x_fast_trie_node_value(0, false) {};
 
-		typedef std::array <node_val, 2> node;
+		x_fast_trie_node_value(key_type key, bool is_descendant):
+			m_key(key),
+			m_is_descendant(is_descendant)
+		{
+		}
+
+		key_type key() const { return m_key; }
+		bool is_descendant() const { return m_is_descendant; }	
 	};
-	
-	
+
+
+	// FIXME: used by the base class.
 	template <typename t_key, typename t_value>
 	struct x_fast_trie_leaf_link
 	{
@@ -101,12 +96,24 @@ namespace asm_lsw {
 	
 	
 	template <typename t_key, typename t_value>
-	struct x_fast_trie_access_leaf_it
+	struct x_fast_trie_trait
 	{
+		typedef t_key key_type;
 		typedef t_value value_type;
+
+		constexpr bool has_value() const
+		{
+			return true;
+		}
 		
 		template <typename t_iterator>
-		t_value operator()(t_iterator it)
+		key_type key(t_iterator it) const
+		{
+			return it->first;
+		}
+
+		template <typename t_iterator>
+		value_type const &value(t_iterator it) const
 		{
 			return it->second.value;
 		}
@@ -114,12 +121,24 @@ namespace asm_lsw {
 	
 	
 	template <typename t_key>
-	struct x_fast_trie_access_leaf_it <t_key, void>
+	struct x_fast_trie_trait <t_key, void>
 	{
+		typedef t_key key_type;
 		typedef t_key value_type;
+		
+		constexpr bool has_value() const
+		{
+			return false;
+		}
 
 		template <typename t_iterator>
-		t_key operator()(t_iterator it)
+		key_type key(t_iterator it)
+		{
+			return it->first;
+		}
+
+		template <typename t_iterator>
+		value_type const &value(t_iterator it)
 		{
 			return it->first;
 		}
