@@ -18,9 +18,13 @@
 #define ASM_LSW_K1_MATCHER_HH
 
 #include <asm_lsw/bp_support_sparse.hh>
+#include <asm_lsw/x_fast_tries.hh>
+#include <asm_lsw/y_fast_tries.hh>
 #include <sdsl/csa_rao.hpp>
 #include <sdsl/cst_sada.hpp>
 #include <sdsl/int_vector.hpp>
+#include <sdsl/isa_lsw.hpp>
+#include <sdsl/rrr_vector.hpp>
 
 
 namespace asm_lsw {
@@ -38,11 +42,11 @@ namespace asm_lsw {
 		typedef sdsl::cst_sada<csa_type>								cst_type;
 		typedef y_fast_trie<csa_type::value_type>						gamma_v_type;
 		typedef std::unordered_map<cst_type::node_type, gamma_v_type>	gamma_type;				// FIXME: use a map with perfect hashing instead.
-		typedef sdsl::rrr_vector										core_nodes_type;
-		typedef bp_support_sparse										core_endpoints_type;	// FIXME: check parameters.
-		typedef sdsl::rmq_succinct_sct									lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
+		typedef sdsl::rrr_vector<>										core_nodes_type;
+		typedef bp_support_sparse<>										core_endpoints_type;	// FIXME: check parameters.
+		typedef sdsl::rmq_succinct_sct<>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
 		typedef std::unordered_map<cst_type::node_type, h_pair>			h_map;					// FIXME: use a map with perfect hashing instead.
-		typedef y_fast_trie<csa_type::size_type, csa_type::size_type>	h_u_type;
+		typedef y_fast_trie<csa_type::size_type, csa_type::size_type>	h_u_type;				// FIXME: check that LCP returns size_type (for key).
 
 		static_assert(std::is_integral<cst_type::node_type>::value, "Integer required for cst_type::node_type.");
 		
@@ -82,7 +86,6 @@ namespace asm_lsw {
 			cst_type::node_type &node // inout
 		)
 		{
-			cst_type::node_type node;
 			auto const begin(pattern.cbegin() + start_idx);
 			pattern_type::size_type char_pos(0);
 
@@ -99,10 +102,10 @@ namespace asm_lsw {
 		
 		// Check if the given node is a side node as per section 2.5.
 		// FIXME: calculate time complexity.
-		static bool is_side_node(cst_type const &cst, cst_type::node_type const node)
+		static bool is_side_node(cst_type const &cst, core_nodes_type const &cn, cst_type::node_type const node)
 		{
 			auto node_id(cst.id(node));
-			return m_core_nodes[node_id];
+			return cn[node_id];
 		}
 		
 		
@@ -133,7 +136,7 @@ namespace asm_lsw {
 			// Count node depths from the bottom and choose the greatest.
 			for (auto it(cst.begin_bottom_up()), end(cst.end_bottom_up()); it != end; ++it)
 			{
-				cst::node_type node(*it);
+				cst_type::node_type node(*it);
 				if (cst.is_leaf(node))
 				{
 					auto res(node_depths.emplace(std::make_pair(node, 1)));
@@ -151,10 +154,10 @@ namespace asm_lsw {
 						auto d_it(node_depths.find(*it));
 						assert(node_depths.end() != d_it);
 						
-						if (max_nd < d_it.second)
+						if (max_nd < d_it->second)
 						{
-							max_nd = d_it.second;
-							argmax_nd = d_it.first;
+							max_nd = d_it->second;
+							argmax_nd = d_it->first;
 						}
 						
 						// d_it->first is not needed anymore.
@@ -176,24 +179,24 @@ namespace asm_lsw {
 		
 		// Core path endpoints from Lemma 15.
 		// FIXME: calculate time complexity.
-		static void construct_core_path_endpoints(cst_type const &cst, core_nodes_type const &cn, core_endpoints_type const &ce)
+		static void construct_core_path_endpoints(cst_type const &cst, core_nodes_type const &cn, core_endpoints_type &ce)
 		{
 			auto const leaf_count(cst.size());
 			auto const node_count(cst.nodes());
-			size_type path_count(0);
-			bit_vector path_endpoints;
-			bit_vector mask;
+			size_t path_count(0);
+			sdsl::bit_vector path_endpoints;
+			sdsl::bit_vector mask;
 
 			{
-				bit_vector opening(node_count, 0);
-				bit_vector closing(node_count, 0);
+				sdsl::bit_vector opening(node_count, 0);
+				sdsl::bit_vector closing(node_count, 0);
 				
 				// Find the '(' endpoint for each of the ')' endpoints in the leaves and count the paths.
 				// The '(' endpoint will not have a bit set in cn.
 				// Documentation for inv_id: identifiers are in range [0, nodes() - 1].
-				for (cst::size_type i(0); i < leaf_count; ++i)
+				for (cst_type::size_type i(0); i < leaf_count; ++i)
 				{
-					cst::node_type node(cst.inv_id(i));
+					cst_type::node_type node(cst.inv_id(i));
 					if (cn[node])
 					{
 						++path_count;
@@ -210,17 +213,16 @@ namespace asm_lsw {
 					}
 				}
 				
-				// Balanced parentheses representation.
 				// Iterate the opening and closing vectors. If either has a bit set,
 				// advance in the endpoint vector.
 				{
-					bit_vector tmp(2 * path_count, 0);
+					sdsl::bit_vector tmp(2 * path_count, 0);
 					path_endpoints = std::move(tmp);
 				}
 				
 				// Dense representation of the balanced parentheses.
 				decltype(path_count) j{0};
-				for (decltype(node_count) i{0}; i < node_count; ++i)
+				for (remove_c_t<decltype(node_count)> i{0}; i < node_count; ++i)
 				{
 					if (opening[i])
 					{
@@ -235,8 +237,9 @@ namespace asm_lsw {
 				assert(2 * path_count == j);
 
 				// Mask of the sparse representation.
-				for (decltype(node_count) i{0}; i < node_count; ++i)
-					opening[i] |= closing[i];
+				// Somehow |= is not ok.
+				for (remove_c_t<decltype(node_count)> i{0}; i < node_count; ++i)
+					opening[i] = opening[i] | closing[i];
 
 				mask = std::move(opening);
 			}
@@ -294,7 +297,7 @@ namespace asm_lsw {
 		}
 
 
-		static void construct_gamma_sets(cst_type const &cst, gamma_type &gamma)
+		static void construct_gamma_sets(cst_type const &cst, core_nodes_type const &cn, gamma_type &gamma)
 		{
 			// Γ_v = {ISA[SA[i] + plen(u) + 1] | i ≡ 1 (mod log₂²n) and v_le ≤ i ≤ v_ri}.
 
@@ -306,7 +309,7 @@ namespace asm_lsw {
 
 			for (auto it(cst.begin()), end(cst.end()); it != end; ++it)
 			{
-				if (is_side_node(cst, *it))
+				if (is_side_node(cst, cn, *it))
 				{
 					cst_type::node_type const v(*it);
 					cst_type::node_type const u(cst.parent(v));
@@ -324,7 +327,7 @@ namespace asm_lsw {
 					// = {i | i = 1 + j log₂²n, j ∈ ℕ and lb ≤ i ≤ rb}
 					// Now lb ≤ 1 + j log₂²n <=> (lb - 1) / log₂²n ≤ j.
 					// In case lb = 0, the inequality above yields 1 for the right side and j ← 0.
-					cst::size_type i(0), j(0);
+					cst_type::size_type i(0), j(0);
 					if (lb)
 						j = std::ceil((lb - 1) / log2n); // FIXME: verify integrality.
 					
@@ -344,7 +347,7 @@ namespace asm_lsw {
 		// Create the auxiliary data structures in order to perform range minimum queries on the LCP array.
 		static void construct_lcp_rmq(cst_type const &cst, lcp_rmq_type &rmq)
 		{
-			lcp_rmq_type rmq_tmp(cst.lcp);
+			lcp_rmq_type rmq_tmp(&cst.lcp);
 			rmq = std::move(rmq_tmp);
 		}
 		
@@ -364,7 +367,7 @@ namespace asm_lsw {
 			auto const plen_v(cst.depth(v));				// FIXME: check that this actually is plen(v).
 			
 			auto const leaf_count(cst.size());
-			cst::size_type i(0), j(0);
+			cst_type::size_type i(0), j(0);
 			while ((i = 1 + j * log2n) < leaf_count)
 			{
 				// Now i is an SA index s.t.
@@ -395,20 +398,20 @@ namespace asm_lsw {
 			auto const log2n(std::pow(logn, 2));			// FIXME: check integrality.
 			h.diff = log2n;
 
-			auto const &bp(ce.bp());
-			auto const count(bp.rank(bp.size() - 1)); // Number of (opening) parentheses.
-			for (decltype(count) i{1}; i <= count; ++i)
+			auto const &bps(ce.bps());
+			auto const count(bps.rank(bps.size() - 1)); // Number of (opening) parentheses.
+			for (remove_c_t<decltype(count)> i{1}; i <= count; ++i)
 			{
 				// Find the index of each opening parenthesis and its counterpart,
 				// then convert to sparse index.
-				auto const bp_begin(bp.select(i));
-				auto const bp_end(bp.find_close(bp_begin));
-				auto const u(ce.to_sparse_idx(bp_end));
+				auto const bps_begin(bps.select(i));
+				auto const bps_end(bps.find_close(bps_begin));
+				auto const u(ce.to_sparse_idx(bps_end));
 				
 				// u is now a core leaf node.
 				h_pair h_u;
 				construct_hl_hr(cst, ce, lcp_rmq, u, log2n, h_u.l, h_u.r);
-				h.maps[u] = h_u;
+				h.maps[u] = std::move(h_u);
 			}
 		}
 		
@@ -461,7 +464,7 @@ namespace asm_lsw {
 			if (r < l)
 				return false;
 
-			auto const mid (l + r) / 2;
+			auto const mid((l + r) / 2);
 			auto const res(lcp_rmq(mid, k));
 
 			// Tail recursion.
@@ -490,29 +493,29 @@ namespace asm_lsw {
 			h_type const &h,
 			h_pair const &hx,
 			csa_type::size_type const k,
-			cst_type::size_type const r_len	// cst.depth returns size_type.
+			cst_type::size_type const r_len,	// cst.depth returns size_type.
 			csa_type::size_type &i
 		)
 		{
 			csa_type::size_type l(0), r(0);
-			h_u_type::leaf_iterator it;
+			h_u_type::const_subtree_iterator it;
 
 			// Try i^l.
 			if (hx.l.find_successor(r_len, it, true))
 			{
-				r = hx.l.dereference(it);
+				r = hx.l.iterator_value(it);
 				assert(r >= h.diff);
 				l = r - h.diff;
-				if (l <= r_len && find_node_ilr_bin(lcp_rmq, r_len, l, r, i))
+				if (l <= r_len && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 					return true;
 			}
 
 			// Try i^r.
 			if (hx.r.find_predecessor(r_len, it, true))
 			{
-				l = hx.r.dereference(it);
+				l = hx.r.iterator_value(it);
 				r = l + h.diff;
-				if (r_len <= r && find_node_ilr_bin(lcp_rmq, r_len, l, r, i))
+				if (r_len <= r && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 					return true;
 			}
 
@@ -520,7 +523,7 @@ namespace asm_lsw {
 			assert(k >= h.diff);
 			l = k - h.diff;
 			r = k + h.diff;
-			if (find_node_i_bin(lcp_rmq, r_len, l, r))
+			if (find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 				return true;			
 
 			return false;
@@ -573,14 +576,14 @@ namespace asm_lsw {
 			}
 			else
 			{
-				// Find an i s.t. st ≤ i ≤ ed by allowing equality and checking the upper bound.
-				decltype(gamma_v)::const_subtree_iterator it;
+				// Find a j s.t. st ≤ j ≤ ed by allowing equality and checking the upper bound.
+				gamma_v_type::const_subtree_iterator it;
 				if (gamma_v.find_successor(st, it, true) && *it <= ed)
 				{
 					// Case 2.
-					// Get i from ISA[SA[i] + |P₁| + 1].
+					// Get i from j = ISA[SA[i] + |P₁| + 1].
 					auto const isa_val(*it);
-					auto const isa_idx(csa[val]);
+					auto const isa_idx(csa[isa_val]);
 					auto const sa_val(isa_idx - pat1_len - 1);
 					auto const sa_idx(csa.isa[sa_val]);
 					i = sa_idx;
@@ -590,7 +593,7 @@ namespace asm_lsw {
 				{
 					// Case 3.
 					// Extend the range slightly if possible.
-					decltype(gamma_v)::const_subtree_iterator a_it, b_it;
+					gamma_v_type::const_subtree_iterator a_it, b_it;
 					csa_type::size_type a(st), b(ed);
 					
 					if (gamma_v.find_predecessor(st, a_it))
@@ -637,18 +640,21 @@ namespace asm_lsw {
 			
 			csa_type::size_type i(0);
 			
-			auto const &gamma_v(gamma.find(v));
-			if (gamma.cend() == gamma_v)
+			auto const g_it(gamma.find(v));
+			auto const pat1_len(cst.depth(u));
+			if (gamma.cend() == g_it)
 			{
 				// No Γ_v with this node so it must be a core node. Find the
 				// core leaf node x at the end of the core path.
+				// Every core leaf node is supposed to have a set H associated with it.
 				cst_type::node_type x(core_endpoints.find_close(core_path_beginning));
-				auto const &hx(h.maps[x]);
+				auto const h_it(h.maps.find(x));
+				assert(h.maps.cend() != h_it);
+				auto const &hx(h_it->second);
 				if (hx.l.size() == 0 && hx.r.size() == 0)
 				{
 					// Case 1.
 					// The number of leaves hanging from the core path is < log₂²n.
-					auto const pat1_len(cst.depth(u));
 					auto const v_le(cst.lb(v));
 					auto const v_ri(cst.rb(v));
 					if (!find_pattern_occurrence(cst.csa, pat1_len, st, ed, v_le, v_ri, i))
@@ -682,7 +688,7 @@ namespace asm_lsw {
 						// of the suitable lcp values stored in hx.l and hx.r.
 						auto const r_len(pat1_len + q + 1);
 						csa_type::size_type ilr(0);
-						if (!find_leaf_i(lcp_rmq, h, hx, k, r_len, ilr))
+						if (!find_node_ilr(lcp_rmq, h, hx, k, r_len, ilr))
 							return false;
 						
 						// XXX Paper requires O(t_SA) time complexity for LCA but cst_sada gives O(rr_enclose).
@@ -703,12 +709,12 @@ namespace asm_lsw {
 							auto const children(cst.children(r));
 							for (auto const child : children)
 							{
-								auto const &gamma_v(gamma.find(child));
-								if (gamma.cend() != gamma_v &&
-									tree_search_side_node(cst, gamma_v, r, child, st, ed, i))
+								auto const g_it(gamma.find(child));
+								if (gamma.cend() != g_it &&
+									tree_search_side_node(cst, g_it->second, r, child, st, ed, i))
 								{
 									left = i;
-									rigth = i;
+									right = i;
 									extend_range(cst, pat1_len, st, ed, left, right);
 									return true;
 								}
@@ -719,7 +725,7 @@ namespace asm_lsw {
 					}
 				}				
 			}
-			else if (tree_search_side_node(cst, gamma_v, u, v, st, ed, i))
+			else if (tree_search_side_node(cst, g_it->second, u, v, st, ed, i))
 			{
 				left = i;
 				right = i;
@@ -744,6 +750,7 @@ namespace asm_lsw {
 
 void test(std::string const &input)
 {
+#if 0 
 	std::string filename("@input.iv8");
 	sdsl::store_to_file(input.c_str(), file);
 
@@ -753,6 +760,7 @@ void test(std::string const &input)
 
 	sdsl::csa_rao<t_spec> csa2;
 	csa2 = std::move(csa);
+#endif
 }
 
 #endif
