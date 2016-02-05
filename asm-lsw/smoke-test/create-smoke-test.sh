@@ -2,9 +2,10 @@
 
 target=tests.mk
 
-echo "include ../../local.mk" > "${target}"
-echo "include ../../common.mk" >> "${target}"
-echo ".PHONY: all clean" >> "${target}"
+printf "# Automatically generated.\n\n" > "${target}"
+printf "include ../../local.mk\n" >> "${target}"
+printf "include ../../common.mk\n\n" >> "${target}"
+printf ".PHONY: all clean\n\n" >> "${target}"
 echo -n "all:" >> "${target}"
 rm -f all.cc
 
@@ -22,4 +23,4 @@ done
 
 echo " all.o" >> "${target}"
 
-printf "\n\nclean:\n\t\$(RM) *.cc *.o ${target}" >> "${target}"
+printf "\nclean:\n\t\$(RM) *.cc *.o ${target}" >> "${target}"
