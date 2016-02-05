@@ -35,12 +35,9 @@ namespace asm_lsw {
 	class k1_matcher
 	{
 	public:
-		struct h_type;
-		struct h_pair;
-		
 		typedef sdsl::int_vector<>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
 		typedef sdsl::int_vector<>										pattern_type;			// FIXME: correct parameters.
-		typedef int_vector_type											f_type;
+		typedef int_vector_type											f_vector_type;
 		typedef sdsl::csa_rao<>											csa_type;				// FIXME: correct parameters.
 		typedef sdsl::cst_sada<csa_type>								cst_type;
 		typedef y_fast_trie<csa_type::value_type>						gamma_v_type;
@@ -48,8 +45,6 @@ namespace asm_lsw {
 		typedef sdsl::rrr_vector<>										core_nodes_type;
 		typedef bp_support_sparse<>										core_endpoints_type;	// FIXME: check parameters.
 		typedef sdsl::rmq_succinct_sct<>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
-		typedef std::unordered_map<cst_type::node_type, h_pair>			h_map;					// FIXME: use a map with perfect hashing instead.
-		typedef y_fast_trie<csa_type::size_type, csa_type::size_type>	h_u_type;				// FIXME: check that LCP returns size_type (for key).
 		typedef std::pair<csa_type::size_type, csa_type::size_type>		csa_range;
 		typedef std::unordered_set<
 			csa_range,
@@ -59,31 +54,175 @@ namespace asm_lsw {
 		static_assert(std::is_integral<cst_type::node_type>::value, "Integer required for cst_type::node_type.");
 		
 	public:
-		struct h_pair
+		class h_type
 		{
-			h_u_type l;
-			h_u_type r;
+		public:
+			typedef y_fast_trie<csa_type::size_type, csa_type::size_type>	h_u_type;				// FIXME: check that LCP returns size_type (for key).
+
+			struct h_pair
+			{
+				h_u_type l;
+				h_u_type r;
+			};
+
+		protected:
+			typedef std::unordered_map<cst_type::node_type, h_pair>			h_map;					// FIXME: use a map with perfect hashing instead.
+
+		protected:
+			h_map m_maps;
+			cst_type::size_type m_diff;
+
+		protected:
+			// Section 3.1, Lemma 17.
+			static void construct_hl_hr(
+				cst_type const &cst,
+				core_endpoints_type const &ce,
+				lcp_rmq_type const &lcp_rmq,
+				cst_type::node_type const u,
+				cst_type::size_type const log2n,
+				h_u_type &hl,
+				h_u_type &hr)
+			{
+				auto const v(ce.find_open(u));					// Core path beginning.
+				auto const k(cst.lb(u));						// Left bound (leftmost leaf index) in SA.
+				auto const plen_v(cst.depth(v));				// FIXME: check that this actually is plen(v).
+				
+				auto const leaf_count(cst.size());
+				cst_type::size_type i(0), j(0);
+				while ((i = 1 + j * log2n) < leaf_count)
+				{
+					// Now i is an SA index s.t.
+					//  i ∈  {i | i ≡ 1 (mod log₂²n)}
+					//     = {i | i - 1 divisible by log₂²n}
+					//     = {1 + j log₂²n | j ∈ ℕ}
+					
+					// Check |lcp(k, i)| ≥ plen(v).
+					auto const lcp_len(lcp_rmq(k, i));
+					if (lcp_len >= plen_v)
+					{
+						if (i <= k)
+							hl.insert(lcp_len, i);
+						else if (i > k)
+							hr.insert(lcp_len, i);
+					}
+					
+					++j;
+				}
+			}
+
+		public:
+			h_map const &maps() const { return m_maps; }
+			cst_type::size_type diff() const { return m_diff; }
+
+			h_type() {}
+			
+			// Section 3.1, Lemma 17.
+			h_type(cst_type const &cst, core_endpoints_type const &ce, lcp_rmq_type const &lcp_rmq, h_type &h)
+			{
+				auto const n(cst.size());						// Text length.
+				auto const logn(std::log2(n));
+				auto const log2n(std::pow(logn, 2));			// FIXME: check integrality.
+				m_diff = log2n;
+
+				auto const &bps(ce.bps());
+				auto const count(bps.rank(bps.size() - 1)); // Number of (opening) parentheses.
+				for (remove_c_t<decltype(count)> i{1}; i <= count; ++i)
+				{
+					// Find the index of each opening parenthesis and its counterpart,
+					// then convert to sparse index.
+					auto const bps_begin(bps.select(i));
+					auto const bps_end(bps.find_close(bps_begin));
+					auto const u(ce.to_sparse_idx(bps_end));
+					
+					// u is now a core leaf node.
+					h_pair h_u;
+					construct_hl_hr(cst, ce, lcp_rmq, u, log2n, h_u.l, h_u.r);
+					m_maps[u] = std::move(h_u);
+				}
+			}
 		};
-		
-		struct h_type
+
+
+		// Def. 1, 2, Lemma 10.
+		class f_type
 		{
-			h_map maps;
-			cst_type::size_type diff;
+		public:
+			static f_vector_type::value_type const not_found{std::numeric_limits<f_vector_type::value_type>::max()};
+
+		protected:
+			f_vector_type m_st;
+			f_vector_type m_ed;
+
+		public:
+			// Return F_st[i].
+			auto st(cst_type const &cst, f_vector_type::size_type const i) const -> f_vector_type::value_type
+			{
+				return (i < m_st.size() ? m_st[i] : 0);
+			}
+			
+			
+			// Return F_ed[i].
+			auto ed(cst_type const &cst, f_vector_type::size_type const i) const -> f_vector_type::value_type
+			{
+				return (i < m_ed.size() ? m_ed[i] : cst.size());
+			}
+
+
+			f_type()
+			{
+			}
+
+
+			// Construct the F arrays as defined in definitions 1 and 2 and lemma 10.
+			// FIXME: calculate time complexity.
+			f_type(cst_type const &cst, pattern_type const &pattern)
+			{
+				auto const m(pattern.size());
+				pattern_type::size_type i(0);
+				cst_type::node_type node;
+
+				f_vector_type st(m, 0);
+				f_vector_type ed(m, 0);
+
+				// Start with i = 1 in pattern[i..m] (zero-based in code).
+				// If not found in CST, fill with sentinels, set i = 2
+				// and continue (Lam et al. 2.4 lemma 10).
+				// FIXME: I'm not sure if this is done right since an upper limit for the whole pattern is O(|pattern| * |pattern| / 2 * t_SA). (There could be a smaller upper limit, though.)
+				while (i < m)
+				{
+					if (find_path(cst, pattern, i, node))
+					{
+						// Find the SA indices of the leftmost and rightmost leaves.
+						st[i] = cst.lb(node);
+						ed[i] = cst.rb(node);
+						break;
+					}
+					else
+					{
+						st[i] = not_found;
+						ed[i] = not_found;
+					}
+
+					++i;
+				}
+
+				// Continue with the suffix links. Either i == m or a match was found. In the latter case, every substring
+				// of the pattern must
+				// FIXME: complete the sentence above.
+				while (i < m)
+				{
+					node = cst.sl(node);
+					st[i] = cst.lb(node);
+					ed[i] = cst.rb(node);
+					++i;
+				}
+
+				m_st = std::move(st);
+				m_ed = std::move(ed);
+			}
 		};
 
 	public:
-		static f_type::value_type const not_found{std::numeric_limits<f_type::value_type>::max()};
-
-	protected:
-		cst_type			m_cst;
-		f_type				m_f_st;				// Def. 1, 2, lemma 10. // FIXME: move m_f_st, m_f_ed inside the search function?
-		f_type				m_f_ed;				// Def. 1, 2, lemma 10.
-		gamma_type			m_gamma;			// Lemma 16.
-		lcp_rmq_type		m_lcp_rmq;
-		core_nodes_type		m_core_nodes;		// FIXME: remove since (probably) not needed after constructing the data structures.
-		core_endpoints_type	m_core_endpoints;
-
-	protected:
 		// Find the path for the given pattern.
 		// Set node to the final node if found.
 		// Time complexity O((|pattern| - start_idx) * t_SA)
@@ -115,20 +254,6 @@ namespace asm_lsw {
 		{
 			auto node_id(cst.id(node));
 			return cn[node_id];
-		}
-		
-		
-		// Return F_st[i].
-		static auto f_st_val(cst_type const &cst, f_type const &f_st, f_type::size_type const i) -> f_type::value_type
-		{
-			return (i < f_st.size() ? f_st[i] : 0);
-		}
-		
-		
-		// Return F_ed[i].
-		static auto f_ed_val(cst_type const &cst, f_type const &f_ed, f_type::size_type const i) -> f_type::value_type
-		{
-			return (i < f_ed.size() ? f_ed[i] : cst.size());
 		}
 		
 		
@@ -258,52 +383,6 @@ namespace asm_lsw {
 		}
 
 
-		// Construct the F arrays as defined in definitions 1 and 2 and lemma 10.
-		// FIXME: calculate time complexity.
-		static void construct_f_arrays(cst_type const &cst, pattern_type const &pattern, f_type &f_st, f_type &f_ed)
-		{
-			auto const m(pattern.size());
-			pattern_type::size_type i(0);
-			cst_type::node_type node;
-
-			f_st = f_type(m, 0);
-			f_ed = f_type(m, 0);
-
-			// Start with i = 1 in pattern[i..m] (zero-based in code).
-			// If not found in CST, fill with sentinels, set i = 2
-			// and continue (Lam et al. 2.4 lemma 10).
-			// FIXME: I'm not sure if this is done right since an upper limit for the whole pattern is O(|pattern| * |pattern| / 2 * t_SA). (There could be a smaller upper limit, though.)
-			while (i < m)
-			{
-				if (find_path(cst, pattern, i, node))
-				{
-					// Find the SA indices of the leftmost and rightmost leaves.
-					f_st[i] = cst.lb(node);
-					f_ed[i] = cst.rb(node);
-					break;
-				}
-				else
-				{
-					f_st[i] = not_found;
-					f_ed[i] = not_found;
-				}
-
-				++i;
-			}
-
-			// Continue with the suffix links. Either i == m or a match was found. In the latter case, every substring
-			// of the pattern must
-			// FIXME: complete the sentence above.
-			while (i < m)
-			{
-				node = cst.sl(node);
-				f_st[i] = cst.lb(node);
-				f_ed[i] = cst.rb(node);
-				++i;
-			}
-		}
-
-
 		static void construct_gamma_sets(cst_type const &cst, core_nodes_type const &cn, gamma_type &gamma)
 		{
 			// Γ_v = {ISA[SA[i] + plen(u) + 1] | i ≡ 1 (mod log₂²n) and v_le ≤ i ≤ v_ri}.
@@ -357,71 +436,7 @@ namespace asm_lsw {
 			lcp_rmq_type rmq_tmp(&cst.lcp);
 			rmq = std::move(rmq_tmp);
 		}
-		
-		
-		// Section 3.1, Lemma 17.
-		static void construct_hl_hr(
-			cst_type const &cst,
-			core_endpoints_type const &ce,
-			lcp_rmq_type const &lcp_rmq,
-			cst_type::node_type const u,
-			cst_type::size_type const log2n,
-			h_u_type &hl,
-			h_u_type &hr)
-		{
-			auto const v(ce.find_open(u));					// Core path beginning.
-			auto const k(cst.lb(u));						// Left bound (leftmost leaf index) in SA.
-			auto const plen_v(cst.depth(v));				// FIXME: check that this actually is plen(v).
-			
-			auto const leaf_count(cst.size());
-			cst_type::size_type i(0), j(0);
-			while ((i = 1 + j * log2n) < leaf_count)
-			{
-				// Now i is an SA index s.t.
-				//  i ∈  {i | i ≡ 1 (mod log₂²n)}
-				//     = {i | i - 1 divisible by log₂²n}
-				//     = {1 + j log₂²n | j ∈ ℕ}
 				
-				// Check |lcp(k, i)| ≥ plen(v).
-				auto const lcp_len(lcp_rmq(k, i));
-				if (lcp_len >= plen_v)
-				{
-					if (i <= k)
-						hl.insert(lcp_len, i);
-					else if (i > k)
-						hr.insert(lcp_len, i);
-				}
-				
-				++j;
-			}
-		}
-		
-		
-		// Section 3.1, Lemma 17.
-		static void construct_h_arrays(cst_type const &cst, core_endpoints_type const &ce, lcp_rmq_type const &lcp_rmq, h_type &h)
-		{
-			auto const n(cst.size());						// Text length.
-			auto const logn(std::log2(n));
-			auto const log2n(std::pow(logn, 2));			// FIXME: check integrality.
-			h.diff = log2n;
-
-			auto const &bps(ce.bps());
-			auto const count(bps.rank(bps.size() - 1)); // Number of (opening) parentheses.
-			for (remove_c_t<decltype(count)> i{1}; i <= count; ++i)
-			{
-				// Find the index of each opening parenthesis and its counterpart,
-				// then convert to sparse index.
-				auto const bps_begin(bps.select(i));
-				auto const bps_end(bps.find_close(bps_begin));
-				auto const u(ce.to_sparse_idx(bps_end));
-				
-				// u is now a core leaf node.
-				h_pair h_u;
-				construct_hl_hr(cst, ce, lcp_rmq, u, log2n, h_u.l, h_u.r);
-				h.maps[u] = std::move(h_u);
-			}
-		}
-		
 		
 		// Find one occurrence of the pattern (index i) s.t. st ≤ ISA[SA[i] + |P₁| + 1] ≤ ed.
 		static bool find_pattern_occurrence(
@@ -498,21 +513,21 @@ namespace asm_lsw {
 		static bool find_node_ilr(
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
-			h_pair const &hx,
+			h_type::h_pair const &hx,
 			csa_type::size_type const k,
 			cst_type::size_type const r_len,	// cst.depth returns size_type.
 			csa_type::size_type &i
 		)
 		{
 			csa_type::size_type l(0), r(0);
-			h_u_type::const_subtree_iterator it;
+			h_type::h_u_type::const_subtree_iterator it;
 
 			// Try i^l.
 			if (hx.l.find_successor(r_len, it, true))
 			{
 				r = hx.l.iterator_value(it);
-				assert(r >= h.diff);
-				l = r - h.diff;
+				assert(r >= h.diff());
+				l = r - h.diff();
 				if (l <= r_len && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 					return true;
 			}
@@ -521,15 +536,15 @@ namespace asm_lsw {
 			if (hx.r.find_predecessor(r_len, it, true))
 			{
 				l = hx.r.iterator_value(it);
-				r = l + h.diff;
+				r = l + h.diff();
 				if (r_len <= r && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 					return true;
 			}
 
 			// Try i^l again with another range.
-			assert(k >= h.diff);
-			l = k - h.diff;
-			r = k + h.diff;
+			assert(k >= h.diff());
+			l = k - h.diff();
+			r = k + h.diff();
 			if (find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 				return true;			
 
@@ -655,8 +670,8 @@ namespace asm_lsw {
 				// core leaf node x at the end of the core path.
 				// Every core leaf node is supposed to have a set H associated with it.
 				cst_type::node_type x(core_endpoints.find_close(core_path_beginning));
-				auto const h_it(h.maps.find(x));
-				assert(h.maps.cend() != h_it);
+				auto const h_it(h.maps().find(x));
+				assert(h.maps().cend() != h_it);
 				auto const &hx(h_it->second);
 				if (hx.l.size() == 0 && hx.r.size() == 0)
 				{
@@ -749,8 +764,7 @@ namespace asm_lsw {
 		// Section 3.3.
 		static void find_1_approximate_at_i(
 			cst_type const &cst,
-			f_type const &f_st,
-			f_type const &f_ed,
+			f_type const &f,
 			gamma_type const &gamma,
 			core_endpoints_type const &core_endpoints,
 			lcp_rmq_type const &lcp_rmq,
@@ -769,8 +783,11 @@ namespace asm_lsw {
 			if (1 + i == pattern.size() || pattern[i] != pattern[1 + i])
 			{
 				auto const cc(cst.csa.comp2char[pattern[1 + i]]);
-				auto const st(f_st_val(cst, f_st, 1 + i));
-				auto const ed(f_ed_val(cst, f_ed, 1 + i));
+				auto const st(f.st(cst, 1 + i));
+				auto const ed(f.ed(cst, 1 + i));
+				assert (st != f_type::not_found);
+				assert (ed != f_type::not_found);
+
 				if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
 				{
 					csa_range range(left, right);
@@ -784,8 +801,10 @@ namespace asm_lsw {
 				if (pattern[i] != c)
 				{
 					auto const cc(cst.csa.comp2char[c]);
-					auto const st(f_st_val(cst, f_st, 1 + i));
-					auto const ed(f_ed_val(cst, f_ed, 1 + i));
+					auto const st(f.st(cst, 1 + i));
+					auto const ed(f.ed(cst, 1 + i));
+					assert (st != f_type::not_found);
+					assert (ed != f_type::not_found);
 					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
 					{
 						csa_range range(left, right);
@@ -801,8 +820,10 @@ namespace asm_lsw {
 				if (1 + i == pattern.size() || pattern[i] != c)
 				{
 					auto const cc(cst.csa.comp2char[c]);
-					auto const st(f_st_val(cst, f_st, i));
-					auto const ed(f_ed_val(cst, f_ed, i));
+					auto const st(f.st(cst, i));
+					auto const ed(f.ed(cst, i));
+					assert (st != f_type::not_found);
+					assert (ed != f_type::not_found);
 					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
 					{
 						csa_range range(left, right);
@@ -816,8 +837,7 @@ namespace asm_lsw {
 		// Section 3.3.
 		static void find_1_approximate(
 			cst_type const &cst,
-			f_type const &f_st,
-			f_type const &f_ed,
+			f_type const &f,
 			gamma_type const &gamma,
 			core_endpoints_type const &core_endpoints,
 			lcp_rmq_type const &lcp_rmq,
@@ -834,7 +854,7 @@ namespace asm_lsw {
 			while (i < patlen)
 			{
 				// Cases 1, 2, 3.
-				find_1_approximate_at_i(cst, f_st, f_ed, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, i, ranges);
+				find_1_approximate_at_i(cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, i, ranges);
 
 				// 4. Exact match.
 				auto const cc(cst.csa.comp2char[pattern[i]]);
@@ -852,7 +872,7 @@ namespace asm_lsw {
 						auto const p_c(pattern[i + k]);
 						if (e_c != p_c)
 						{
-							find_1_approximate_at_i(cst, f_st, f_ed, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, k + i, ranges);
+							find_1_approximate_at_i(cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, k + i, ranges);
 							return;
 						}
 					}
