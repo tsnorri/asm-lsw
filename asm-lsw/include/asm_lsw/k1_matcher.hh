@@ -20,11 +20,14 @@
 #include <asm_lsw/bp_support_sparse.hh>
 #include <asm_lsw/x_fast_tries.hh>
 #include <asm_lsw/y_fast_tries.hh>
+#include <boost/functional/hash.hpp>
+#include <boost/range/irange.hpp>
 #include <sdsl/csa_rao.hpp>
 #include <sdsl/cst_sada.hpp>
 #include <sdsl/int_vector.hpp>
 #include <sdsl/isa_lsw.hpp>
 #include <sdsl/rrr_vector.hpp>
+#include <unordered_set>
 
 
 namespace asm_lsw {
@@ -36,7 +39,7 @@ namespace asm_lsw {
 		struct h_pair;
 		
 		typedef sdsl::int_vector<>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
-		typedef std::string												pattern_type;
+		typedef sdsl::int_vector<>										pattern_type;			// FIXME: correct parameters.
 		typedef int_vector_type											f_type;
 		typedef sdsl::csa_rao<>											csa_type;				// FIXME: correct parameters.
 		typedef sdsl::cst_sada<csa_type>								cst_type;
@@ -47,6 +50,11 @@ namespace asm_lsw {
 		typedef sdsl::rmq_succinct_sct<>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
 		typedef std::unordered_map<cst_type::node_type, h_pair>			h_map;					// FIXME: use a map with perfect hashing instead.
 		typedef y_fast_trie<csa_type::size_type, csa_type::size_type>	h_u_type;				// FIXME: check that LCP returns size_type (for key).
+		typedef std::pair<csa_type::size_type, csa_type::size_type>		csa_range;
+		typedef std::unordered_set<
+			csa_range,
+			boost::hash<csa_range>
+		>																csa_range_set;
 
 		static_assert(std::is_integral<cst_type::node_type>::value, "Integer required for cst_type::node_type.");
 		
@@ -92,7 +100,8 @@ namespace asm_lsw {
 			for (auto it(begin), end(pattern.cend()); it != end; ++it)
 			{
 				// node is inout.
-				if (0 == sdsl::forward_search(cst, node, it - begin, *it, char_pos))
+				auto const c(cst.csa.comp2char[*it]);
+				if (0 == sdsl::forward_search(cst, node, it - begin, c, char_pos))
 					return false;
 			}
 
@@ -110,18 +119,16 @@ namespace asm_lsw {
 		
 		
 		// Return F_st[i].
-		// FIXME: calculate time complexity.
-		auto f_st(f_type::size_type const i) const -> f_type::value_type
+		static auto f_st_val(cst_type const &cst, f_type const &f_st, f_type::size_type const i) -> f_type::value_type
 		{
-			return (i < m_f_st.size() ? m_f_st[i] : 0);
+			return (i < f_st.size() ? f_st[i] : 0);
 		}
 		
 		
 		// Return F_ed[i].
-		// FIXME: calculate time complexity.
-		auto f_ed(f_type::size_type const i) const -> f_type::value_type
+		static auto f_ed_val(cst_type const &cst, f_type const &f_ed, f_type::size_type const i) -> f_type::value_type
 		{
-			return (i < m_f_ed.size() ? m_f_ed[i] : m_cst.size());
+			return (i < f_ed.size() ? f_ed[i] : cst.size());
 		}
 		
 		
@@ -740,9 +747,127 @@ namespace asm_lsw {
 		
 		
 		// Section 3.3.
-		static void find_1_mismatch()
+		static void find_1_approximate_at_i(
+			cst_type const &cst,
+			f_type const &f_st,
+			f_type const &f_ed,
+			gamma_type const &gamma,
+			core_endpoints_type const &core_endpoints,
+			lcp_rmq_type const &lcp_rmq,
+			h_type const &h,
+			cst_type::node_type const u,
+			cst_type::node_type const core_path_beginning,
+			pattern_type const &pattern,
+			pattern_type::size_type const i,
+			csa_range_set &ranges
+		)
 		{
-			// FIXME: complete me.
+			csa_type::size_type left{0}, right{0};
+
+			// 1. Deletion
+			// Needn't be checked if P[i] == P[i + 1].
+			if (1 + i == pattern.size() || pattern[i] != pattern[1 + i])
+			{
+				auto const cc(cst.csa.comp2char[pattern[1 + i]]);
+				auto const st(f_st_val(cst, f_st, 1 + i));
+				auto const ed(f_ed_val(cst, f_ed, 1 + i));
+				if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
+				{
+					csa_range range(left, right);
+					ranges.emplace(std::move(range));
+				}
+			}
+
+			// 2. Substitution.
+			for (auto const c : boost::irange(static_cast<decltype(cst.csa.sigma)>(0), cst.csa.sigma))
+			{
+				if (pattern[i] != c)
+				{
+					auto const cc(cst.csa.comp2char[c]);
+					auto const st(f_st_val(cst, f_st, 1 + i));
+					auto const ed(f_ed_val(cst, f_ed, 1 + i));
+					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
+					{
+						csa_range range(left, right);
+						ranges.emplace(std::move(range));
+					}
+				}
+			}
+
+			// 3. Insertion.
+			// Allow insertion of the same character to the end of the string.
+			for (auto const c : boost::irange(static_cast<decltype(cst.csa.sigma)>(0), cst.csa.sigma))
+			{
+				if (1 + i == pattern.size() || pattern[i] != c)
+				{
+					auto const cc(cst.csa.comp2char[c]);
+					auto const st(f_st_val(cst, f_st, i));
+					auto const ed(f_ed_val(cst, f_ed, i));
+					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
+					{
+						csa_range range(left, right);
+						ranges.emplace(std::move(range));
+					}
+				}
+			}
+		}
+
+
+		// Section 3.3.
+		static void find_1_approximate(
+			cst_type const &cst,
+			f_type const &f_st,
+			f_type const &f_ed,
+			gamma_type const &gamma,
+			core_endpoints_type const &core_endpoints,
+			lcp_rmq_type const &lcp_rmq,
+			h_type const &h,
+			pattern_type const &pattern,
+			csa_range_set &ranges
+		)
+		{
+			cst_type::node_type u(cst.root());
+			cst_type::node_type core_path_beginning(u);
+			auto const patlen(pattern.size());
+			remove_c_t<decltype(patlen)> i(0);
+
+			while (i < patlen)
+			{
+				// Cases 1, 2, 3.
+				find_1_approximate_at_i(cst, f_st, f_ed, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, i, ranges);
+
+				// 4. Exact match.
+				auto const cc(cst.csa.comp2char[pattern[i]]);
+				cst_type::size_type char_pos{0};
+				auto const v(cst.child(u, cc, char_pos));
+				if (cst.root() != v)
+				{
+					auto const u_depth(cst.depth(u));
+					auto const v_depth(cst.depth(v));
+					auto const len(std::min(v_depth - u_depth, patlen - i));
+
+					for (auto const k : boost::irange(static_cast<decltype(len)>(0), len))
+					{
+						auto const e_c(cst.edge_c(v, 1 + k));
+						auto const p_c(pattern[i + k]);
+						if (e_c != p_c)
+						{
+							find_1_approximate_at_i(cst, f_st, f_ed, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, k + i, ranges);
+							return;
+						}
+					}
+
+					u = v;
+					i += len;
+
+					// FIXME: is this needed? If T = "abcd" and P = "bcd" it would seem so.
+					if (cst.is_leaf(v))
+					{
+						auto const idx(cst.id(v));
+						ranges.emplace(idx, idx);
+					}
+				}
+			}
 		}
 	};
 }
