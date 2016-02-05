@@ -785,6 +785,7 @@ namespace asm_lsw {
 				auto const cc(cst.csa.comp2char[pattern[1 + i]]);
 				auto const st(f.st(cst, 1 + i));
 				auto const ed(f.ed(cst, 1 + i));
+				// FIXME: handle the error e.g. by continuing.
 				assert (st != f_type::not_found);
 				assert (ed != f_type::not_found);
 
@@ -803,6 +804,7 @@ namespace asm_lsw {
 					auto const cc(cst.csa.comp2char[c]);
 					auto const st(f.st(cst, 1 + i));
 					auto const ed(f.ed(cst, 1 + i));
+					// FIXME: handle the error e.g. by continuing.
 					assert (st != f_type::not_found);
 					assert (ed != f_type::not_found);
 					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
@@ -822,6 +824,7 @@ namespace asm_lsw {
 					auto const cc(cst.csa.comp2char[c]);
 					auto const st(f.st(cst, i));
 					auto const ed(f.ed(cst, i));
+					// FIXME: handle the error e.g. by continuing.
 					assert (st != f_type::not_found);
 					assert (ed != f_type::not_found);
 					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
@@ -850,6 +853,8 @@ namespace asm_lsw {
 			cst_type::node_type core_path_beginning(u);
 			auto const patlen(pattern.size());
 			remove_c_t<decltype(patlen)> i(0);
+
+			// FIXME: update core_path_beginning.
 
 			while (i < patlen)
 			{
