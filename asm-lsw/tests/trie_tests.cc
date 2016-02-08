@@ -22,110 +22,168 @@
 
 using namespace bandit;
 
+
+template <typename t_trie>
+void set_type_tests()
+{
+	it("can insert", [&](){
+		t_trie trie;
+		trie.insert('a');
+	});
+
+	it("can find inserted keys", [&](){
+		t_trie trie;
+
+		trie.insert('a');
+
+		AssertThat(trie.contains('a'), Equals(true));
+		AssertThat(trie.contains('b'), Equals(false));
+	});
+
+	it("can find inserted keys", [&](){
+		t_trie trie;
+
+		trie.insert('a');
+		trie.insert('b');
+
+		AssertThat(trie.contains('a'), Equals(true));
+		AssertThat(trie.contains('b'), Equals(true));
+	});
+
+	it("can erase", [&](){
+		t_trie trie;
+
+		trie.insert('a');
+		trie.insert('b');
+		trie.insert('k');
+		trie.insert('j');
+
+		AssertThat(trie.contains('a'), Equals(true));
+		AssertThat(trie.contains('b'), Equals(true));
+		AssertThat(trie.contains('k'), Equals(true));
+		AssertThat(trie.contains('j'), Equals(true));
+
+		trie.erase('j');
+
+		AssertThat(trie.contains('a'), Equals(true));
+		AssertThat(trie.contains('b'), Equals(true));
+		AssertThat(trie.contains('k'), Equals(true));
+		AssertThat(trie.contains('j'), Equals(false));
+	});
+
+	it("can find successors", [&](){
+		t_trie trie;
+		trie.insert('a');
+		trie.insert('b');
+		trie.insert('k');
+
+		typename t_trie::const_iterator succ;
+		AssertThat(trie.find_successor('i', succ), Equals(true));
+		auto s(trie.iterator_key(succ));
+		AssertThat('k', Equals(s));
+	});
+
+	it("can find successors", [&](){
+		t_trie trie;
+		trie.insert('a');
+		trie.insert('b');
+		trie.insert('k');
+		trie.insert('j');
+
+		typename t_trie::const_iterator succ;
+
+		{
+			AssertThat(trie.find_successor('i', succ), Equals(true));
+			auto s(trie.iterator_key(succ));
+			AssertThat(s, Equals('j'));
+		}
+
+		trie.erase('j');
+
+		{
+			AssertThat(trie.find_successor('i', succ), Equals(true));
+			auto s(trie.iterator_key(succ));
+			AssertThat(s, Equals('k'));
+		}
+	});
+
+	it("can find successors", [&](){
+		t_trie trie;
+
+		trie.insert(128);
+		trie.insert(129);
+		trie.insert(130);
+		trie.insert(131);
+		trie.insert(132);
+		trie.insert(133);
+
+		for (auto const i : boost::irange(128, 134, 1))
+		{
+			typename t_trie::const_iterator succ;
+			AssertThat(trie.find_successor(1, succ), Equals(true));
+			auto s(trie.iterator_key(succ));
+			AssertThat(s, Equals(i));
+			trie.erase(i);
+		}
+
+		AssertThat(trie.size(), Equals(0));
+	});
+}
+
+
+template <typename t_trie>
+void map_type_tests()
+{
+	it("can find inserted values by keys", [&](){
+		t_trie trie;
+
+		trie.insert('a', 'k');
+		trie.insert('b', 'l');
+
+		typename t_trie::const_iterator it;
+
+		AssertThat(trie.find('a', it), Equals(true));
+		AssertThat(trie.iterator_value(it), Equals('k'));
+
+		AssertThat(trie.find('b', it), Equals(true));
+		AssertThat(trie.iterator_value(it), Equals('l'));
+
+		AssertThat(trie.find('c', it), Equals(false));
+	});
+}
+
+
 go_bandit([](){
 
-	describe("x-fast trie:", [](){
-		it("can insert", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
-			trie.insert('a');
-		});
+	describe("X-fast trie <uint8_t>:", [](){
+		set_type_tests <asm_lsw::x_fast_trie <uint8_t>>();
+	});
 
-		it("can find inserted keys", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
+	describe("X-fast trie <uint32_t>:", [](){
+		set_type_tests <asm_lsw::x_fast_trie <uint32_t>>();
+	});
 
-			trie.insert('a');
+	describe("X-fast trie <uint8_t, uint8_t>:", [](){
+		map_type_tests <asm_lsw::x_fast_trie <uint8_t, uint8_t>>();
+	});
 
-			AssertThat(trie.contains('a'), Equals(true));
-			AssertThat(trie.contains('b'), Equals(false));
-		});
+	describe("X-fast trie <uint32_t, uint32_t>:", [](){
+		map_type_tests <asm_lsw::x_fast_trie <uint32_t, uint32_t>>();
+	});
 
-		it("can find inserted keys", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
+	describe("Y-fast trie <uint8_t>:", [](){
+		set_type_tests <asm_lsw::y_fast_trie <uint8_t>>();
+	});
 
-			trie.insert('a');
-			trie.insert('b');
+	describe("Y-fast trie <uint32_t>:", [](){
+		set_type_tests <asm_lsw::y_fast_trie <uint32_t>>();
+	});
 
-			AssertThat(trie.contains('a'), Equals(true));
-			AssertThat(trie.contains('b'), Equals(true));
-		});
+	describe("Y-fast trie <uint8_t, uint8_t>:", [](){
+		map_type_tests <asm_lsw::y_fast_trie <uint8_t, uint8_t>>();
+	});
 
-		it("can erase", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
-
-			trie.insert('a');
-			trie.insert('b');
-			trie.insert('k');
-			trie.insert('j');
-
-			AssertThat(trie.contains('a'), Equals(true));
-			AssertThat(trie.contains('b'), Equals(true));
-			AssertThat(trie.contains('k'), Equals(true));
-			AssertThat(trie.contains('j'), Equals(true));
-
-			trie.erase('j');
-
-			AssertThat(trie.contains('a'), Equals(true));
-			AssertThat(trie.contains('b'), Equals(true));
-			AssertThat(trie.contains('k'), Equals(true));
-			AssertThat(trie.contains('j'), Equals(false));
-		});
-
-		it("can find successors", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
-			trie.insert('a');
-			trie.insert('b');
-			trie.insert('k');
-
-			decltype(trie)::const_leaf_iterator succ;
-			AssertThat(trie.find_successor('i', succ), Equals(true));
-			auto s(succ->first);
-			AssertThat('k', Equals(s));
-		});
-
-		it("can find successors", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
-			trie.insert('a');
-			trie.insert('b');
-			trie.insert('k');
-			trie.insert('j');
-
-			decltype(trie)::const_leaf_iterator succ;
-
-			{
-				AssertThat(trie.find_successor('i', succ), Equals(true));
-				auto s(succ->first);
-				AssertThat(s, Equals('j'));
-			}
-
-			trie.erase('j');
-
-			{
-				AssertThat(trie.find_successor('i', succ), Equals(true));
-				auto s(succ->first);
-				AssertThat(s, Equals('k'));
-			}
-		});
-
-		it("can find successors", [&](){
-			asm_lsw::x_fast_trie <uint8_t> trie;
-
-			trie.insert(128);
-			trie.insert(129);
-			trie.insert(130);
-			trie.insert(131);
-			trie.insert(132);
-			trie.insert(133);
-
-			for (auto const i : boost::irange(128, 134, 1))
-			{
-				decltype(trie)::const_leaf_iterator succ;
-				AssertThat(trie.find_successor(1, succ), Equals(true));
-				auto s(succ->first);
-				AssertThat(s, Equals(i));
-				trie.erase(i);
-			}
-
-			AssertThat(trie.size(), Equals(0));
-		});
+	describe("Y-fast trie <uint32_t, uint32_t>:", [](){
+		map_type_tests <asm_lsw::y_fast_trie <uint32_t, uint32_t>>();
 	});
 });
