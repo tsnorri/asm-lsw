@@ -854,8 +854,6 @@ namespace asm_lsw {
 			auto const patlen(pattern.size());
 			remove_c_t<decltype(patlen)> i(0);
 
-			// FIXME: update core_path_beginning.
-
 			while (i < patlen)
 			{
 				// Cases 1, 2, 3.
@@ -884,6 +882,10 @@ namespace asm_lsw {
 
 					u = v;
 					i += len;
+
+					// Check if the current node starts a core path and update core_path_beginning.
+					if (core_endpoints.mask()[i] && core_endpoints.bp()[core_endpoints.to_bp_idx(i)])
+						core_path_beginning = u;
 
 					// FIXME: is this needed? If T = "abcd" and P = "bcd" it would seem so.
 					if (cst.is_leaf(v))
