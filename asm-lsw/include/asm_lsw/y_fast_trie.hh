@@ -186,7 +186,7 @@ namespace asm_lsw {
 		if (0 == this->m_reps.size())
 			return false;
 		
-		value_type k1, k2;
+		key_type k1, k2;
 		if (!this->find_nearest_subtrees(key, k1, k2))
 			return false;
 		
