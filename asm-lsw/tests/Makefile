@@ -7,7 +7,8 @@ include ../../common.mk
 CPPFLAGS += -DASM_LSW_EXCEPTIONS
 
 OBJECTS	=	bp_support_sparse_tests.o \
-			test_main.o
+			test_main.o \
+			trie_tests.o
 
 all: tests
 
