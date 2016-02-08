@@ -4,3 +4,6 @@
 [submodule "lib/phf"]
 	path = lib/phf
 	url = git@github.com:tsnorri/phf.git
+[submodule "lib/bandit"]
+	path = lib/bandit
+	url = git@github.com:joakimkarlsson/bandit.git
