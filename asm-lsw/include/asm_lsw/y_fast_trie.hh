@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_Y_FAST_TRIE_HH
 #define ASM_LSW_Y_FAST_TRIE_HH
 
+#include <asm_lsw/exception_tpl.hh>
 #include <asm_lsw/util.hh>
 #include <asm_lsw/y_fast_trie_base.hh>
 #include <unordered_map>
@@ -50,6 +51,13 @@ namespace asm_lsw {
 		typedef typename base_class::representative_trie representative_trie;
 		typedef typename base_class::subtree subtree;
 		typedef typename base_class::subtree_map subtree_map;
+
+	public:
+		enum class error : uint32_t
+		{
+			no_error = 0,
+			out_of_range
+		};
 		
 	protected:
 		key_type m_max_key{std::numeric_limits <key_type>::max()};
@@ -129,7 +137,7 @@ namespace asm_lsw {
 	typename std::enable_if<std::is_void<T>::value, void>::type
 	y_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
-		assert(key <= m_max_key);
+		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
 		++this->m_size;
 
 		if (0 == this->m_reps.size())
@@ -151,7 +159,7 @@ namespace asm_lsw {
 	template <typename T>
 	void y_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val) // FIXME: making a copy of val.
 	{
-		assert(key <= m_max_key);
+		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
 		++this->m_size;
 
 		if (0 == this->m_reps.size())
