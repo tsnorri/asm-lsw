@@ -18,7 +18,9 @@
 #ifndef ASM_LSW_BP_SUPPORT_SPARSE_HH
 #define ASM_LSW_BP_SUPPORT_SPARSE_HH
 
+#include <asm_lsw/exception_tpl.hh>
 #include <asm_lsw/util.hh>
+#include <boost/format.hpp>
 #include <cstdint>
 #include <cstdio>
 #include <sdsl/bp_support.hpp>
@@ -31,6 +33,7 @@ namespace asm_lsw {
 	{
 	public:
 		typedef sdsl::bit_vector	bp_type;
+
 	protected:
 		// Apparently all bps classes require the sequence as a plain (non-compressed) bit vector.
 		// Fortunately in this case the vector isn't sparse.
@@ -68,6 +71,14 @@ namespace asm_lsw {
 			Space,
 			Opening,
 			Closing
+		};
+
+		enum class error : uint32_t
+		{
+			no_error = 0,
+			bad_parenthesis,
+			out_of_range,
+			sparse_index
 		};
 		
 		typedef bp_support_sparse_base<t_vector>	base_class;
@@ -131,7 +142,7 @@ namespace asm_lsw {
 			m_rss(other.m_rss)
 		{
 			m_bps.set_vector(&this->m_bp);
-			m_rss.fix_support(this->m_opening, this->m_closing);
+			m_rss.fix_support(this->m_mask);
 		}
 		
 		
@@ -190,7 +201,7 @@ namespace asm_lsw {
 					break;
 					
 				default:
-					assert(0); // FIXME: throw instead.
+					throw std::invalid_argument(boost::str(boost::format("Unexpected character '%c' at index %u.") % src[i] % i));
 					break;
 			}
 			
@@ -235,7 +246,7 @@ namespace asm_lsw {
 					break;
 					
 				default:
-					assert(0); // FIXME: exception instead.
+					throw std::invalid_argument(boost::str(boost::format("Got unexpected value '%u'.") % c));
 					break;
 			}
 		}
@@ -322,7 +333,7 @@ namespace asm_lsw {
 						break;
 						
 					default:
-						assert(0); // FIXME: exception instead.
+						throw std::invalid_argument(boost::str(boost::format("Got unexpected value '%u'") % c));
 						break;
 				}
 			}
@@ -392,10 +403,12 @@ namespace asm_lsw {
 	template <typename t_bps, typename t_vector>
 	auto bp_support_sparse <t_bps, t_vector>::find_open(size_type i) const -> size_type
 	{
-		assert(i < this->m_mask.size());
-		assert(1 == this->m_mask[i]);
-		
+		asm_lsw_assert(i < this->m_mask.size(), std::invalid_argument, error::out_of_range);
+		asm_lsw_assert(1 == this->m_mask[i], std::invalid_argument, error::sparse_index);
+
 		auto bp_end(to_bp_idx(i));
+		asm_lsw_assert(0 == this->m_bp[bp_end], std::invalid_argument, error::bad_parenthesis);
+
 		auto bp_begin(m_bps.find_open(bp_end));
 		auto begin(to_sparse_idx(bp_begin));
 		return begin;
@@ -405,10 +418,12 @@ namespace asm_lsw {
 	template <typename t_bps, typename t_vector>
 	auto bp_support_sparse <t_bps, t_vector>::find_close(size_type i) const -> size_type
 	{
-		assert(i < this->m_mask.size());
-		assert(1 == this->m_mask[i]);
+		asm_lsw_assert(i < this->m_mask.size(), std::invalid_argument, error::out_of_range);
+		asm_lsw_assert(1 == this->m_mask[i], std::invalid_argument, error::sparse_index);
 		
 		auto bp_begin(to_bp_idx(i));
+		asm_lsw_assert(1 == this->m_bp[bp_begin], std::invalid_argument, error::bad_parenthesis);
+
 		auto bp_end(m_bps.find_close(bp_begin));
 		auto end(to_sparse_idx(bp_end));
 		return end;
@@ -418,6 +433,8 @@ namespace asm_lsw {
 	template <typename t_bps, typename t_vector>
 	auto bp_support_sparse <t_bps, t_vector>::rank(size_type i) const -> size_type
 	{
+		asm_lsw_assert(i < this->m_mask.size(), std::invalid_argument, error::out_of_range);
+
 		auto bp_i(m_rss.mask_rank1_support(1 + i) - 1);
 		auto retval(m_bps.rank(bp_i));
 		return retval;
