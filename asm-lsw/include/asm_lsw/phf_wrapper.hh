@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_PHF_WRAPPER_HH
 #define ASM_LSW_PHF_WRAPPER_HH
 
+#include <cstring>
 #include <phf.h>
 
 namespace asm_lsw {
