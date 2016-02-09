@@ -42,9 +42,9 @@ namespace asm_lsw {
 		
 	public:
 		map_adaptor() = default;
-		map_adaptor(map_adaptor const &) = delete;
+		map_adaptor(map_adaptor const &) = default;
 		map_adaptor(map_adaptor &&) = default;
-		map_adaptor &operator=(map_adaptor const &) & = delete;
+		map_adaptor &operator=(map_adaptor const &) & = default;
 		map_adaptor &operator=(map_adaptor &&) & = default;
 
 		map_adaptor(map_type &map): m_map(std::move(map)) {}
