@@ -285,6 +285,7 @@ namespace asm_lsw {
 		
 		nearest = trie.m_leaf_links.find(node.key());
 		assert(trie.m_leaf_links.cend() != nearest);
+		assert(node.key() == nearest->first);
 	}
 
 
