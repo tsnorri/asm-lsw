@@ -71,7 +71,7 @@ void set_type_tests()
 		AssertThat(trie.contains('j'), Equals(false));
 	});
 
-	it("can find successors", [&](){
+	it("can find successors (1)", [&](){
 		t_trie trie;
 		trie.insert('a');
 		trie.insert('b');
@@ -83,7 +83,7 @@ void set_type_tests()
 		AssertThat('k', Equals(s));
 	});
 
-	it("can find successors", [&](){
+	it("can find successors (2)", [&](){
 		t_trie trie;
 		trie.insert('a');
 		trie.insert('b');
@@ -107,7 +107,7 @@ void set_type_tests()
 		}
 	});
 
-	it("can find successors", [&](){
+	it("can find successors (range)", [&](){
 		t_trie trie;
 
 		trie.insert(128);
@@ -122,6 +122,112 @@ void set_type_tests()
 			typename t_trie::const_iterator succ;
 			AssertThat(trie.find_successor(1, succ), Equals(true));
 			auto s(trie.iterator_key(succ));
+			AssertThat(s, Equals(i));
+			trie.erase(i);
+		}
+
+		AssertThat(trie.size(), Equals(0));
+	});
+}
+
+
+template <typename t_trie, typename t_compact_trie>
+void compact_set_type_tests()
+{
+	it("can find inserted keys", [&](){
+		t_trie trie;
+
+		trie.insert('a');
+
+		t_compact_trie ct(trie);
+		AssertThat(ct.contains('a'), Equals(true));
+		AssertThat(ct.contains('b'), Equals(false));
+	});
+
+	it("can find inserted keys", [&](){
+		t_trie trie;
+
+		trie.insert('a');
+		trie.insert('b');
+
+		t_compact_trie ct(trie);
+		AssertThat(ct.contains('a'), Equals(true));
+		AssertThat(ct.contains('b'), Equals(true));
+	});
+
+	it("can find successors (1)", [&](){
+		t_trie trie;
+		trie.insert('a');
+		trie.insert('b');
+		trie.insert('k');
+
+		t_compact_trie ct(trie);
+
+		typename t_compact_trie::const_iterator succ;
+		AssertThat(ct.find_successor('i', succ), Equals(true));
+		auto s(ct.iterator_key(succ));
+		AssertThat('k', Equals(s));
+	});
+
+	it("can find successors (2)", [&](){
+		t_trie trie;
+		t_compact_trie ct;
+		trie.insert('a');
+		trie.insert('b');
+		trie.insert('k');
+		trie.insert('j');
+
+		{
+			t_trie tmp(trie);
+			t_compact_trie tmp_ct(tmp);
+			ct = std::move(tmp_ct);
+		}
+
+		typename t_compact_trie::const_iterator succ;
+
+		{
+			AssertThat(ct.find_successor('i', succ), Equals(true));
+			auto s(ct.iterator_key(succ));
+			AssertThat(s, Equals('j'));
+		}
+
+		trie.erase('j');
+
+		{
+			t_trie tmp(trie);
+			t_compact_trie tmp_ct(tmp);
+			ct = std::move(tmp_ct);
+		}
+
+		{
+			AssertThat(ct.find_successor('i', succ), Equals(true));
+			auto s(ct.iterator_key(succ));
+			AssertThat(s, Equals('k'));
+		}
+	});
+
+	it("can find successors (range)", [&](){
+		t_trie trie;
+		t_compact_trie ct;
+
+		trie.insert(128);
+		trie.insert(129);
+		trie.insert(130);
+		trie.insert(131);
+		trie.insert(132);
+		trie.insert(133);
+
+		for (auto const i : boost::irange(128, 134, 1))
+		{
+			{
+				t_trie tmp(trie);
+				t_compact_trie tmp_ct(tmp);
+				ct = std::move(tmp_ct);
+			}
+
+			typename t_compact_trie::const_iterator succ;
+			AssertThat(ct.find_successor(1, succ), Equals(true));
+			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals(i));
 			trie.erase(i);
 		}
@@ -153,7 +259,33 @@ void map_type_tests()
 }
 
 
+template <typename t_trie, typename t_compact_trie>
+void compact_map_type_tests()
+{
+	it("can find inserted values by keys", [&](){
+		t_trie trie;
+
+		trie.insert('a', 'k');
+		trie.insert('b', 'l');
+
+		t_compact_trie ct(trie);
+
+		typename t_compact_trie::const_iterator it;
+
+		AssertThat(ct.find('a', it), Equals(true));
+		AssertThat(ct.iterator_value(it), Equals('k'));
+
+		AssertThat(ct.find('b', it), Equals(true));
+		AssertThat(ct.iterator_value(it), Equals('l'));
+
+		AssertThat(ct.find('c', it), Equals(false));
+	});
+}
+
+
 go_bandit([](){
+
+	// X-fast tries
 
 	describe("X-fast trie <uint8_t>:", [](){
 		set_type_tests <asm_lsw::x_fast_trie <uint8_t>>();
@@ -171,6 +303,25 @@ go_bandit([](){
 		map_type_tests <asm_lsw::x_fast_trie <uint32_t, uint32_t>>();
 	});
 
+	// Compact X-fast tries
+	describe("compact X-fast trie <uint8_t>:", [](){
+		compact_set_type_tests <asm_lsw::x_fast_trie <uint8_t>, asm_lsw::x_fast_trie_compact <uint8_t>>();
+	});
+
+	describe("compact X-fast trie <uint32_t>:", [](){
+		compact_set_type_tests <asm_lsw::x_fast_trie <uint32_t>, asm_lsw::x_fast_trie_compact <uint32_t>>();
+	});
+
+	describe("compact X-fast trie <uint8_t, uint8_t>:", [](){
+		compact_map_type_tests <asm_lsw::x_fast_trie <uint8_t, uint8_t>, asm_lsw::x_fast_trie_compact <uint8_t, uint8_t>>();
+	});
+
+	describe("compact X-fast trie <uint32_t, uint32_t>:", [](){
+		compact_map_type_tests <asm_lsw::x_fast_trie <uint32_t, uint32_t>, asm_lsw::x_fast_trie_compact <uint32_t, uint32_t>>();
+	});
+
+	// Y-fast tries
+
 	describe("Y-fast trie <uint8_t>:", [](){
 		set_type_tests <asm_lsw::y_fast_trie <uint8_t>>();
 	});
@@ -185,5 +336,23 @@ go_bandit([](){
 
 	describe("Y-fast trie <uint32_t, uint32_t>:", [](){
 		map_type_tests <asm_lsw::y_fast_trie <uint32_t, uint32_t>>();
+	});
+
+	// Compact Y-fast tries
+
+	describe("compact Y-fast trie <uint8_t>:", [](){
+		compact_set_type_tests <asm_lsw::y_fast_trie <uint8_t>, asm_lsw::y_fast_trie_compact <uint8_t>>();
+	});
+
+	describe("compact Y-fast trie <uint32_t>:", [](){
+		compact_set_type_tests <asm_lsw::y_fast_trie <uint32_t>, asm_lsw::y_fast_trie_compact <uint32_t>>();
+	});
+
+	describe("compact Y-fast trie <uint8_t, uint8_t>:", [](){
+		compact_map_type_tests <asm_lsw::y_fast_trie <uint8_t, uint8_t>, asm_lsw::y_fast_trie_compact <uint8_t, uint8_t>>();
+	});
+
+	describe("compact Y-fast trie <uint32_t, uint32_t>:", [](){
+		compact_map_type_tests <asm_lsw::y_fast_trie <uint32_t, uint32_t>, asm_lsw::y_fast_trie_compact <uint32_t, uint32_t>>();
 	});
 });
