@@ -3,3 +3,4 @@ local.mk
 
 asm-lsw/smoke-test/*.cc
 asm-lsw/smoke-test/tests.mk
+asm-lsw/tests/tests
