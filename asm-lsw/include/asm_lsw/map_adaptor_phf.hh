@@ -147,7 +147,9 @@ namespace asm_lsw {
 		typename base_class::used_indices_type::select_1_type m_used_indices_select1_support;
 		
 	protected:
-		typename vector_type::size_type adapted_key(typename vector_type::size_type key) const { return PHF::hash(&this->m_phf.get(), key); }
+		typename vector_type::size_type adapted_key(typename vector_type::size_type key) const { 
+			return PHF::hash(&this->m_phf.get(), key);
+		}
 		
 		template <typename t_adaptor>
 		static size_type find_index(t_adaptor &adaptor, key_type const &key);
@@ -226,12 +228,9 @@ namespace asm_lsw {
 	{
 		auto const adapted_key(adaptor.adapted_key(key));
 		if (adapted_key < adaptor.m_vector.size() && key == adaptor.m_vector[adapted_key].first)
-		{
-			auto const rank0(adaptor.m_used_indices_rank0_support(adapted_key));
-			return adapted_key - rank0;
-		}
+			return adapted_key;
 		
-		return adaptor.m_size;
+		return adaptor.m_vector.size();
 	}
 	
 	
@@ -240,8 +239,8 @@ namespace asm_lsw {
 	void map_adaptor_phf <t_vector, t_key, t_val>::fill_with_map_keys(t_vec &dst, t_map const &map)
 	{
 		typename t_vec::size_type i{0};
-		for (auto it : map)
-			dst[i++] = it.first;
+		for (auto const &kv : map)
+			dst[i++] = kv.first;
 	}
 
 
@@ -254,12 +253,13 @@ namespace asm_lsw {
 		
 		// Make a copy of the keys to generate the hash function.
 		// FIXME: check integrality of key_type.
-		sdsl::int_vector <0> keys(map.size(), 0, std::numeric_limits <typename t_map::key_type>::digits);
+		typedef typename vector_type::size_type key_type;
+		sdsl::int_vector <0> keys(map.size(), 0, std::numeric_limits <key_type>::digits);
 		fill_with_map_keys(keys, map);
 		
 		// FIXME: consider the parameters below (4, 80, 0).
-		int st(PHF::init <typename t_map::key_type, false>(
-			&this->m_phf.get(), reinterpret_cast <typename t_map::key_type *>(keys.data()), keys.size(), 4, 80, 0
+		int st(PHF::init <key_type, false>(
+			&this->m_phf.get(), reinterpret_cast <key_type *>(keys.data()), keys.size(), 4, 80, 0
 		));
 		assert(0 == st); // FIXME: throw instead on error. (Or do this in a wrapper for phf.)
 		
@@ -284,12 +284,15 @@ namespace asm_lsw {
 		
 		// Create the mapping. Since all possible values are known at this time,
 		// PHF::hash will return unique values and no sublists are needed.
-		for (auto it : map)
+		// FIXME: since the template parameter of PHF::hash is independent of that of PHF::init,
+		// the function may return incorrect hashes thus making its use rather error-prone.
+		// For now, using the same type with PHF::init and adapted_key() needs to be ensured.
+		for (auto const &kv : map)
 		{
-			auto const key(it.first);
-			auto const hash(PHF::hash(&this->m_phf.get(), key));
-			auto val(std::make_pair(key, std::move(it.second))); // FIXME: needs to take the key for it.second in case of a set-type container.
-			
+			auto const key(kv.first);
+			auto const hash(this->adapted_key(key));
+			auto val(std::make_pair(key, std::move(kv.second))); // FIXME: needs to take the key for it.second in case of a set-type container.
+
 			assert(!this->m_used_indices[hash]);
 			this->m_vector[hash] = std::move(val);
 			this->m_used_indices[hash] = 1;
