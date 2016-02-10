@@ -24,6 +24,25 @@ using namespace bandit;
 
 
 template <typename t_trie>
+struct ref_trie_adaptor
+{
+	typedef t_trie trie_type;
+	typedef t_trie &return_type;
+	t_trie &operator()(t_trie &trie) const { return trie; }
+	t_trie const &operator()(t_trie const &trie) const { return trie; }
+};
+
+
+template <typename t_trie, typename t_compact_trie>
+struct compact_trie_adaptor
+{
+	typedef t_compact_trie trie_type;
+	typedef t_compact_trie return_type;
+	t_compact_trie operator()(t_trie &trie) const { return t_compact_trie(trie); }
+};
+
+
+template <typename t_trie>
 void insert_with_limit(t_trie &trie, typename t_trie::key_type const last, typename t_trie::key_type const max_value)
 {
 	t_trie tmp_trie(max_value);
@@ -44,31 +63,13 @@ void insert_with_limit(t_trie &trie, typename t_trie::key_type const last, typen
 template <typename t_trie>
 void set_type_tests()
 {
-	it("can insert", [&](){
+	it("can insert", [](){
 		t_trie trie;
 		trie.insert('a');
 	});
 
-	it("can find inserted keys", [&](){
-		t_trie trie;
 
-		trie.insert('a');
-
-		AssertThat(trie.contains('a'), Equals(true));
-		AssertThat(trie.contains('b'), Equals(false));
-	});
-
-	it("can find inserted keys", [&](){
-		t_trie trie;
-
-		trie.insert('a');
-		trie.insert('b');
-
-		AssertThat(trie.contains('a'), Equals(true));
-		AssertThat(trie.contains('b'), Equals(true));
-	});
-
-	it("can erase", [&](){
+	it("can erase", [](){
 		t_trie trie;
 
 		trie.insert('a');
@@ -88,76 +89,25 @@ void set_type_tests()
 		AssertThat(trie.contains('k'), Equals(true));
 		AssertThat(trie.contains('j'), Equals(false));
 	});
-
-	it("can find successors (1)", [&](){
-		t_trie trie;
-		trie.insert('a');
-		trie.insert('b');
-		trie.insert('k');
-
-		typename t_trie::const_iterator succ;
-		AssertThat(trie.find_successor('i', succ), Equals(true));
-		auto s(trie.iterator_key(succ));
-		AssertThat('k', Equals(s));
-	});
-
-	it("can find successors (2)", [&](){
-		t_trie trie;
-		trie.insert('a');
-		trie.insert('b');
-		trie.insert('k');
-		trie.insert('j');
-
-		typename t_trie::const_iterator succ;
-
-		{
-			AssertThat(trie.find_successor('i', succ), Equals(true));
-			auto s(trie.iterator_key(succ));
-			AssertThat(s, Equals('j'));
-		}
-
-		trie.erase('j');
-
-		{
-			AssertThat(trie.find_successor('i', succ), Equals(true));
-			auto s(trie.iterator_key(succ));
-			AssertThat(s, Equals('k'));
-		}
-	});
-
-	it("can find successors (range)", [&](){
-		t_trie trie;
-
-		trie.insert(128);
-		trie.insert(129);
-		trie.insert(130);
-		trie.insert(131);
-		trie.insert(132);
-		trie.insert(133);
-
-		for (auto const i : boost::irange(128, 134, 1))
-		{
-			typename t_trie::const_iterator succ;
-			AssertThat(trie.find_successor(1, succ), Equals(true));
-			auto s(trie.iterator_key(succ));
-			AssertThat(s, Equals(i));
-			trie.erase(i);
-		}
-
-		AssertThat(trie.size(), Equals(0));
-	});
 }
 
 
-template <typename t_trie, typename t_compact_trie>
-void compact_set_type_tests()
+template <typename t_trie, typename t_adaptor>
+void common_set_type_tests()
 {
+	t_adaptor adaptor;
+
+	it("can initialize", [](){
+		t_trie trie;
+		AssertThat(trie.size(), Equals(0));
+	});
+
 	it("can find inserted keys", [&](){
 		t_trie trie;
 
 		trie.insert('a');
 
-		t_compact_trie ct(trie);
+		typename t_adaptor::return_type ct((adaptor(trie)));
 		AssertThat(ct.contains('a'), Equals(true));
 		AssertThat(ct.contains('b'), Equals(false));
 	});
@@ -168,7 +118,7 @@ void compact_set_type_tests()
 		trie.insert('a');
 		trie.insert('b');
 
-		t_compact_trie ct(trie);
+		typename t_adaptor::return_type ct((adaptor(trie)));
 		AssertThat(ct.contains('a'), Equals(true));
 		AssertThat(ct.contains('b'), Equals(true));
 	});
@@ -179,9 +129,8 @@ void compact_set_type_tests()
 		trie.insert('b');
 		trie.insert('k');
 
-		t_compact_trie ct(trie);
-
-		typename t_compact_trie::const_iterator succ;
+		typename t_adaptor::return_type ct((adaptor(trie)));
+		typename t_adaptor::trie_type::const_iterator succ;
 		AssertThat(ct.find_successor('i', succ), Equals(true));
 		auto s(ct.iterator_key(succ));
 		AssertThat('k', Equals(s));
@@ -189,21 +138,14 @@ void compact_set_type_tests()
 
 	it("can find successors (2)", [&](){
 		t_trie trie;
-		t_compact_trie ct;
 		trie.insert('a');
 		trie.insert('b');
 		trie.insert('k');
 		trie.insert('j');
 
 		{
-			t_trie tmp(trie);
-			t_compact_trie tmp_ct(tmp);
-			ct = std::move(tmp_ct);
-		}
-
-		typename t_compact_trie::const_iterator succ;
-
-		{
+			typename t_adaptor::return_type ct((adaptor(trie)));
+			typename t_adaptor::trie_type::const_iterator succ;
 			AssertThat(ct.find_successor('i', succ), Equals(true));
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals('j'));
@@ -212,12 +154,8 @@ void compact_set_type_tests()
 		trie.erase('j');
 
 		{
-			t_trie tmp(trie);
-			t_compact_trie tmp_ct(tmp);
-			ct = std::move(tmp_ct);
-		}
-
-		{
+			typename t_adaptor::return_type ct((adaptor(trie)));
+			typename t_adaptor::trie_type::const_iterator succ;
 			AssertThat(ct.find_successor('i', succ), Equals(true));
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals('k'));
@@ -226,7 +164,7 @@ void compact_set_type_tests()
 
 	it("can find successors (range)", [&](){
 		t_trie trie;
-		t_compact_trie ct;
+		t_adaptor adaptor;
 
 		trie.insert(128);
 		trie.insert(129);
@@ -237,58 +175,32 @@ void compact_set_type_tests()
 
 		for (auto const i : boost::irange(128, 134, 1))
 		{
-			{
-				t_trie tmp(trie);
-				t_compact_trie tmp_ct(tmp);
-				ct = std::move(tmp_ct);
-			}
-
-			typename t_compact_trie::const_iterator succ;
+			typename t_adaptor::return_type ct((adaptor(trie)));
+			typename t_adaptor::trie_type::const_iterator succ;
 			AssertThat(ct.find_successor(1, succ), Equals(true));
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals(i));
 			trie.erase(i);
 		}
 
-		AssertThat(trie.size(), Equals(0));
+		typename t_adaptor::return_type ct((adaptor(trie)));
+		AssertThat(ct.size(), Equals(0));
 	});
 }
 
 
-template <typename t_trie>
-void map_type_tests()
+template <typename t_trie, typename t_adaptor>
+void common_map_type_tests()
 {
-	it("can find inserted values by keys", [&](){
+	it("can find inserted values by keys", [](){
 		t_trie trie;
+		t_adaptor adaptor;
 
 		trie.insert('a', 'k');
 		trie.insert('b', 'l');
 
-		typename t_trie::const_iterator it;
-
-		AssertThat(trie.find('a', it), Equals(true));
-		AssertThat(trie.iterator_value(it), Equals('k'));
-
-		AssertThat(trie.find('b', it), Equals(true));
-		AssertThat(trie.iterator_value(it), Equals('l'));
-
-		AssertThat(trie.find('c', it), Equals(false));
-	});
-}
-
-
-template <typename t_trie, typename t_compact_trie>
-void compact_map_type_tests()
-{
-	it("can find inserted values by keys", [&](){
-		t_trie trie;
-
-		trie.insert('a', 'k');
-		trie.insert('b', 'l');
-
-		t_compact_trie ct(trie);
-
-		typename t_compact_trie::const_iterator it;
+		typename t_adaptor::return_type ct((adaptor(trie)));
+		typename t_adaptor::trie_type::const_iterator it;
 
 		AssertThat(ct.find('a', it), Equals(true));
 		AssertThat(ct.iterator_value(it), Equals('k'));
@@ -297,6 +209,19 @@ void compact_map_type_tests()
 		AssertThat(ct.iterator_value(it), Equals('l'));
 
 		AssertThat(ct.find('c', it), Equals(false));
+	});
+}
+
+
+template <typename t_trie, typename t_compact_trie>
+void compact_any_type_tests()
+{
+	it("can initialize with empty container", [](){
+		t_trie trie;
+		AssertThat(trie.size(), Equals(0));
+
+		t_compact_trie ct(trie);
+		AssertThat(ct.size(), Equals(0));
 	});
 }
 
@@ -345,73 +270,99 @@ go_bandit([](){
 
 	// X-fast tries
 	describe("X-fast trie <uint8_t>:", [](){
-		set_type_tests <asm_lsw::x_fast_trie <uint8_t>>();
+		typedef asm_lsw::x_fast_trie <uint8_t> trie_type;
+		set_type_tests <trie_type>();
+		common_set_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	describe("X-fast trie <uint32_t>:", [](){
-		set_type_tests <asm_lsw::x_fast_trie <uint32_t>>();
+		typedef asm_lsw::x_fast_trie <uint32_t> trie_type;
+		set_type_tests <trie_type>();
+		common_set_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	describe("X-fast trie <uint8_t, uint8_t>:", [](){
-		map_type_tests <asm_lsw::x_fast_trie <uint8_t, uint8_t>>();
+		typedef asm_lsw::x_fast_trie <uint8_t, uint8_t> trie_type;
+		common_map_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	describe("X-fast trie <uint32_t, uint32_t>:", [](){
-		map_type_tests <asm_lsw::x_fast_trie <uint32_t, uint32_t>>();
+		typedef asm_lsw::x_fast_trie <uint32_t, uint32_t> trie_type;
+		common_map_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	// Compact X-fast tries
 	describe("compact X-fast trie <uint8_t>:", [](){
-		compact_set_type_tests <asm_lsw::x_fast_trie <uint8_t>, asm_lsw::x_fast_trie_compact <uint8_t>>();
+		typedef asm_lsw::x_fast_trie <uint8_t> trie_type;
+		typedef asm_lsw::x_fast_trie_compact <uint8_t> ct_type;
+		common_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact X-fast trie <uint32_t>:", [](){
-		compact_set_type_tests <asm_lsw::x_fast_trie <uint32_t>, asm_lsw::x_fast_trie_compact <uint32_t>>();
+		typedef asm_lsw::x_fast_trie <uint32_t> trie_type;
+		typedef asm_lsw::x_fast_trie_compact <uint32_t> ct_type;
+		common_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact X-fast trie <uint8_t, uint8_t>:", [](){
-		compact_map_type_tests <asm_lsw::x_fast_trie <uint8_t, uint8_t>, asm_lsw::x_fast_trie_compact <uint8_t, uint8_t>>();
+		typedef asm_lsw::x_fast_trie <uint8_t, uint8_t> trie_type;
+		typedef asm_lsw::x_fast_trie_compact <uint8_t, uint8_t> ct_type;
+		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact X-fast trie <uint32_t, uint32_t>:", [](){
-		compact_map_type_tests <asm_lsw::x_fast_trie <uint32_t, uint32_t>, asm_lsw::x_fast_trie_compact <uint32_t, uint32_t>>();
+		typedef asm_lsw::x_fast_trie <uint32_t, uint32_t> trie_type;
+		typedef asm_lsw::x_fast_trie_compact <uint32_t, uint32_t> ct_type;
+		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	// Y-fast tries
 	describe("Y-fast trie <uint8_t>:", [](){
 		typedef asm_lsw::y_fast_trie <uint8_t> trie_type;
 		set_type_tests <trie_type>();
+		common_set_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 		y_fast_set_tests <trie_type>();
 	});
 
 	describe("Y-fast trie <uint32_t>:", [](){
 		typedef asm_lsw::y_fast_trie <uint32_t> trie_type;
 		set_type_tests <trie_type>();
+		common_set_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 		y_fast_set_tests <trie_type>();
 	});
 
 	describe("Y-fast trie <uint8_t, uint8_t>:", [](){
-		map_type_tests <asm_lsw::y_fast_trie <uint8_t, uint8_t>>();
+		typedef asm_lsw::y_fast_trie <uint8_t, uint8_t> trie_type;
+		common_map_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	describe("Y-fast trie <uint32_t, uint32_t>:", [](){
-		map_type_tests <asm_lsw::y_fast_trie <uint32_t, uint32_t>>();
+		typedef asm_lsw::y_fast_trie <uint32_t, uint32_t> trie_type;
+		common_map_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	// Compact Y-fast tries
 	describe("compact Y-fast trie <uint8_t>:", [](){
-		compact_set_type_tests <asm_lsw::y_fast_trie <uint8_t>, asm_lsw::y_fast_trie_compact <uint8_t>>();
+		typedef asm_lsw::y_fast_trie <uint8_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact <uint8_t> ct_type;
+		common_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint32_t>:", [](){
-		compact_set_type_tests <asm_lsw::y_fast_trie <uint32_t>, asm_lsw::y_fast_trie_compact <uint32_t>>();
+		typedef asm_lsw::y_fast_trie <uint32_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact <uint32_t> ct_type;
+		common_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint8_t, uint8_t>:", [](){
-		compact_map_type_tests <asm_lsw::y_fast_trie <uint8_t, uint8_t>, asm_lsw::y_fast_trie_compact <uint8_t, uint8_t>>();
+		typedef asm_lsw::y_fast_trie <uint8_t, uint8_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact <uint8_t, uint8_t> ct_type;
+		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint32_t, uint32_t>:", [](){
-		compact_map_type_tests <asm_lsw::y_fast_trie <uint32_t, uint32_t>, asm_lsw::y_fast_trie_compact <uint32_t, uint32_t>>();
+		typedef asm_lsw::y_fast_trie <uint32_t, uint32_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact <uint32_t, uint32_t> ct_type;
+		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 });
