@@ -1,6 +1,9 @@
-local.mk
 *.o
-
+*.gcda
+*.gcno
 asm-lsw/smoke-test/*.cc
+
+local.mk
 asm-lsw/smoke-test/tests.mk
 asm-lsw/tests/tests
+asm-lsw/tests/coverage
