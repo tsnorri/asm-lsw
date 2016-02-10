@@ -15,7 +15,7 @@ OBJECTS	=	bp_support_sparse_tests.o \
 all: tests
 
 coverage: run_tests
-	mkdir -p coverage
+	$(MKDIR) -p coverage
 	$(GCOVR) --root .. --print-summary --html --html-details -o coverage/index.html
 
 run_tests: tests
