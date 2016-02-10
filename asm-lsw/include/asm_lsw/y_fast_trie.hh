@@ -75,6 +75,8 @@ namespace asm_lsw {
 		y_fast_trie &operator=(y_fast_trie const &) & = default;
 		y_fast_trie &operator=(y_fast_trie &&) & = default;
 		y_fast_trie(key_type const max_key): m_max_key(max_key) {}
+
+		key_type max_key() const { return m_max_key; }
 		
 		// Conditionally enable either.
 		// (Return type of the first one is void == std::enable_if<...>::type.)

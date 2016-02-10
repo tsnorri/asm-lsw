@@ -98,6 +98,11 @@ namespace asm_lsw {
 		bool find_successor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const;
 		bool find_nearest_subtrees(key_type const key, key_type &k1, key_type &k2) const;
 		void print() const;
+
+		y_fast_trie_subtree_map_proxy <subtree_map> subtree_map_proxy() const { return y_fast_trie_subtree_map_proxy <subtree_map>(&m_subtrees); }
+
+		typename subtree_map::const_iterator subtree_cbegin() const { return m_subtrees.cbegin(); }
+		typename subtree_map::const_iterator subtree_cend() const { return m_subtrees.cend(); }
 		
 		typename trait::key_type const iterator_key(const_subtree_iterator const &it) const { trait t; return t.key(it); }
 		typename trait::value_type const &iterator_value(const_subtree_iterator const &it) const { trait t; return t.value(it); }
