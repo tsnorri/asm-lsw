@@ -231,6 +231,14 @@ void common_set_type_tests()
 			}
 		};
 
+		it("can find exact matches", [&](){
+			decltype(search_values) const expected{1, 0, 0, 0, 33, 0, 255};
+			auto cb = [](ct_var_type &ct, ct_key_type search_value, ct_const_iterator &it) -> bool {
+				return ct.find(search_value, it);
+			};
+			fn(expected, cb);
+		});
+
 		it("can find predecessors", [&](){
 			decltype(search_values) const expected{0, 1, 15, 27, 27, 33, 249};
 			auto cb = [](ct_var_type &ct, ct_key_type search_value, ct_const_iterator &it) -> bool {
