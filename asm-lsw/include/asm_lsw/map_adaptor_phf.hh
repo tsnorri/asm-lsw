@@ -43,7 +43,7 @@ namespace asm_lsw {
 		vector_type m_vector;
 		used_indices_type m_used_indices;
 		phf_wrapper m_phf;
-		size_type m_size;
+		size_type m_size{0};
 		
 	public:
 		map_adaptor_phf_base() = default;
@@ -316,10 +316,10 @@ namespace asm_lsw {
 	template <template <typename ...> class t_vector, typename t_key, typename t_val>
 	map_adaptor_phf <t_vector, t_key, t_val>::map_adaptor_phf(map_adaptor_phf &&other):
 		base_class(std::move(other)),
-		m_used_indices_rank0_support(std::move(m_used_indices_rank0_support))
+		m_used_indices_rank0_support(std::move(other.m_used_indices_rank0_support)),
+		m_used_indices_select1_support(std::move(other.m_used_indices_select1_support))
 	{
 		m_used_indices_rank0_support.set_vector(&this->m_used_indices);
-		m_used_indices_select1_support(std::move(m_used_indices_select1_support));
 		m_used_indices_select1_support.set_vector(&this->m_used_indices);
 	}
 
