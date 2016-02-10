@@ -24,6 +24,24 @@ using namespace bandit;
 
 
 template <typename t_trie>
+void insert_with_limit(t_trie &trie, typename t_trie::key_type const last, typename t_trie::key_type const max_value)
+{
+	t_trie tmp_trie(max_value);
+
+	typename t_trie::key_type key(1);
+	while (true)
+	{
+		tmp_trie.insert(key);
+		if (key == last)
+			break;
+		++key;
+	}
+
+	trie = std::move(tmp_trie);
+}
+
+
+template <typename t_trie>
 void set_type_tests()
 {
 	it("can insert", [&](){
@@ -283,10 +301,49 @@ void compact_map_type_tests()
 }
 
 
+template <typename t_trie>
+void y_fast_set_test_subtree_size(t_trie &trie, typename t_trie::size_type const max)
+{
+	insert_with_limit(trie, max, max);
+	auto const log2M(std::log2(max));
+	for (auto const &kv : trie.subtree_map_proxy())
+	{
+		auto const &subtree(kv.second);
+		AssertThat(subtree.size(), IsLessThan(2 * log2M));
+	}			
+}
+
+
+template <typename t_trie>
+void y_fast_set_tests()
+{
+	it("should retain key limit after moving", [&](){
+		t_trie t1(5);
+		t_trie t2(6);
+
+		t1 = std::move(t2);
+		AssertThat(t1.max_key(), Equals(6));
+	});
+
+	it("should enforce key limit", [&](){
+		t_trie trie(5);
+
+		AssertThrows(asm_lsw::invalid_argument, trie.insert(6));
+		AssertThat(LastException <asm_lsw::invalid_argument>().error <typename t_trie::error>(), Equals(t_trie::error::out_of_range));
+	});
+
+	it("should have small subtrees", [&](){
+		t_trie trie;
+		y_fast_set_test_subtree_size(trie, 20);
+		y_fast_set_test_subtree_size(trie, 40);
+		y_fast_set_test_subtree_size(trie, 255);
+	});
+}
+
+
 go_bandit([](){
 
 	// X-fast tries
-
 	describe("X-fast trie <uint8_t>:", [](){
 		set_type_tests <asm_lsw::x_fast_trie <uint8_t>>();
 	});
@@ -321,13 +378,16 @@ go_bandit([](){
 	});
 
 	// Y-fast tries
-
 	describe("Y-fast trie <uint8_t>:", [](){
-		set_type_tests <asm_lsw::y_fast_trie <uint8_t>>();
+		typedef asm_lsw::y_fast_trie <uint8_t> trie_type;
+		set_type_tests <trie_type>();
+		y_fast_set_tests <trie_type>();
 	});
 
 	describe("Y-fast trie <uint32_t>:", [](){
-		set_type_tests <asm_lsw::y_fast_trie <uint32_t>>();
+		typedef asm_lsw::y_fast_trie <uint32_t> trie_type;
+		set_type_tests <trie_type>();
+		y_fast_set_tests <trie_type>();
 	});
 
 	describe("Y-fast trie <uint8_t, uint8_t>:", [](){
@@ -339,7 +399,6 @@ go_bandit([](){
 	});
 
 	// Compact Y-fast tries
-
 	describe("compact Y-fast trie <uint8_t>:", [](){
 		compact_set_type_tests <asm_lsw::y_fast_trie <uint8_t>, asm_lsw::y_fast_trie_compact <uint8_t>>();
 	});
