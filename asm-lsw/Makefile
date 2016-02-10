@@ -1,6 +1,6 @@
 all:
 	$(MAKE) -C smoke-test
-	$(MAKE) -C tests run_tests
+	$(MAKE) -C tests coverage
 
 clean:
 	$(MAKE) -C smoke-test clean
