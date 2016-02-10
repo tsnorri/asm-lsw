@@ -18,6 +18,8 @@
 #include <asm_lsw/x_fast_tries.hh>
 #include <asm_lsw/y_fast_tries.hh>
 #include <bandit/bandit.h>
+#include <boost/iterator/zip_iterator.hpp>
+#include <boost/range.hpp>
 #include <boost/range/irange.hpp>
 
 using namespace bandit;
@@ -102,7 +104,7 @@ void common_set_type_tests()
 		AssertThat(trie.size(), Equals(0));
 	});
 
-	it("can find inserted keys", [&](){
+	it("can find inserted keys (1)", [&](){
 		t_trie trie;
 
 		trie.insert('a');
@@ -112,7 +114,7 @@ void common_set_type_tests()
 		AssertThat(ct.contains('b'), Equals(false));
 	});
 
-	it("can find inserted keys", [&](){
+	it("can find inserted keys (2)", [&](){
 		t_trie trie;
 
 		trie.insert('a');
@@ -186,6 +188,81 @@ void common_set_type_tests()
 		typename t_adaptor::return_type ct((adaptor(trie)));
 		AssertThat(ct.size(), Equals(0));
 	});
+
+	{
+		// Make a trie with test_values and pass items in search_values to various functions.
+
+		typedef typename t_trie::key_type trie_key_type;
+		typedef typename t_adaptor::return_type ct_var_type;
+		typedef typename t_adaptor::trie_type::key_type ct_key_type;
+		typedef typename t_adaptor::trie_type::const_iterator ct_const_iterator;
+
+		std::vector<trie_key_type> const test_values{1, 15, 27, 33, 92, 120, 148, 163, 199, 201, 214, 227, 228, 229, 230, 243, 249, 255};
+		std::vector<ct_key_type> const search_values{1, 14, 22, 32, 33, 34, 255};
+
+		t_trie trie;
+		for (auto const val : test_values)
+			trie.insert(val);
+		ct_var_type ct((adaptor(trie)));
+
+		// The test loop. Call to the trie's member function to be tested is packed into cb.
+		// Zero in the expected values indicates that the tested function should return false.
+		auto fn = [&](
+			decltype(search_values) const &expected_values,
+			std::function <bool (ct_var_type &, ct_key_type, ct_const_iterator &)> cb
+		) -> void {
+			auto zbegin(boost::make_zip_iterator(boost::make_tuple(search_values.cbegin(), expected_values.cbegin())));
+			auto const zend(boost::make_zip_iterator(boost::make_tuple(search_values.cend(), expected_values.cend())));
+			for (auto const tup : boost::make_iterator_range(zbegin, zend))
+			{
+				trie_key_type test{0};
+				ct_key_type expected{0};
+				boost::tie(test, expected) = tup;
+				ct_const_iterator it;
+				auto const res(cb(ct, test, it));
+				if (res)
+				{
+					AssertThat(ct.iterator_key(it), Equals(expected));
+				}
+				else
+				{
+					AssertThat(0, Equals(expected));
+				}
+			}
+		};
+
+		it("can find predecessors", [&](){
+			decltype(search_values) const expected{0, 1, 15, 27, 27, 33, 249};
+			auto cb = [](ct_var_type &ct, ct_key_type search_value, ct_const_iterator &it) -> bool {
+				return ct.find_predecessor(search_value, it);
+			};
+			fn(expected, cb);
+		});
+
+		it("can find predecessors with allow_equal", [&](){
+			decltype(search_values) const expected{1, 1, 15, 27, 33, 33, 255};
+			auto cb = [](ct_var_type &ct, ct_key_type search_value, ct_const_iterator &it) -> bool {
+				return ct.find_predecessor(search_value, it, true);
+			};
+			fn(expected, cb);
+		});
+
+		it("can find successors", [&](){
+			decltype(search_values) const expected{15, 15, 27, 33, 92, 92, 0};
+			auto cb = [](ct_var_type &ct, ct_key_type search_value, ct_const_iterator &it) -> bool {
+				return ct.find_successor(search_value, it);
+			};
+			fn(expected, cb);
+		});
+
+		it("can find successors with allow_equal", [&](){
+			decltype(search_values) const expected{1, 15, 27, 33, 33, 92, 255};
+			auto cb = [](ct_var_type &ct, ct_key_type search_value, ct_const_iterator &it) -> bool {
+				return ct.find_successor(search_value, it, true);
+			};
+			fn(expected, cb);
+		});
+	}
 }
 
 
