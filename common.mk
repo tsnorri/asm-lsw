@@ -1,14 +1,14 @@
 # Ignore Xcode's setting since the SDK may contain older versions of Clang and libc++.
 unexport SDKROOT
 
-CXX		?= clang++
+CC		?= gcc
+CXX		?= g++
 GCOVR	?= gcovr
 MKDIR	?= mkdir
 
 WARNING_FLAGS	= -Wall -Werror -Wno-unused -Wno-missing-braces
 
 LOCAL_CXXFLAGS		?= -std=c++14
-LOCAL_LDFLAGS		?= -stdlib=libc++
 OPT_FLAGS_DEBUG		?= -ggdb -O0
 OPT_FLAGS_RELEASE	?= -O2
 
