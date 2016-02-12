@@ -4,13 +4,16 @@ include ../../common.mk
 .PHONY: run_tests
 .PRECIOUS: tests
 
-CPPFLAGS += -DASM_LSW_EXCEPTIONS
-CXXFLAGS += -fprofile-arcs -ftest-coverage
-LDFLAGS += -lgcov
+LDFLAGS_COVERAGE ?= -lgcov
 
-OBJECTS	=	bp_support_sparse_tests.o \
-			test_main.o \
-			trie_tests.o
+CPPFLAGS	+= -DASM_LSW_EXCEPTIONS
+CXXFLAGS	+= -fprofile-arcs -ftest-coverage
+LDFLAGS		+= $(LDFLAGS_COVERAGE)
+
+OBJECTS		=	bp_support_sparse_tests.o \
+				map_adaptor_tests.o \
+				test_main.o \
+				trie_tests.o
 
 all: tests
 
