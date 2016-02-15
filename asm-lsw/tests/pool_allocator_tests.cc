@@ -22,8 +22,19 @@
 using namespace bandit;
 
 template <typename t_element>
-void common_tests()
+void typed_tests()
 {
+	it("can allocate memory with different alignments", [](){
+		asm_lsw::pool_allocator <uint16_t> allocator_1(8);
+		allocator_1.allocate(1);
+
+		asm_lsw::pool_allocator <uint64_t> allocator_2(allocator_1);
+		allocator_2.allocate(1);
+		
+		AssertThat(allocator_1.bytes_left(), Equals(0));
+		AssertThat(allocator_1.bytes_left(), Equals(0));
+	});
+
 	it("can allocate memory for std::vector", [](){
 		std::size_t const size(10);
 		asm_lsw::pool_allocator <t_element> allocator(size);
@@ -54,12 +65,45 @@ void common_tests()
 }
 
 
+void common_tests()
+{
+	it("doesn't affect destructor calls", [](){
+		
+		struct test
+		{
+			int32_t *c{nullptr};
+			
+			~test()
+			{
+				if (c)
+					++*c;
+			}
+		};
+		
+		int32_t c{0};
+		asm_lsw::pool_allocator <test> allocator(1);
+		
+		{
+			test t;
+			std::vector <test, decltype(allocator)> vec(1, t, allocator);
+			vec[0].c = &c;
+		}
+		
+		AssertThat(c, Equals(1));
+	});
+}
+
+
 go_bandit([](){
 	describe("pool_allocator<uint8_t>:", [](){
-		common_tests <uint8_t>();
+		typed_tests <uint8_t>();
 	});
 
 	describe("pool_allocator<uint64_t>:", [](){
-		common_tests <uint64_t>();
+		typed_tests <uint64_t>();
+	});
+	
+	describe("pool_allocator", [](){
+		common_tests();
 	});
 });
