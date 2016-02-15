@@ -12,8 +12,9 @@ LDFLAGS		+= $(LDFLAGS_COVERAGE)
 
 OBJECTS		=	bp_support_sparse_tests.o \
 				map_adaptor_tests.o \
-				test_main.o \
-				trie_tests.o
+				pool_allocator_tests.o \
+				trie_tests.o \
+				test_main.o
 
 all: tests
 
