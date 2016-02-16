@@ -30,6 +30,7 @@ namespace asm_lsw {
 		std::size_t m_amount{0};
 		
 	public:
+		space_requirement() = default;
 		space_requirement(uintptr_t addr): m_addr(addr) {}
 
 		// Calculate space requirement for (count * sizeof(t_element)) with proper alignment.
@@ -87,11 +88,10 @@ namespace asm_lsw { namespace detail {
 		}
 		
 		template <typename t_element>
-		void allocate_pool(std::size_t n)
+		void allocate_pool_bytes(std::size_t size)
 		{
 			assert(!m_ptr.get());
-			
-			auto const size(n * sizeof(t_element));
+
 			m_ptr.reset(
 				reinterpret_cast <unsigned char *> (
 					new std::aligned_storage <1, alignof(t_element)>[size]
@@ -100,6 +100,13 @@ namespace asm_lsw { namespace detail {
 			
 			m_n = size;
 			m_idx = 0;
+		}
+		
+		template <typename t_element>
+		void allocate_pool(std::size_t n)
+		{
+			auto const size(n * sizeof(t_element));
+			allocate_pool_bytes <t_element>(size);
 		}
 		
 		void destroy_pool()
@@ -141,9 +148,14 @@ namespace asm_lsw {
 	class pool_allocator
 	{
 		template <typename> friend class pool_allocator;
+		template <typename T, typename U> friend bool operator==(pool_allocator <T> const &, pool_allocator <U> const &);
 		
 	public:
 		typedef t_element value_type;
+		typedef std::true_type propagate_on_container_copy_assignment;
+		typedef std::true_type propagate_on_container_move_assignment;
+		typedef std::true_type propagate_on_container_swap;
+		typedef std::false_type is_always_equal;
 		
 		template <typename U>
 		struct rebind
@@ -155,16 +167,28 @@ namespace asm_lsw {
 		std::shared_ptr <detail::pool_allocator_impl> m_a;
 		
 	public:
-		pool_allocator(std::size_t n):
+		pool_allocator(std::size_t n = 0):
 			m_a(new detail::pool_allocator_impl())
 		{
 			m_a->allocate_pool <value_type>(n);
+		}
+		
+		pool_allocator(space_requirement const &sr):
+			m_a(new detail::pool_allocator_impl())
+		{
+			m_a->allocate_pool_bytes <value_type>(sr.amount());
 		}
 		
 		template <typename U>
 		pool_allocator(pool_allocator <U> const &other)
 		{
 			m_a = other.m_a;
+		}
+		
+		pool_allocator select_on_container_copy_construction() const
+		{
+			// Return a copy.
+			return pool_allocator(*this);
 		}
 		
 		value_type *allocate(std::size_t n)
