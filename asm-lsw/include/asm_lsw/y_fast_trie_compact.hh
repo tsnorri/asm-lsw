@@ -24,7 +24,7 @@
 
 namespace asm_lsw {
 	
-	template <template <typename ...> class t_vector, typename t_key, typename t_val>
+	template <typename t_spec>
 	class map_adaptor_phf;
 	
 	template <typename t_key, typename t_value>
@@ -35,7 +35,7 @@ namespace asm_lsw {
 	
 	
 	template <typename t_key, typename t_value>
-	using y_fast_trie_compact_spec = y_fast_trie_base_spec <t_key, t_value, std::vector, map_adaptor_phf, x_fast_trie_compact>;
+	using y_fast_trie_compact_spec = y_fast_trie_base_spec <t_key, t_value, std::vector, fast_trie_compact_map_adaptor, x_fast_trie_compact>;
 	
 	
 	// Use perfect hashing instead of the one provided by STL.

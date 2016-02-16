@@ -31,6 +31,8 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value = void>
 	class x_fast_trie : public x_fast_trie_base <x_fast_trie_spec <t_key, t_value>>
 	{
+		template <typename, typename> friend class x_fast_trie_compact;
+		
 	protected:
 		typedef x_fast_trie_base <x_fast_trie_spec <t_key, t_value>> base_class;
 		typedef typename base_class::size_type level_idx_type;
