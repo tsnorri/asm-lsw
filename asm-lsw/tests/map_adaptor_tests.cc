@@ -16,6 +16,7 @@
 
 
 #include <asm_lsw/map_adaptors.hh>
+#include <asm_lsw/pool_allocator.hh>
 #include <bandit/bandit.h>
 #include <boost/format.hpp>
 #include <typeinfo>
@@ -57,28 +58,27 @@ void common_tests(t_adaptor const &adaptor, t_map const &test_values)
 }
 
 
-template <typename t_adaptor, template <typename ...> class t_map, typename t_key, typename t_value>
-void test_one_adaptor(t_adaptor &adaptor, t_map <t_key, t_value> const &test_values)
-{
-	describe(boost::str(boost::format("%s:") % typeid(adaptor).name()).c_str(), [&](){
-		auto tv_copy(test_values);
-		adaptor = std::move(t_adaptor(tv_copy));
-		common_tests(adaptor, test_values);
-	});
-}
-
-
 template <template <typename ...> class t_map, typename t_key, typename t_value>
 void test_adaptors(t_map <t_key, t_value> const &test_values)
 {
 	{
 		asm_lsw::map_adaptor <t_map, t_key, t_value> adaptor;
-		test_one_adaptor(adaptor, test_values);
+		auto tv_copy(test_values);
+		describe(boost::str(boost::format("%s:") % typeid(adaptor).name()).c_str(), [&](){
+			adaptor = std::move(decltype(adaptor)(tv_copy));
+			common_tests(adaptor, test_values);
+		});
 	}
 
 	{
-		asm_lsw::map_adaptor_phf <std::vector, t_key, t_value> adaptor;
-		test_one_adaptor(adaptor, test_values);
+		typedef asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, t_key, t_value> adaptor_spec;
+		auto tv_copy(test_values);
+		asm_lsw::map_adaptor_phf_builder <adaptor_spec, decltype(test_values)> builder(tv_copy);
+		
+		describe(boost::str(boost::format("%s:") % typeid(typename decltype(builder)::adaptor_type).name()).c_str(), [&](){
+			typename decltype(builder)::adaptor_type adaptor(builder);
+			common_tests(adaptor, test_values);
+		});
 	}
 }
 
