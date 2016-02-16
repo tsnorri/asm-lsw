@@ -22,6 +22,45 @@
 #include <memory>
 
 
+namespace asm_lsw {
+	class space_requirement
+	{
+	protected:
+		uintptr_t m_addr{0};
+		std::size_t m_amount{0};
+		
+	public:
+		space_requirement(uintptr_t addr): m_addr(addr) {}
+
+		// Calculate space requirement for (count * sizeof(t_element)) with proper alignment.
+		template <typename t_element>
+		static void bytes_from_address(uintptr_t const addr, std::size_t const count, std::size_t &size, std::size_t &add)
+		{
+			uintptr_t const al(alignof(t_element));
+			uintptr_t const diff(addr % al);
+			add = (diff ? (al - diff) : 0);
+			size = (count * sizeof(t_element));
+		}
+		
+		template <typename t_element>
+		static std::size_t bytes_from_address(uintptr_t const addr, std::size_t const count)
+		{
+			std::size_t size{0}, add{0};
+			bytes_from_address <t_element>(addr, count, size, add);
+			return size + add;
+		}
+		
+		std::size_t amount() const { return m_amount; }
+		
+		template <typename t_element>
+		void add(std::size_t count)
+		{
+			m_amount += bytes_from_address <t_element>(m_addr, count);
+		}
+	};
+}
+
+
 namespace asm_lsw { namespace detail {
 	class pool_allocator_impl
 	{
@@ -75,12 +114,10 @@ namespace asm_lsw { namespace detail {
 		unsigned char *allocate(std::size_t n)
 		{
 			// Make sure that the pointer is aligned properly.
-			uintptr_t const al(alignof(t_element));
 			uintptr_t const start(reinterpret_cast <uintptr_t>(m_ptr.get()));
 			uintptr_t const addr(start + m_idx);
-			uintptr_t const diff(addr % al);
-			std::size_t add(diff ? (al - diff) : 0);
-			std::size_t const size(n * sizeof(t_element));
+			std::size_t size{0}, add{0};
+			space_requirement::bytes_from_address <t_element>(addr, n, size, add);
 			
 			// Compare the byte counts (not addresses).
 			if (m_idx + add + size <= m_n)
@@ -99,6 +136,7 @@ namespace asm_lsw { namespace detail {
 
 
 namespace asm_lsw {
+	
 	template <typename t_element>
 	class pool_allocator
 	{
