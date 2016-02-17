@@ -43,7 +43,7 @@ namespace asm_lsw {
 
 
 	// FIXME: used by the base class.
-	template <typename t_key>
+	template <typename t_key, unsigned int t_levels>
 	class x_fast_trie_edge
 	{
 	protected:
@@ -64,6 +64,16 @@ namespace asm_lsw {
 
 		key_type key() const { return m_key; }
 		bool is_descendant() const { return m_is_descendant; }	
+		bool is_descendant(unsigned int const level, key_type const branch) const
+		{
+			if (level)
+			{
+				assert(0 == branch || 1 == branch);
+				key_type const ind(m_key >> level);
+				assert(m_is_descendant == ((0x1 & ind) == (!branch)));
+			}
+			return m_is_descendant;
+		}
 	};
 
 

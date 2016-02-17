@@ -43,10 +43,10 @@ namespace asm_lsw {
 	public:
 		typedef typename t_spec::key_type key_type;
 		typedef typename t_spec::value_type value_type;
-		static int const s_levels{std::numeric_limits <key_type>::digits};
+		static unsigned int const s_levels{std::numeric_limits <key_type>::digits};
 
 	protected:
-		typedef x_fast_trie_edge <key_type> edge;
+		typedef x_fast_trie_edge <key_type, s_levels> edge;
 		typedef std::array <edge, 2> node;
 		typedef x_fast_trie_leaf_link <key_type, value_type> leaf_link;
 		typedef x_fast_trie_trait<key_type, value_type> trait;
@@ -142,6 +142,8 @@ namespace asm_lsw {
 		typename trait::value_type const &iterator_value(const_leaf_iterator const &it) const { trait t; return t.value(it); };
 
 		void print() const;
+		void print_level(unsigned int const) const __attribute__((noinline));
+		void print_level(level_map const &) const;
 	};
 	
 	
@@ -281,7 +283,7 @@ namespace asm_lsw {
 		key_type const next_branch(0x1 & (key >> level));
 		edge const &edge(it->second[next_branch]);
 		
-		assert(1 == level || edge.is_descendant());
+		assert(1 == level || edge.is_descendant(level, next_branch));
 		
 		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
@@ -375,6 +377,42 @@ namespace asm_lsw {
 
 
 	template <typename t_spec>
+	void x_fast_trie_base <t_spec>::print_level(unsigned int const i) const
+	{
+		print_level(m_lss[i]);
+	}
+
+
+	template <typename t_spec>
+	void x_fast_trie_base <t_spec>::print_level(level_map const &lmap) const
+	{
+		for (auto const &kv : lmap)
+		{
+			// In case of the PHF map adaptor, kv.first points to the
+			// first item in the pair (which is the key as expected),
+			// not the vector index.
+			auto const key(kv.first);
+			auto const left(kv.second[0].key());
+			auto const right(kv.second[1].key());
+			bool const l_is_descendant(kv.second[0].is_descendant());
+			bool const r_is_descendant(kv.second[1].is_descendant());
+			std::cerr << boost::format(" (%02x [%02x]: %02x") % (+key) % (+(0x1 & key)) % (+left);
+			if (l_is_descendant)
+				std::cerr << " (d) ";
+			else
+				std::cerr << "     ";
+
+			std::cerr << boost::format("%02x") % (+right);
+			if (r_is_descendant)
+				std::cerr << " (d) ";
+			else
+				std::cerr << "     ";
+			std::cerr << ")";
+		}
+	}
+
+
+	template <typename t_spec>
 	void x_fast_trie_base <t_spec>::print() const
 	{
 		std::cerr << "LSS:\n[level]: key [0x1 & key]: left (d if descendant) right (d if descendant)\n";
@@ -385,30 +423,7 @@ namespace asm_lsw {
 			for (auto lss_it(m_lss.crbegin()), lss_end(m_lss.crend()); lss_it != lss_end; ++lss_it)
 			{
 				std::cerr << boost::format("\t[%02x]:") % (size - i - 1);
-				for (auto node_it(lss_it->cbegin()), node_end(lss_it->cend()); node_it != node_end; ++node_it)
-				{
-					// In case of the PHF map adaptor, node_it->first points to the
-					// first item in the pair (which is the key as expected),
-					// not the vector index.
-					auto const key(node_it->first);
-					auto const left(node_it->second[0].key());
-					auto const right(node_it->second[1].key());
-					bool const l_is_descendant(node_it->second[0].is_descendant());
-					bool const r_is_descendant(node_it->second[1].is_descendant());
-					std::cerr << boost::format(" (%02x [%02x]: %02x") % (+key) % (+(0x1 & key)) % (+left);
-					if (l_is_descendant)
-						std::cerr << " (d) ";
-					else
-						std::cerr << "     ";
-
-					std::cerr << boost::format("%02x") % (+right);
-					if (r_is_descendant)
-						std::cerr << " (d) ";
-					else
-						std::cerr << "     ";
-					std::cerr << ")";
-				}
-	
+				print_level(*lss_it);
 				std::cerr << "\n";
 				++i;
 			}

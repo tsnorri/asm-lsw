@@ -189,6 +189,7 @@ namespace asm_lsw {
 		// Update the level map.
 		for (level_idx_type i(0); i < base_class::s_levels; ++i)
 		{
+			// s_levels - 1 is the topmost level (no bits set).
 			level_idx_type const level(base_class::s_levels - i);
 			key_type const lk(this->level_key(key, level));
 			key_type const nlk(this->level_key(key, level - 1));
@@ -200,7 +201,7 @@ namespace asm_lsw {
 			{
 				node &node(node_it->second);
 				node[next_branch] = edge(nlk, false);
-				if (node[other_branch].is_descendant())
+				if (node[other_branch].is_descendant(level - 1, other_branch))
 				{
 					auto desc(node[other_branch].key());
 					node[other_branch] = edge(other_branch ? std::max(desc, key) : std::min(desc, key), true);
@@ -246,7 +247,7 @@ namespace asm_lsw {
 			key_type const target_branch(0x1 & nlk);
 			key_type const other_branch(!target_branch);
 
-			if (node[other_branch].is_descendant())
+			if (node[other_branch].is_descendant(i, other_branch))
 				this->m_lss[i].map().erase(node_it);
 			else
 			{
@@ -267,7 +268,7 @@ namespace asm_lsw {
 			key_type const target_branch(0x1 & nlk);
 			key_type const other_branch(!target_branch);
 
-			if (node[other_branch].is_descendant())
+			if (node[other_branch].is_descendant(i, other_branch))
 				node[other_branch] = edge(other_branch ? prev : next, true);
 			
 			++i;
