@@ -44,7 +44,7 @@ namespace asm_lsw {
 
 	// FIXME: used by the base class.
 	template <typename t_key>
-	class x_fast_trie_node_value
+	class x_fast_trie_edge
 	{
 	protected:
 		typedef t_key key_type;
@@ -54,9 +54,9 @@ namespace asm_lsw {
 		bool m_is_descendant;	// If true, points to m_leaf_links.
 		
 	public:
-		x_fast_trie_node_value(): x_fast_trie_node_value(0, false) {};
+		x_fast_trie_edge(): x_fast_trie_edge(0, false) {};
 
-		x_fast_trie_node_value(key_type key, bool is_descendant):
+		x_fast_trie_edge(key_type key, bool is_descendant):
 			m_key(key),
 			m_is_descendant(is_descendant)
 		{

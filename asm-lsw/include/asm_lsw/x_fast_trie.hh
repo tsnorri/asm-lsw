@@ -38,7 +38,7 @@ namespace asm_lsw {
 		typedef typename base_class::size_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::node node;
-		typedef typename base_class::node_value node_value;
+		typedef typename base_class::edge edge;
 
 	public:
 		typedef typename base_class::key_type key_type;
@@ -199,18 +199,18 @@ namespace asm_lsw {
 			if (find_node(key, level - 1, node_it))
 			{
 				node &node(node_it->second);
-				node[next_branch] = node_value(nlk, false);
+				node[next_branch] = edge(nlk, false);
 				if (node[other_branch].is_descendant())
 				{
 					auto desc(node[other_branch].key());
-					node[other_branch] = node_value(other_branch ? std::max(desc, key) : std::min(desc, key), true);
+					node[other_branch] = edge(other_branch ? std::max(desc, key) : std::min(desc, key), true);
 				}
 			}
 			else
 			{
 				node node;
-				node[next_branch] = node_value(nlk, false);
-				node[other_branch] = node_value(key, true);
+				node[next_branch] = edge(nlk, false);
+				node[other_branch] = edge(key, true);
 				level_idx_type lss_idx(level - 1);
 				this->m_lss[lss_idx].map().emplace(lk, std::move(node));
 			}
@@ -250,7 +250,7 @@ namespace asm_lsw {
 				this->m_lss[i].map().erase(node_it);
 			else
 			{
-				node[target_branch] = node_value(target_branch ? prev : next, true);
+				node[target_branch] = edge(target_branch ? prev : next, true);
 				break;
 			}
 			
@@ -268,7 +268,7 @@ namespace asm_lsw {
 			key_type const other_branch(!target_branch);
 
 			if (node[other_branch].is_descendant())
-				node[other_branch] = node_value(other_branch ? prev : next, true);
+				node[other_branch] = edge(other_branch ? prev : next, true);
 			
 			++i;
 		}

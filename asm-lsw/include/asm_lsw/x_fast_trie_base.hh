@@ -30,7 +30,7 @@
 
 namespace asm_lsw {
 	
-	// TODO: for t_key or t_value equal to or larger than some threshold (e.g. pointer size, unsigned long long), use a specialization that stores pointers in node_value and leaf_link?
+	// TODO: for t_key or t_value equal to or larger than some threshold (e.g. pointer size, unsigned long long), use a specialization that stores pointers in edge and leaf_link?
 
 	template <typename t_spec>
 	class x_fast_trie_base
@@ -46,8 +46,8 @@ namespace asm_lsw {
 		static int const s_levels{std::numeric_limits <key_type>::digits};
 
 	protected:
-		typedef x_fast_trie_node_value <key_type> node_value;
-		typedef std::array <node_value, 2> node;
+		typedef x_fast_trie_edge <key_type> edge;
+		typedef std::array <edge, 2> node;
 		typedef x_fast_trie_leaf_link <key_type, value_type> leaf_link;
 		typedef x_fast_trie_trait<key_type, value_type> trait;
 		typedef typename t_spec::template map_adaptor_type <key_type, node> level_map;
@@ -279,7 +279,7 @@ namespace asm_lsw {
 		find_lowest_ancestor(trie, key, it, level);
 		
 		key_type const next_branch(0x1 & (key >> level));
-		node_value const &node(it->second[next_branch]);
+		edge const &node(it->second[next_branch]);
 		
 		assert(1 == level || node.is_descendant());
 		
