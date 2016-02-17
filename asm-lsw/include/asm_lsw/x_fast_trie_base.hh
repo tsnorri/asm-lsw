@@ -279,13 +279,13 @@ namespace asm_lsw {
 		find_lowest_ancestor(trie, key, it, level);
 		
 		key_type const next_branch(0x1 & (key >> level));
-		edge const &node(it->second[next_branch]);
+		edge const &edge(it->second[next_branch]);
 		
-		assert(1 == level || node.is_descendant());
+		assert(1 == level || edge.is_descendant());
 		
-		nearest = trie.m_leaf_links.find(node.key());
+		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
-		assert(node.key() == nearest->first);
+		assert(edge.key() == nearest->first);
 	}
 
 
