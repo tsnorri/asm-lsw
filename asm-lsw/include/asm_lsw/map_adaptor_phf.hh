@@ -224,6 +224,9 @@ namespace asm_lsw {
 	template <typename t_spec, typename t_map>
 	class map_adaptor_phf_builder
 	{
+	protected:
+		struct call_protected_constructor {};
+		
 	public:
 		typedef typename t_spec::key_type										key_type;
 		typedef typename t_spec::value_type										value_type;
@@ -235,6 +238,7 @@ namespace asm_lsw {
 		
 	protected:
 		phf_wrapper				m_phf;
+		allocator_type			m_allocator;	// FIXME: always copy?
 		t_map					&m_map;
 		
 	public:
@@ -252,11 +256,15 @@ namespace asm_lsw {
 		}
 		
 		phf_wrapper &phf() { return m_phf; }
-		allocator_type allocator() const { return allocator_type(element_count()); }
+		allocator_type &allocator() { return m_allocator; }
 		t_map &map() { return m_map; }
 
 		map_adaptor_phf_builder();
 		map_adaptor_phf_builder(t_map &map);
+		map_adaptor_phf_builder(t_map &map, allocator_type const &allocator);
+	
+	protected:
+		map_adaptor_phf_builder(t_map &map, call_protected_constructor);
 	};
 	
 	
@@ -404,6 +412,22 @@ namespace asm_lsw {
 	
 	template <typename t_spec, typename t_map>
 	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(t_map &map):
+		map_adaptor_phf_builder(map, call_protected_constructor())
+	{
+		m_allocator = std::move(allocator_type(element_count()));
+	}
+	
+	
+	template <typename t_spec, typename t_map>
+	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(t_map &map, allocator_type const &allocator):
+		map_adaptor_phf_builder(map, call_protected_constructor())
+	{
+		m_allocator = std::move(allocator_type(allocator));
+	}
+	
+	
+	template <typename t_spec, typename t_map>
+	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(t_map &map, call_protected_constructor):
 		m_map(map)
 	{
 		// Make a copy of the keys to generate the hash function.
