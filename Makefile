@@ -1,6 +1,7 @@
 include local.mk
+include common.mk
 
-.PHONY: all clean-all clean clean-dependencies dependencies
+.PHONY: all clean-all clean clean-dependencies dependencies cloc
 
 all: dependencies
 	$(MAKE) -C asm-lsw
@@ -15,6 +16,9 @@ clean-dependencies:
 	cd lib/sdsl/build && ./clean.sh
 
 dependencies: lib/phf/libphf.a lib/sdsl/build/lib/libsdsl.a
+
+cloc:
+	$(CLOC) asm-lsw/include lib/sdsl/include/sdsl/csa_rao*.hpp
 
 lib/phf/libphf.a:
 	CC="$(CC)" \

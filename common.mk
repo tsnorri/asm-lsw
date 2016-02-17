@@ -5,6 +5,7 @@ CC		?= gcc
 CXX		?= g++
 GCOVR	?= gcovr
 MKDIR	?= mkdir
+CLOC	?= cloc
 
 WARNING_FLAGS	= -Wall -Werror -Wno-unused -Wno-missing-braces
 
