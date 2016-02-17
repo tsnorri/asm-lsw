@@ -56,7 +56,8 @@ namespace asm_lsw {
 		template <typename t_element>
 		void add(std::size_t count)
 		{
-			m_amount += bytes_from_address <t_element>(m_addr, count);
+			auto const amt(bytes_from_address <t_element>(m_addr + m_amount, count));
+			m_amount += amt;
 		}
 	};
 }
@@ -76,6 +77,11 @@ namespace asm_lsw { namespace detail {
 		pool_allocator_impl(pool_allocator_impl &&) = default;
 		pool_allocator_impl &operator=(pool_allocator_impl const &) & = delete;
 		pool_allocator_impl &operator=(pool_allocator_impl &&) & = default;
+		
+		std::size_t bytes_total() const
+		{
+			return m_n;
+		}
 		
 		std::size_t bytes_left() const
 		{
@@ -167,7 +173,12 @@ namespace asm_lsw {
 		std::shared_ptr <detail::pool_allocator_impl> m_a;
 		
 	public:
-		pool_allocator(std::size_t n = 0):
+		pool_allocator():
+			m_a(new detail::pool_allocator_impl())
+		{
+		}
+		
+		pool_allocator(std::size_t n):
 			m_a(new detail::pool_allocator_impl())
 		{
 			m_a->allocate_pool <value_type>(n);
@@ -176,6 +187,12 @@ namespace asm_lsw {
 		pool_allocator(space_requirement const &sr):
 			m_a(new detail::pool_allocator_impl())
 		{
+			m_a->allocate_pool_bytes <value_type>(sr.amount());
+		}
+		
+		void allocate_pool(space_requirement const &sr)
+		{
+			// The called function contains the required assertion.
 			m_a->allocate_pool_bytes <value_type>(sr.amount());
 		}
 		
