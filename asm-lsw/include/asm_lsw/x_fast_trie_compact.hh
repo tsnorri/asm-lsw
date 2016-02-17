@@ -72,44 +72,67 @@ namespace asm_lsw {
 		x_fast_trie_compact()
 	{
 		typedef typename std::remove_reference <decltype(other)>::type other_adaptor_type;
+		typedef typename level_map::template builder_type <
+			typename other_adaptor_type::level_map::map_type
+		> lss_builder_type;
+		typedef typename leaf_link_map::template builder_type <
+			typename other_adaptor_type::leaf_link_map::map_type
+		> leaf_link_map_builder_type;
+		typedef typename lss_builder_type::adaptor_type lss_adaptor_type;
+		typedef typename leaf_link_map_builder_type::adaptor_type leaf_link_map_adaptor_type;
 		
-		// Calculate the total space requirement.
-		// Since new allocates space with correct alignment w.r.t. all fundamental types,
-		// the starting address may be assumed to be zero.
-		space_requirement sr;
+		// Create an empty allocator to be passed to the builders.
+		pool_allocator <typename level_map::kv_type> allocator;
 		
-		for (auto const &v : other.m_lss)
-			sr.add <typename level_map::kv_type>(v.size());
-		
-		sr.add <typename leaf_link_map::kv_type>(other.m_leaf_links.size());
-		
-		// Allocate memory.
-		pool_allocator <typename level_map::kv_type> allocator(sr);
-		// XXX Pass the allocator.
-		
-		// LSS
+		// Create the builders.
 		typename lss::size_type const count(this->m_lss.size());
 		assert(other.m_lss.size() == count);
+		
+		std::vector <lss_builder_type> lss_builders;
+		lss_builders.reserve(count);
 		for (typename lss::size_type i(0); i < count; ++i)
 		{
 			// Move the contents of the other map.
 			auto &map(other.m_lss[i].map());
-			
-			typename level_map::template builder_type <typename other_adaptor_type::level_map::map_type> builder(map);
-			typename decltype(builder)::adaptor_type adaptor(builder);
-			
-			// Store the new adaptor.
-			this->m_lss[i] = std::move(adaptor);
+			lss_builder_type builder(map, allocator);
+		
+			lss_builders.emplace_back(std::move(builder));
 		}
 		
-		// Leaf links
-		auto &map(other.m_leaf_links.map());
-		typename leaf_link_map::template builder_type <typename other_adaptor_type::leaf_link_map::map_type> builder(map);
-		typename decltype(builder)::adaptor_type adaptor(builder);
-		this->m_leaf_links = std::move(adaptor);
+		leaf_link_map_builder_type leaf_link_map_builder(other.m_leaf_links.map(), allocator);
+		
+		// Calculate the space needed.
+		// Since new allocates space with correct alignment w.r.t. all fundamental types,
+		// the starting address may be assumed to be zero.
+		space_requirement sr;
+		
+		for (auto const &v : lss_builders)
+			sr.add <typename level_map::kv_type>(v.element_count());
+		
+		sr.add <typename leaf_link_map::kv_type>(leaf_link_map_builder.element_count());
+		
+		// Allocate memory.
+		allocator.allocate_pool(sr);
+		
+		// Create the adaptors.
+		{
+			std::size_t i(0);
+			for (auto &builder : lss_builders)
+			{
+				lss_adaptor_type adaptor(builder);
+				this->m_lss[i] = std::move(adaptor);
+				++i;
+			}
+			
+			leaf_link_map_adaptor_type adaptor(leaf_link_map_builder);
+			this->m_leaf_links = std::move(adaptor);
+		}
 		
 		// Min. value
 		this->m_min = other.m_min;
+		
+		// The allocator shouldn't have any space left at this point.
+		assert(0 == allocator.bytes_left());
 	}
 }
 
