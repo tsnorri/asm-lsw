@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_X_FAST_TRIE_COMPACT_HH
 #define ASM_LSW_X_FAST_TRIE_COMPACT_HH
 
+#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/pool_allocator.hh>
 #include <asm_lsw/x_fast_trie_base.hh>
 
@@ -28,15 +29,6 @@ namespace asm_lsw {
 	class x_fast_trie;
 	
 	// FIXME: move to namespace detail.
-	// Fix the allocator parameter of the vector used by the adaptor.
-	// Replace the second parameter if a different allocator is desired.
-	template <template <typename ...> class t_vector, typename t_key, typename t_value>
-	using x_fast_trie_compact_map_adaptor_spec = map_adaptor_phf_spec <t_vector, pool_allocator, t_key, t_value>;
-	
-	// Pass the adaptor parameters received from the trie to the specification.
-	template <template <typename ...> class t_vector, typename t_key, typename t_value>
-	using fast_trie_compact_map_adaptor = map_adaptor_phf <x_fast_trie_compact_map_adaptor_spec <t_vector, t_key, t_value>>;
-	
 	template <typename t_key, typename t_value>
 	using x_fast_trie_compact_spec = x_fast_trie_base_spec <t_key, t_value, std::vector, fast_trie_compact_map_adaptor>;
 	

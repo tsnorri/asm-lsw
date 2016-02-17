@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_Y_FAST_TRIE_COMPACT_HH
 #define ASM_LSW_Y_FAST_TRIE_COMPACT_HH
 
+#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/y_fast_trie_base.hh>
 #include <vector>
 
