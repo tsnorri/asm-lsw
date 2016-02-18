@@ -194,46 +194,8 @@ namespace asm_lsw {
 		map[prev].next = next;
 		map[next].prev = prev;
 		map.erase(leaf_it);
-		
-		bool continue_erasing = true;
-		
-		level_idx_type i(0);
-		while (i < base_class::s_levels)
-		{
-			typename level_map::iterator node_it;
-			find_node(key, i, node_it);
-			node &node(node_it->second);
 
-			key_type const nlk(this->m_lss.level_key(key, i));
-			key_type const target_branch(0x1 & nlk);
-			key_type const other_branch(!target_branch);
-
-			if (node[other_branch].is_descendant())
-				this->m_lss.level(i).map().erase(node_it);
-			else
-			{
-				node[target_branch] = edge(target_branch ? prev : next, true);
-				break;
-			}
-			
-			++i;
-		}
-		
-		while (i < base_class::s_levels)
-		{
-			typename level_map::iterator node_it;
-			find_node(key, i, node_it);
-			node &node(node_it->second);
-
-			key_type const nlk(this->m_lss.level_key(key, i));
-			key_type const target_branch(0x1 & nlk);
-			key_type const other_branch(!target_branch);
-
-			if (node[other_branch].is_descendant())
-				node[other_branch] = edge(other_branch ? prev : next, true);
-			
-			++i;
-		}
+		this->m_lss.erase_key(key, prev, next);
 		
 		if (key < prev)
 			this->m_min = next;

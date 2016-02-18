@@ -93,10 +93,11 @@ namespace asm_lsw {
 			template <typename t_lss, typename t_iterator>
 			static bool find_node(t_lss &lss, key_type const key, level_idx_type const level, t_iterator &node);
 
+			key_type level_key(key_type const key, level_idx_type const level) const { return key >> level; }
+
 		public:
 			lss_access() = default;
 
-			key_type level_key(key_type const key, level_idx_type const level) const { return key >> level; }
 			typename level_map::size_type level_size(level_idx_type const idx) const;
 			level_map &level(level_idx_type const);
 			level_map const &level(level_idx_type const) const;
@@ -108,6 +109,7 @@ namespace asm_lsw {
 			bool find_node(key_type const key, level_idx_type const level, typename level_map::const_iterator &node) const;
 
 			void update_levels(key_type const key);
+			void erase_key(key_type const key, key_type const prev, key_type const next);
 		};
 
 	protected:
@@ -278,6 +280,49 @@ namespace asm_lsw {
 				level_idx_type lss_idx(level - 1);
 				this->m_lss[lss_idx].map().emplace(lk, std::move(node));
 			}
+		}
+	}
+
+
+	template <typename t_spec>
+	void x_fast_trie_base <t_spec>::lss_access::erase_key(key_type const key, key_type const prev, key_type const next)
+	{
+		level_idx_type i(0);
+		while (i < s_levels)
+		{
+			typename level_map::iterator node_it;
+			find_node(key, i, node_it);
+			node &node(node_it->second);
+
+			key_type const nlk(level_key(key, i));
+			key_type const target_branch(0x1 & nlk);
+			key_type const other_branch(!target_branch);
+
+			if (node[other_branch].is_descendant())
+				m_lss[i].map().erase(node_it);
+			else
+			{
+				node[target_branch] = edge(target_branch ? prev : next, true);
+				break;
+			}
+			
+			++i;
+		}
+		
+		while (i < s_levels)
+		{
+			typename level_map::iterator node_it;
+			find_node(key, i, node_it);
+			node &node(node_it->second);
+
+			key_type const nlk(level_key(key, i));
+			key_type const target_branch(0x1 & nlk);
+			key_type const other_branch(!target_branch);
+
+			if (node[other_branch].is_descendant())
+				node[other_branch] = edge(other_branch ? prev : next, true);
+			
+			++i;
 		}
 	}
 	
