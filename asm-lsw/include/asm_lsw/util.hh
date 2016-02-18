@@ -23,7 +23,10 @@
 namespace asm_lsw {
 	// Preserve C++11 compatibility.
 	template <typename T>
-	using remove_c_t = typename std::remove_const<T>::type;
+	using remove_c_t = typename std::remove_const <T>::type;
+
+	template <typename T>
+	using remove_ref_t = typename std::remove_reference <T>::type;
 }
 
 #endif
