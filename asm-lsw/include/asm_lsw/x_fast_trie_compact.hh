@@ -20,6 +20,7 @@
 
 #include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/pool_allocator.hh>
+#include <asm_lsw/util.hh>
 #include <asm_lsw/x_fast_trie_base.hh>
 
 
@@ -38,13 +39,17 @@ namespace asm_lsw {
 	{
 	protected:
 		typedef x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value>> base_class;
-		typedef typename base_class::lss lss;
+		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::leaf_link_map leaf_link_map;
+		typedef typename base_class::node node;
+		typedef typename base_class::edge edge;
 		
 	public:
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
+		typedef typename base_class::leaf_iterator leaf_iterator;
+		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 		typedef typename base_class::iterator iterator;
 		typedef typename base_class::const_iterator const_iterator;
 		
@@ -63,7 +68,7 @@ namespace asm_lsw {
 	x_fast_trie_compact <t_key, t_value>::x_fast_trie_compact(x_fast_trie <key_type, value_type> &other):
 		x_fast_trie_compact()
 	{
-		typedef typename std::remove_reference <decltype(other)>::type other_adaptor_type;
+		typedef remove_ref_t <decltype(other)> other_adaptor_type;
 		typedef typename level_map::template builder_type <
 			typename other_adaptor_type::level_map::map_type
 		> lss_builder_type;
@@ -77,15 +82,14 @@ namespace asm_lsw {
 		pool_allocator <typename level_map::kv_type> allocator;
 		
 		// Create the builders.
-		typename lss::size_type const count(this->m_lss.size());
-		assert(other.m_lss.size() == count);
+		assert(remove_ref_t <decltype(other)>::s_levels == base_class::s_levels);
 		
 		std::vector <lss_builder_type> lss_builders;
-		lss_builders.reserve(count);
-		for (typename lss::size_type i(0); i < count; ++i)
+		lss_builders.reserve(base_class::s_levels);
+		for (level_idx_type i(0); i < base_class::s_levels; ++i)
 		{
 			// Move the contents of the other map.
-			auto &map(other.m_lss[i].map());
+			auto &map(other.m_lss.level(i).map());
 			lss_builder_type builder(map, allocator);
 		
 			lss_builders.emplace_back(std::move(builder));
@@ -112,7 +116,7 @@ namespace asm_lsw {
 			for (auto &builder : lss_builders)
 			{
 				lss_adaptor_type adaptor(builder);
-				this->m_lss[i] = std::move(adaptor);
+				this->m_lss.level(i) = std::move(adaptor);
 				++i;
 			}
 			

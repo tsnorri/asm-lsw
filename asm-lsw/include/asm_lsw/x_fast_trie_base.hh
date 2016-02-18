@@ -19,6 +19,7 @@
 #define ASM_LSW_X_FAST_TRIE_BASE_HH
 
 #include <asm_lsw/map_adaptors.hh>
+#include <asm_lsw/util.hh>
 #include <asm_lsw/x_fast_trie_helper.hh>
 #include <boost/format.hpp>
 #include <array>
@@ -39,6 +40,9 @@ namespace asm_lsw {
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
 		template <typename, typename> friend class x_fast_trie_compact;
+
+	protected:
+		class lss_access;
 	
 	public:
 		typedef typename t_spec::key_type key_type;
@@ -52,8 +56,7 @@ namespace asm_lsw {
 		typedef x_fast_trie_trait<key_type, value_type> trait;
 		typedef typename t_spec::template map_adaptor_type <key_type, node> level_map;
 		typedef typename t_spec::template map_adaptor_type <key_type, leaf_link> leaf_link_map;
-		typedef std::array <level_map, s_levels> lss;
-		typedef typename lss::size_type level_idx_type;
+		typedef typename lss_access::level_idx_type level_idx_type;
 
 	public:
 		typedef typename leaf_link_map::iterator leaf_iterator;
@@ -76,8 +79,39 @@ namespace asm_lsw {
 			typedef typename t_container::const_iterator type;
 		};
 
+		class lss_access
+		{
+		public:
+			typedef x_fast_trie_base::level_map level_map;
+			typedef std::array <level_map, s_levels> lss;
+			typedef typename lss::size_type level_idx_type;
+
+		protected:
+			lss m_lss;
+
+		protected:
+			template <typename t_lss, typename t_iterator>
+			static bool find_node(t_lss &lss, key_type const key, level_idx_type const level, t_iterator &node);
+
+		public:
+			lss_access() = default;
+
+			key_type level_key(key_type const key, level_idx_type const level) const { return key >> level; }
+			typename level_map::size_type level_size(level_idx_type const idx) const;
+			level_map &level(level_idx_type const);
+			level_map const &level(level_idx_type const) const;
+
+			typename lss::const_reverse_iterator crbegin() const { return m_lss.crbegin(); }
+			typename lss::const_reverse_iterator crend() const { return m_lss.crend(); }
+
+			bool find_node(key_type const key, level_idx_type const level, typename level_map::iterator &node);
+			bool find_node(key_type const key, level_idx_type const level, typename level_map::const_iterator &node) const;
+
+			void update_levels(key_type const key);
+		};
+
 	protected:
-		lss m_lss;
+		lss_access m_lss;
 		leaf_link_map m_leaf_links;
 		key_type m_min;
 
@@ -112,9 +146,6 @@ namespace asm_lsw {
 			level_idx_type const top
 		);
 		
-		template <typename t_trie, typename t_iterator>
-		static bool find_node(t_trie &trie, key_type const key, level_idx_type const level, t_iterator &node);
-		
 	public:
 		x_fast_trie_base() = default;
 		x_fast_trie_base(x_fast_trie_base const &) = default;
@@ -123,7 +154,6 @@ namespace asm_lsw {
 		x_fast_trie_base &operator=(x_fast_trie_base &&) & = default;
 
 		size_type size() const { return m_leaf_links.size(); }
-		auto level_key(key_type const key, level_idx_type const level) const -> key_type;
 		bool contains(key_type const key) const;
 		key_type min_key() const { return m_min; } // Returns a meaningful value if the tree is not empty.
 		
@@ -143,15 +173,115 @@ namespace asm_lsw {
 
 		void print() const;
 	};
-	
-	
+
+
 	template <typename t_spec>
-	auto x_fast_trie_base <t_spec>::level_key(key_type const key, level_idx_type const level) const -> key_type
+	auto x_fast_trie_base <t_spec>::lss_access::level_size(level_idx_type const idx) const -> typename level_map::size_type
 	{
-		return (key >> level);
+		assert(0 <= idx);
+		assert(idx < s_levels);
+		return m_lss[idx].size();
 	}
 
 
+	template <typename t_spec>
+	auto x_fast_trie_base <t_spec>::lss_access::level(level_idx_type const idx) -> level_map &
+	{
+		assert(0 <= idx);
+		assert(idx < s_levels);
+		return m_lss[idx];
+	}
+
+
+	template <typename t_spec>
+	auto x_fast_trie_base <t_spec>::lss_access::level(level_idx_type const idx) const -> level_map const &
+	{
+		assert(0 <= idx);
+		assert(idx < s_levels);
+		return m_lss[idx];
+	}
+
+
+	template <typename t_spec>
+	template <typename t_lss, typename t_iterator>
+	bool x_fast_trie_base <t_spec>::lss_access::find_node(
+		t_lss &lss,
+		key_type const key,
+		level_idx_type const level,
+		t_iterator &node
+	)
+	{
+		assert(0 <= level);
+		assert(level < s_levels);
+
+		key_type const current_key(lss.level_key(key, 1 + level));
+
+		auto it(lss.m_lss[level].find(current_key));
+		if (lss.m_lss[level].cend() == it)
+			return false;
+
+		node = it;
+		return true;
+	}
+
+
+	template <typename t_spec>
+	bool x_fast_trie_base <t_spec>::lss_access::find_node(
+		key_type const key,
+		level_idx_type const level,
+		typename level_map::iterator &node
+	)
+	{
+		return find_node(*this, key, level, node);
+	}
+
+
+	template <typename t_spec>
+	bool x_fast_trie_base <t_spec>::lss_access::find_node(
+		key_type const key,
+		level_idx_type const level,
+		typename level_map::const_iterator &node
+	) const
+	{
+		return find_node(*this, key, level, node);
+	}
+
+
+	template <typename t_spec>
+	void x_fast_trie_base <t_spec>::lss_access::update_levels(key_type const key)
+	{
+		// Update the level map.
+		for (level_idx_type i(0); i < s_levels; ++i)
+		{
+			level_idx_type const level(s_levels - i);
+			key_type const lk(level_key(key, level));
+			key_type const nlk(level_key(key, level - 1));
+			key_type const next_branch(0x1 & nlk);
+			key_type const other_branch(!next_branch);
+			
+			typename level_map::iterator node_it;
+			if (find_node(key, level - 1, node_it))
+			{
+				node &node(node_it->second);
+				node[next_branch] = edge(nlk, false);
+				if (node[other_branch].is_descendant())
+				{
+					auto desc(node[other_branch].key());
+					node[other_branch] = edge(other_branch ? std::max(desc, key) : std::min(desc, key), true);
+				}
+			}
+			else
+			{
+				node node;
+				node[next_branch] = edge(nlk, false);
+				node[other_branch] = edge(key, true);
+				level_idx_type lss_idx(level - 1);
+				this->m_lss[lss_idx].map().emplace(lk, std::move(node));
+			}
+		}
+	}
+	
+	
 	template <typename t_spec>
 	bool x_fast_trie_base <t_spec>::contains(key_type const key) const
 	{
@@ -328,7 +458,7 @@ namespace asm_lsw {
 		
 		level_idx_type const mid((bottom + top) / 2);
 		
-		if (!find_node(trie, key, mid, ancestor))
+		if (!trie.m_lss.find_node(key, mid, ancestor))
 		{
 			// Candidate hasn't been found yet, conditionally return false.
 			return find_lowest_ancestor(trie, key, ancestor, level, 1 + mid, top);
@@ -349,27 +479,7 @@ namespace asm_lsw {
 		typename level_map::const_iterator &node
 	) const
 	{
-		return find_node(*this, key, level, node);
-	}
-
-
-	template <typename t_spec>
-	template <typename t_trie, typename t_iterator>
-	bool x_fast_trie_base <t_spec>::find_node(
-		t_trie &trie,
-		key_type const key,
-		level_idx_type const level,
-		t_iterator &node
-	)
-	{
-		key_type const current_key(trie.level_key(key, 1 + level));
-		
-		auto it(trie.m_lss[level].find(current_key));
-		if (trie.m_lss[level].cend() == it)
-			return false;
-		
-		node = it;
-		return true;
+		return m_lss.find_node(key, level, node);
 	}
 
 
@@ -379,7 +489,7 @@ namespace asm_lsw {
 		std::cerr << "LSS:\n[level]: key [0x1 & key]: left (d if descendant) right (d if descendant)\n";
 
 		{
-			decltype(s_levels) i(0);
+			remove_c_t <decltype(s_levels)> i(0);
 			for (auto lss_it(m_lss.crbegin()), lss_end(m_lss.crend()); lss_it != lss_end; ++lss_it)
 			{
 				std::cerr << boost::format("\t[%02x]:") % (s_levels - i - 1);

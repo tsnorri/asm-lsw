@@ -35,8 +35,9 @@ namespace asm_lsw {
 		
 	protected:
 		typedef x_fast_trie_base <x_fast_trie_spec <t_key, t_value>> base_class;
-		typedef typename base_class::size_type level_idx_type;
+		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
+		typedef typename base_class::leaf_link_map leaf_link_map;
 		typedef typename base_class::node node;
 		typedef typename base_class::edge edge;
 
@@ -47,9 +48,6 @@ namespace asm_lsw {
 		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 		typedef typename base_class::iterator iterator;
 		typedef typename base_class::const_iterator const_iterator;
-		
-	protected:
-		void update_level_map(key_type const key);
 		
 	public:
 		x_fast_trie() = default;
@@ -92,7 +90,7 @@ namespace asm_lsw {
 	{
 		// Update leaf links.
 		auto &map(this->m_leaf_links.map());
-		if (0 == this->m_lss[base_class::s_levels - 1].size())
+		if (0 == this->m_lss.level_size(base_class::s_levels - 1))
 		{
 			// Special case for empty trie to make things simpler.
 			map.emplace(
@@ -130,7 +128,7 @@ namespace asm_lsw {
 				this->m_min = key;
 			}
 		}
-		update_level_map(key);
+		this->m_lss.update_levels(key);
 	}
 	
 
@@ -140,7 +138,7 @@ namespace asm_lsw {
 	{
 		// Update leaf links.
 		auto &map(this->m_leaf_links.map());
-		if (0 == this->m_lss[base_class::s_levels - 1].size())
+		if (0 == this->m_lss.level_size(base_class::s_levels - 1))
 		{
 			// Special case for empty trie to make things simpler.
 			map.emplace(
@@ -178,46 +176,10 @@ namespace asm_lsw {
 				this->m_min = key;
 			}
 		}
-		update_level_map(key);
+		this->m_lss.update_levels(key);
 	}
 
 	
-	
-	template <typename t_key, typename t_value>
-	void x_fast_trie <t_key, t_value>::update_level_map(key_type const key)
-	{
-		// Update the level map.
-		for (level_idx_type i(0); i < base_class::s_levels; ++i)
-		{
-			level_idx_type const level(base_class::s_levels - i);
-			key_type const lk(this->level_key(key, level));
-			key_type const nlk(this->level_key(key, level - 1));
-			key_type const next_branch(0x1 & nlk);
-			key_type const other_branch(!next_branch);
-			
-			typename level_map::iterator node_it;
-			if (find_node(key, level - 1, node_it))
-			{
-				node &node(node_it->second);
-				node[next_branch] = edge(nlk, false);
-				if (node[other_branch].is_descendant())
-				{
-					auto desc(node[other_branch].key());
-					node[other_branch] = edge(other_branch ? std::max(desc, key) : std::min(desc, key), true);
-				}
-			}
-			else
-			{
-				node node;
-				node[next_branch] = edge(nlk, false);
-				node[other_branch] = edge(key, true);
-				level_idx_type lss_idx(level - 1);
-				this->m_lss[lss_idx].map().emplace(lk, std::move(node));
-			}
-		}
-	}
-
-
 	template <typename t_key, typename t_value>
 	void x_fast_trie <t_key, t_value>::erase(key_type const key)
 	{
@@ -242,12 +204,12 @@ namespace asm_lsw {
 			find_node(key, i, node_it);
 			node &node(node_it->second);
 
-			key_type const nlk(this->level_key(key, i));
+			key_type const nlk(this->m_lss.level_key(key, i));
 			key_type const target_branch(0x1 & nlk);
 			key_type const other_branch(!target_branch);
 
 			if (node[other_branch].is_descendant())
-				this->m_lss[i].map().erase(node_it);
+				this->m_lss.level(i).map().erase(node_it);
 			else
 			{
 				node[target_branch] = edge(target_branch ? prev : next, true);
@@ -263,7 +225,7 @@ namespace asm_lsw {
 			find_node(key, i, node_it);
 			node &node(node_it->second);
 
-			key_type const nlk(this->level_key(key, i));
+			key_type const nlk(this->m_lss.level_key(key, i));
 			key_type const target_branch(0x1 & nlk);
 			key_type const other_branch(!target_branch);
 
@@ -324,7 +286,7 @@ namespace asm_lsw {
 		typename level_map::iterator &node
 	)
 	{
-		return find_node(*this, key, level, node);
+		return this->m_lss.find_node(key, level, node);
 	}
 }
 
