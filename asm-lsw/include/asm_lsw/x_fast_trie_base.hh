@@ -43,7 +43,7 @@ namespace asm_lsw {
 	public:
 		typedef typename t_spec::key_type key_type;
 		typedef typename t_spec::value_type value_type;
-		static int const s_levels{std::numeric_limits <key_type>::digits};
+		static std::size_t const s_levels{std::numeric_limits <key_type>::digits};
 
 	protected:
 		typedef x_fast_trie_edge <key_type> edge;
@@ -308,8 +308,7 @@ namespace asm_lsw {
 		level_idx_type &level
 	)
 	{
-		level_idx_type const levels(trie.m_lss.size());
-		find_lowest_ancestor(trie, key, it, level, 0, levels - 1);
+		find_lowest_ancestor(trie, key, it, level, 0, s_levels - 1);
 	}
 
 
@@ -380,11 +379,10 @@ namespace asm_lsw {
 		std::cerr << "LSS:\n[level]: key [0x1 & key]: left (d if descendant) right (d if descendant)\n";
 
 		{
-			auto size(m_lss.size());
-			decltype(size) i(0);
+			decltype(s_levels) i(0);
 			for (auto lss_it(m_lss.crbegin()), lss_end(m_lss.crend()); lss_it != lss_end; ++lss_it)
 			{
-				std::cerr << boost::format("\t[%02x]:") % (size - i - 1);
+				std::cerr << boost::format("\t[%02x]:") % (s_levels - i - 1);
 				for (auto node_it(lss_it->cbegin()), node_end(lss_it->cend()); node_it != node_end; ++node_it)
 				{
 					// In case of the PHF map adaptor, node_it->first points to the
