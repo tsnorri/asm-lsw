@@ -63,6 +63,7 @@ namespace asm_lsw {
 		}
 
 		key_type key() const { return m_key; }
+		key_type level_key(std::size_t level) const { assert(0 <= level); return m_key >> level; }
 		bool is_descendant() const { return m_is_descendant; }	
 	};
 

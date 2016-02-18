@@ -265,7 +265,7 @@ namespace asm_lsw {
 			if (find_node(key, level - 1, node_it))
 			{
 				node &node(node_it->second);
-				node[next_branch] = edge(nlk, false);
+				node[next_branch] = edge(key, false);
 				if (node[other_branch].is_descendant())
 				{
 					auto desc(node[other_branch].key());
@@ -275,7 +275,7 @@ namespace asm_lsw {
 			else
 			{
 				node node;
-				node[next_branch] = edge(nlk, false);
+				node[next_branch] = edge(key, false);
 				node[other_branch] = edge(key, true);
 				level_idx_type lss_idx(level - 1);
 				this->m_lss[lss_idx].map().emplace(lk, std::move(node));
@@ -457,7 +457,7 @@ namespace asm_lsw {
 		edge const &edge(it->second[next_branch]);
 		
 		assert(1 == level || edge.is_descendant());
-		
+
 		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
 		assert(edge.key() == nearest->first);
@@ -531,43 +531,49 @@ namespace asm_lsw {
 	template <typename t_spec>
 	void x_fast_trie_base <t_spec>::print() const
 	{
-		std::cerr << "LSS:\n[level]: key [0x1 & key]: left (d if descendant) right (d if descendant)\n";
+		std::cerr
+			<< "LSS:" << std::endl
+			<< "[level]: key [0x1 & key]: left key (left value) (d if descendant) right key (right value) (d if descendant)" << std::endl;
 
 		{
 			remove_c_t <decltype(s_levels)> i(0);
 			for (auto lss_it(m_lss.crbegin()), lss_end(m_lss.crend()); lss_it != lss_end; ++lss_it)
 			{
-				std::cerr << boost::format("\t[%02x]:") % (s_levels - i - 1);
+				auto const level(s_levels - i - 1);
+				std::cerr << boost::format("[%02x]:") % level;
 				for (auto node_it(lss_it->cbegin()), node_end(lss_it->cend()); node_it != node_end; ++node_it)
 				{
 					// In case of the PHF map adaptor, node_it->first points to the
 					// first item in the pair (which is the key as expected),
 					// not the vector index.
 					auto const key(node_it->first);
-					auto const left(node_it->second[0].key());
-					auto const right(node_it->second[1].key());
-					bool const l_is_descendant(node_it->second[0].is_descendant());
-					bool const r_is_descendant(node_it->second[1].is_descendant());
-					std::cerr << boost::format(" (%02x [%02x]: %02x") % (+key) % (+(0x1 & key)) % (+left);
+					auto const &node(node_it->second);
+					auto const left(node[0].key());
+					auto const right(node[1].key());
+					auto const llk(node[0].level_key(level));
+					auto const rlk(node[1].level_key(level));
+					bool const l_is_descendant(node[0].is_descendant());
+					bool const r_is_descendant(node[1].is_descendant());
+					std::cerr << boost::format("\t(%02x [%02x]: %02x (%02x)") % (+key) % (+(0x1 & key)) % (+llk) % (+left);
 					if (l_is_descendant)
 						std::cerr << " (d) ";
 					else
 						std::cerr << "     ";
 
-					std::cerr << boost::format("%02x") % (+right);
+					std::cerr << boost::format("%02x (%02x)") % (+rlk) % (+right);
 					if (r_is_descendant)
 						std::cerr << " (d) ";
 					else
 						std::cerr << "     ";
-					std::cerr << ")";
+					std::cerr << ")" << std::endl;
 				}
 	
-				std::cerr << "\n";
+				std::cerr << std::endl;
 				++i;
 			}
 		}
 		
-		std::cerr << "Leaves:\n";
+		std::cerr << "Leaves:" << std::endl;
 		{
 			for (auto it(m_leaf_links.cbegin()), end(m_leaf_links.cend()); it != end; ++it)
 			{
