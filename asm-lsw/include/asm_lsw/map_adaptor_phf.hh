@@ -30,7 +30,54 @@ namespace asm_lsw {
 	
 	template <typename t_spec, typename t_map>
 	class map_adaptor_phf_builder;
-	
+
+
+	// Specialize when t_value = void.
+	template <typename t_spec, bool t_value_is_void = std::is_void <typename t_spec::value_type>::value>
+	struct map_adaptor_phf_trait
+	{
+	};
+
+	template <typename t_spec>
+	struct map_adaptor_phf_trait <t_spec, true>
+	{
+		typedef typename t_spec::key_type			key_type;
+		typedef typename t_spec::value_type			value_type;
+		typedef key_type							kv_type;
+
+		template <typename t_kv>
+		static key_type key(t_kv &kv)
+		{
+			return kv;
+		}
+
+		template <typename t_kv>
+		static kv_type kv(t_kv kv)
+		{
+			return kv;
+		}
+	};
+
+	template <typename t_spec>
+	struct map_adaptor_phf_trait <t_spec, false>
+	{
+		typedef typename t_spec::key_type			key_type;
+		typedef typename t_spec::value_type			value_type;
+		typedef std::pair <key_type, value_type>	kv_type;
+
+		template <typename t_kv>
+		static key_type key(t_kv &kv)
+		{
+			return kv.first;
+		}
+
+		template <typename t_kv>
+		static kv_type kv(t_kv kv)
+		{
+			return std::make_pair(kv.first, std::move(kv.second));
+		}
+	};
+
 	
 	template <
 		template <typename ...> class t_vector,
@@ -54,9 +101,10 @@ namespace asm_lsw {
 		typedef sdsl::bit_vector used_indices_type;
 		
 	public:
+		typedef map_adaptor_phf_trait <t_spec>									trait_type;
 		typedef typename t_spec::key_type										key_type;
 		typedef typename t_spec::value_type										value_type;
-		typedef std::pair <key_type, value_type>								kv_type;
+		typedef typename trait_type::kv_type									kv_type;
 		typedef typename t_spec::template allocator_type <kv_type>				allocator_type;
 		typedef typename t_spec::template vector_type <kv_type, allocator_type>	vector_type;
 		typedef typename vector_type::size_type									size_type;
@@ -162,14 +210,16 @@ namespace asm_lsw {
 		typedef map_adaptor_phf_base <t_spec> base_class;
 		
 	public:
-		typedef typename base_class::key_type key_type;
-		typedef typename base_class::value_type value_type;
-		typedef typename base_class::kv_type kv_type;
-		typedef typename base_class::allocator_type allocator_type;
-		typedef typename base_class::vector_type vector_type;
-		typedef typename base_class::size_type size_type;
-		typedef map_iterator_phf_tpl <map_adaptor_phf, kv_type> iterator;
-		typedef map_iterator_phf_tpl <map_adaptor_phf, kv_type const> const_iterator;
+		typedef	typename base_class::trait_type							trait_type;
+		typedef typename base_class::key_type							key_type;
+		typedef typename base_class::value_type							value_type;
+		typedef typename base_class::kv_type							kv_type;
+		typedef typename base_class::allocator_type						allocator_type;
+		typedef typename base_class::vector_type						vector_type;
+		typedef typename base_class::size_type							size_type;
+		// If value_type is void, kv_type is the same as key_type.
+		typedef map_iterator_phf_tpl <map_adaptor_phf, kv_type>			iterator;
+		typedef map_iterator_phf_tpl <map_adaptor_phf, kv_type const>	const_iterator;
 		
 		template <typename t_map>
 		using builder_type = map_adaptor_phf_builder <t_spec, t_map>;
@@ -228,13 +278,14 @@ namespace asm_lsw {
 		struct call_protected_constructor {};
 		
 	public:
-		typedef typename t_spec::key_type										key_type;
-		typedef typename t_spec::value_type										value_type;
-		typedef std::pair <key_type, value_type>								kv_type;
-		typedef typename t_spec::template allocator_type <kv_type>				allocator_type;
-		typedef typename t_spec::template vector_type <kv_type, allocator_type>	vector_type;
-		typedef typename vector_type::size_type									size_type;
-		typedef map_adaptor_phf<t_spec>											adaptor_type;
+		typedef map_adaptor_phf <t_spec>				adaptor_type;
+		typedef typename adaptor_type::trait_type		trait_type;
+		typedef typename adaptor_type::key_type			key_type;
+		typedef typename adaptor_type::value_type		value_type;
+		typedef typename adaptor_type::kv_type			kv_type;
+		typedef typename adaptor_type::allocator_type	allocator_type;
+		typedef typename adaptor_type::vector_type		vector_type;
+		typedef typename adaptor_type::size_type		size_type;
 		
 	protected:
 		phf_wrapper				m_phf;
@@ -247,7 +298,7 @@ namespace asm_lsw {
 		{
 			typename t_vec::size_type i{0};
 			for (auto const &kv : map)
-				dst[i++] = kv.first;
+				dst[i++] = trait_type::key(kv);
 		}
 		
 		std::size_t element_count() const
@@ -313,7 +364,7 @@ namespace asm_lsw {
 		auto const adapted_key(adaptor.adapted_key(key));
 
 		// In case the user passes a non-existent key, the hash function may return a colliding value.
-		if (adapted_key < adaptor.m_vector.size() && key == adaptor.m_vector[adapted_key].first)
+		if (adapted_key < adaptor.m_vector.size() && key == trait_type::key(adaptor.m_vector[adapted_key]))
 			return adapted_key;
 		
 		return adaptor.m_vector.size();
@@ -386,12 +437,11 @@ namespace asm_lsw {
 		// For now, using the same type with PHF::init and adapted_key() needs to be ensured.
 		for (auto const &kv : map)
 		{
-			auto const key(kv.first);
+			auto const key(trait_type::key(kv));
 			auto const hash(this->adapted_key(key));
-			auto val(std::make_pair(key, std::move(kv.second))); // FIXME: needs to take the key for it.second in case of a set-type container.
-
 			assert(!this->m_used_indices[hash]);
-			this->m_vector[hash] = std::move(val);
+
+			this->m_vector[hash] = std::move(trait_type::kv(kv));
 			this->m_used_indices[hash] = 1;
 			++this->m_size;
 		}

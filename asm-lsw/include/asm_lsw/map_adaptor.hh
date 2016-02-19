@@ -22,14 +22,28 @@
 
 
 namespace asm_lsw {
+	// FIXME: move to namespace detail.
+	template <template <typename ...> class t_map, typename t_key, typename t_value>
+	struct map_adaptor_trait
+	{
+		typedef t_map <t_key, t_value> map_type;
+	};
+
+	template <template <typename ...> class t_map, typename t_key>
+	struct map_adaptor_trait <t_map, t_key, void>
+	{
+		typedef t_map <t_key> map_type;
+	};
+
 	
-	template <template <typename ...> class t_map, typename t_key, typename t_val>
+	template <template <typename ...> class t_map, typename t_key, typename t_val = void>
 	class map_adaptor
 	{
 	public:
 		typedef t_key key_type;
 		typedef t_val value_type;
-		typedef t_map <key_type, t_val> map_type;
+		typedef map_adaptor_trait <t_map, key_type, value_type> trait_type;
+		typedef typename trait_type::map_type map_type;
 		typedef typename map_type::size_type size_type;
 		typedef typename map_type::iterator iterator;
 		typedef typename map_type::const_iterator const_iterator;

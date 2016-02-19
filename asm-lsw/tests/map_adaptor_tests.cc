@@ -20,17 +20,65 @@
 #include <bandit/bandit.h>
 #include <boost/format.hpp>
 #include <typeinfo>
+#include <unordered_map>
+#include <unordered_set>
 
 using namespace bandit;
 
-template <typename t_adaptor, typename t_map>
-void common_tests(t_adaptor const &adaptor, t_map const &test_values)
+enum collection_kind
 {
-	it("can report its size", [&](){
-		AssertThat(adaptor.size(), Equals(test_values.size()));
-	});
+	map,
+	set
+};
 
-	it("can find objects", [&](){
+
+template <typename, collection_kind>
+struct test_specialization
+{
+};
+
+template <typename t_value>
+struct test_specialization <t_value, collection_kind::set>
+{
+	typedef void value_type;
+
+	template <typename t_adaptor, typename t_set>
+	void test_find(t_adaptor const &adaptor, t_set const &test_values)
+	{
+		auto tv_copy(test_values);
+		for (auto const &kv : test_values)
+		{
+			auto const it(adaptor.find(kv));
+			AssertThat(it, Is().Not().EqualTo(adaptor.cend()));
+			AssertThat(*it, Equals(kv));
+			tv_copy.erase(kv);
+		}
+		AssertThat(tv_copy.size(), Equals(0));
+	}
+
+	template <typename t_adaptor, typename t_set>
+	void test_iterate(t_adaptor const &adaptor, t_set const &test_values)
+	{
+		auto tv_copy(test_values);
+		for (auto const &kv : adaptor)
+		{
+			auto it(tv_copy.find(kv));
+			AssertThat(it, Is().Not().EqualTo(tv_copy.end()));
+			AssertThat(*it, Equals(kv));
+			tv_copy.erase(kv);
+		}
+		AssertThat(tv_copy.size(), Equals(0));	
+	}
+};
+
+template <typename t_value>
+struct test_specialization <t_value, collection_kind::map>
+{
+	typedef t_value value_type;
+
+	template <typename t_adaptor, typename t_map>
+	void test_find(t_adaptor const &adaptor, t_map const &test_values)
+	{
 		auto tv_copy(test_values);
 		for (auto const &kv : test_values)
 		{
@@ -41,9 +89,11 @@ void common_tests(t_adaptor const &adaptor, t_map const &test_values)
 			tv_copy.erase(kv.first);
 		}
 		AssertThat(tv_copy.size(), Equals(0));
-	});
+	}
 
-	it("can iterate objects", [&](){
+	template <typename t_adaptor, typename t_map>
+	void test_iterate(t_adaptor const &adaptor, t_map const &test_values)
+	{
 		auto tv_copy(test_values);
 		for (auto const &kv : adaptor)
 		{
@@ -53,37 +103,67 @@ void common_tests(t_adaptor const &adaptor, t_map const &test_values)
 			AssertThat(it->second, Equals(kv.second));
 			tv_copy.erase(it);
 		}
-		AssertThat(tv_copy.size(), Equals(0));
+		AssertThat(tv_copy.size(), Equals(0));	
+	}
+};
+
+
+template <typename t_adaptor, typename t_map, typename t_test_specialization>
+void common_tests(t_adaptor const &adaptor, t_map const &test_values, t_test_specialization &test_spec)
+{
+	it("can report its size", [&](){
+		AssertThat(adaptor.size(), Equals(test_values.size()));
+	});
+
+	it("can find objects", [&](){
+		test_spec.test_find(adaptor, test_values);
+	});
+
+	it("can iterate objects", [&](){
+		test_spec.test_iterate(adaptor, test_values);
 	});
 }
 
 
-template <template <typename ...> class t_map, typename t_key, typename t_value>
+template <collection_kind t_collection_kind, template <typename ...> class t_map, typename t_key, typename t_value>
 void test_adaptors(t_map <t_key, t_value> const &test_values)
 {
+	test_specialization <t_value, t_collection_kind> test_spec;
+	typedef typename decltype(test_spec)::value_type value_type;
+
 	{
-		asm_lsw::map_adaptor <t_map, t_key, t_value> adaptor;
+		asm_lsw::map_adaptor <t_map, t_key, value_type> adaptor;
 		auto tv_copy(test_values);
 		describe(boost::str(boost::format("%s:") % typeid(adaptor).name()).c_str(), [&](){
 			adaptor = std::move(decltype(adaptor)(tv_copy));
-			common_tests(adaptor, test_values);
+			common_tests(adaptor, test_values, test_spec);
 		});
 	}
 
 	{
-		typedef asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, t_key, t_value> adaptor_spec;
+		typedef asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, t_key, value_type> adaptor_spec;
 		auto tv_copy(test_values);
 		asm_lsw::map_adaptor_phf_builder <adaptor_spec, decltype(test_values)> builder(tv_copy);
 		
 		describe(boost::str(boost::format("%s:") % typeid(typename decltype(builder)::adaptor_type).name()).c_str(), [&](){
 			typename decltype(builder)::adaptor_type adaptor(builder);
-			common_tests(adaptor, test_values);
+			common_tests(adaptor, test_values, test_spec);
 		});
 	}
 }
 
 
 go_bandit([](){
+	describe("std::unordered_set<uint8_t>:", [](){
+		std::unordered_set<uint8_t> set{1, 5, 99, 33, 87, 107, 200};
+		test_adaptors <collection_kind::set>(set);
+	});
+
+	describe("std::unordered_set<uint32_t>:", [](){
+		std::unordered_set<uint32_t> set{100, 29813, 1938, 213193, 38921, 547385, 6598, 5462, 54325};
+		test_adaptors <collection_kind::set>(set);
+	});
+
 	describe("std::unordered_map<uint8_t, uint8_t>:", [](){
 		std::unordered_map<uint8_t, uint8_t> map{
 			{1, 2},
@@ -94,7 +174,7 @@ go_bandit([](){
 			{107, 15},
 			{200, 100}
 		};
-		test_adaptors(map);
+		test_adaptors <collection_kind::map>(map);
 	});
 
 	describe("std::unordered_map<uint32_t, uint32_t>:", [](){
@@ -109,6 +189,6 @@ go_bandit([](){
 			{5462, 49835},
 			{54325, 1312}
 		};
-		test_adaptors(map);
+		test_adaptors <collection_kind::map>(map);
 	});
 });
