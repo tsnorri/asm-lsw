@@ -28,23 +28,45 @@ namespace asm_lsw {
 	template <typename t_spec>
 	class map_adaptor_phf;
 	
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, typename t_access_key>
 	class x_fast_trie_compact;
 	
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, typename t_hash>
 	class y_fast_trie;
 	
 	
-	template <typename t_key, typename t_value>
-	using y_fast_trie_compact_spec = y_fast_trie_base_spec <t_key, t_value, std::vector, fast_trie_compact_map_adaptor, x_fast_trie_compact>;
+	template <typename t_access_key>
+	class y_fast_trie_compact_map_adaptor_trait
+	{
+	protected:
+		template <typename t_key, typename t_value>
+		struct check
+		{
+			static_assert(std::is_same <t_key, typename t_access_key::key_type>::value, "");
+			typedef typename fast_trie_compact_map_adaptor <t_access_key>::template type <t_value> type;
+		};
+
+	public:
+		template <typename t_key, typename t_value>
+		using type = check <t_key, t_value>;
+	};
+	
+	
+	template <typename t_key, typename t_value, typename t_access_key>
+	using y_fast_trie_compact_spec = y_fast_trie_base_spec <
+		t_key,
+		t_value,
+		y_fast_trie_compact_map_adaptor_trait <t_access_key>::template type,
+		x_fast_trie_compact <t_key, void, t_access_key>
+	>;
 	
 	
 	// Use perfect hashing instead of the one provided by STL.
-	template <typename t_key, typename t_value = void>
-	class y_fast_trie_compact : public y_fast_trie_base <y_fast_trie_compact_spec <t_key, t_value>>
+	template <typename t_key, typename t_value = void, typename t_access_key = map_adaptor_access_key <t_key>>
+	class y_fast_trie_compact : public y_fast_trie_base <y_fast_trie_compact_spec <t_key, t_value, t_access_key>>
 	{
 	public:
-		typedef y_fast_trie_base <y_fast_trie_compact_spec <t_key, t_value>> base_class;
+		typedef y_fast_trie_base <y_fast_trie_compact_spec <t_key, t_value, t_access_key>> base_class;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::size_type size_type;

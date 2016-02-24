@@ -25,20 +25,102 @@
 
 
 namespace asm_lsw {
-	
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, typename t_hash>
 	class x_fast_trie;
 	
-	// FIXME: move to namespace detail.
-	template <typename t_key, typename t_value>
-	using x_fast_trie_compact_spec = x_fast_trie_base_spec <t_key, t_value, std::vector, fast_trie_compact_map_adaptor>;
 	
-	// Use perfect hashing instead of the one provided by STL.
-	template <typename t_key, typename t_value = void>
-	class x_fast_trie_compact : public x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value>>
+	// FIXME: move to namespace detail.
+	// Use partial template specialization to apply a custom access_key
+	// (which in turn uses the provided access_key) to pack two keys into
+	// x_fast_trie_edge <t_key>.
+	template <typename t_key, typename t_value, typename t_access_key>
+	struct x_fast_trie_compact_map_adaptor_tpl
+	{
+	};
+	
+	
+	// Specialization for the regular case, i.e. t_key is the map key.
+	template <typename t_access_key, typename t_value>
+	struct x_fast_trie_compact_map_adaptor_tpl <typename t_access_key::key_type, t_value, t_access_key>
+	{
+		using type = typename fast_trie_compact_map_adaptor <t_access_key>::template type <t_value>;
+		static constexpr bool needs_custom_constructor() { return false; } // FIXME: should not be needed.
+	};
+	
+	
+	// Specialization for nodes / edges with a custom access_key.
+	// FIXME: t_access_key isn't actually needed here, so this should be simplified.
+	template <typename t_key, typename t_value, typename t_access_key>
+	class x_fast_trie_compact_map_adaptor_tpl <x_fast_trie_node <t_key>, t_value, t_access_key>
+	{
+		class access_key : protected t_access_key
+		{
+		protected:
+			uint8_t m_level{0};
+
+		public:
+			typedef x_fast_trie_node <t_key> key_type;
+			typedef t_key accessed_type;
+			
+			access_key() = default;
+			access_key(uint8_t level): m_level(level) {}
+			
+			accessed_type operator()(key_type const &node) const
+			{
+				// FIXME: verify the shift amount.
+				return t_access_key::operator()(node[0].level_key(m_level));
+			}
+		};
+		
+	public:
+		using type = typename fast_trie_compact_map_adaptor <access_key>::template type <t_value>;
+		
+		// Custom constructor not needed here, since the x_fast_trie_compact's constructor
+		// handles everything.
+		static constexpr bool needs_custom_constructor() { return false; }
+	};
+	
+	
+	// Fix access_key.
+	template <typename t_access_key>
+	struct x_fast_trie_compact_map_adaptor
+	{
+		template <typename t_key, typename t_value>
+		using type = x_fast_trie_compact_map_adaptor_tpl <t_key, t_value, t_access_key>;
+	};
+	
+	
+	struct x_fast_trie_compact_lss_find_fn
+	{
+		template <typename t_lss, typename t_iterator>
+		bool operator()(t_lss &lss, typename t_lss::level_idx_type const level, typename t_lss::key_type const key, t_iterator &it)
+		{
+			typename t_lss::key_type const current_key(lss.level_key(key, 1 + level));
+			it = lss.m_lss[level].find_acc(current_key);
+			if (lss.m_lss[level].cend() == it)
+				return false;
+	
+			return true;
+		}
+	};
+	
+	
+	template <typename t_key, typename t_value, typename t_access_key>
+	using x_fast_trie_compact_spec = x_fast_trie_base_spec <
+		t_key,
+		t_value,
+		x_fast_trie_compact_map_adaptor <t_access_key>::template type,
+		x_fast_trie_compact_lss_find_fn
+	>;
+	
+	
+	// Uses perfect hashing instead of the one provided by STL.
+	template <typename t_key, typename t_value = void, typename t_access_key = map_adaptor_access_key <t_key>>
+	class x_fast_trie_compact : public x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value, t_access_key>>
 	{
 	protected:
-		typedef x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value>> base_class;
+		typedef x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value, t_access_key>> base_class;
+		
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::leaf_link_map leaf_link_map;
@@ -52,6 +134,7 @@ namespace asm_lsw {
 		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 		typedef typename base_class::iterator iterator;
 		typedef typename base_class::const_iterator const_iterator;
+		typedef t_access_key access_key_fn_type;
 		
 	public:
 		x_fast_trie_compact() = default;
@@ -60,12 +143,14 @@ namespace asm_lsw {
 		x_fast_trie_compact &operator=(x_fast_trie_compact const &) & = default;
 		x_fast_trie_compact &operator=(x_fast_trie_compact &&) & = default;
 		
-		explicit x_fast_trie_compact(x_fast_trie <key_type, value_type> &other);
+		template <typename t_hash>
+		explicit x_fast_trie_compact(x_fast_trie <key_type, value_type, t_hash> &other);
 	};
 	
 	
-	template <typename t_key, typename t_value>
-	x_fast_trie_compact <t_key, t_value>::x_fast_trie_compact(x_fast_trie <key_type, value_type> &other):
+	template <typename t_key, typename t_value, typename t_access_key>
+	template <typename t_hash>
+	x_fast_trie_compact <t_key, t_value, t_access_key>::x_fast_trie_compact(x_fast_trie <key_type, value_type, t_hash> &other):
 		x_fast_trie_compact()
 	{
 		typedef remove_ref_t <decltype(other)> other_adaptor_type;
@@ -88,9 +173,11 @@ namespace asm_lsw {
 		lss_builders.reserve(base_class::s_levels);
 		for (level_idx_type i(0); i < base_class::s_levels; ++i)
 		{
+			typename level_map::access_key_fn_type acc(i);
+			
 			// Move the contents of the other map.
 			auto &map(other.m_lss.level(i).map());
-			lss_builder_type builder(map, allocator);
+			lss_builder_type builder(map, allocator, acc);
 		
 			lss_builders.emplace_back(std::move(builder));
 		}
@@ -116,6 +203,7 @@ namespace asm_lsw {
 			for (auto &builder : lss_builders)
 			{
 				lss_adaptor_type adaptor(builder);
+				
 				this->m_lss.level(i) = std::move(adaptor);
 				++i;
 			}

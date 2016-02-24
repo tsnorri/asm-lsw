@@ -22,7 +22,7 @@ namespace asm_lsw {
 	template <typename>
 	class pool_allocator;
 	
-	template <template <typename ...> class, template <typename> class, typename, typename>
+	template <template <typename ...> class, template <typename> class, typename, typename, typename>
 	struct map_adaptor_phf_spec;
 	
 	template <typename>
@@ -30,14 +30,28 @@ namespace asm_lsw {
 	
 	
 	// FIXME: move to namespace detail.
-	// Fix the allocator parameter of the vector used by the adaptor.
-	// Replace the second parameter if a different allocator is desired.
-	template <template <typename ...> class t_vector, typename t_key, typename t_value>
-	using fast_trie_compact_map_adaptor_spec = map_adaptor_phf_spec <t_vector, pool_allocator, t_key, t_value>;
+	// Fix the vector and allocator parameters.
+	template <typename t_access_key, typename t_value>
+	using fast_trie_compact_map_adaptor_spec = map_adaptor_phf_spec <
+		std::vector,
+		pool_allocator,
+		typename t_access_key::key_type,
+		t_value,
+		t_access_key
+	>;
 	
 	// Pass the adaptor parameters received from the trie to the specification.
-	template <template <typename ...> class t_vector, typename t_key, typename t_value>
-	using fast_trie_compact_map_adaptor = map_adaptor_phf <fast_trie_compact_map_adaptor_spec <t_vector, t_key, t_value>>;
+	template <typename t_access_key>
+	struct fast_trie_compact_map_adaptor
+	{
+		template <typename t_value>
+		using type = map_adaptor_phf <
+			fast_trie_compact_map_adaptor_spec <
+				t_access_key,
+				t_value
+			>
+		>;
+	};
 }
 
 #endif

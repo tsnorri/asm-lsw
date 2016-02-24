@@ -26,23 +26,25 @@ namespace asm_lsw {
 	template <
 		typename t_key,
 		typename t_value,
-		template <typename ...> class t_map,
-		template <template <typename ...> class, typename, typename> class t_map_adaptor
+		template <typename, typename> class t_map_adaptor_trait,
+		typename t_lss_find_fn
 	>
 	struct x_fast_trie_base_spec
 	{
 		typedef t_key key_type;														// Trie key type.
 		typedef t_value value_type;													// Trie value type.
 
-		template <typename ... Args>
-		using map_type = t_map <Args ...>;											// Hash set / map type.
-		
+		// A class that has a member type “type” which is the actual adaptor.
+		// Other parameteres are supposed to have been fixed earlier.
 		template <typename t_map_key, typename t_map_value>
-		using map_adaptor_type = t_map_adaptor <map_type, t_map_key, t_map_value>;	// Hash map adaptor. Parameters are map type, key type and value type.
+		using map_adaptor_trait = t_map_adaptor_trait <t_map_key, t_map_value>;
+		
+		typedef t_lss_find_fn lss_find_fn;
 	};
 
 
 	// FIXME: used by the base class.
+	// FIXME: refactor so that m_is_descendant is not needed.
 	template <typename t_key>
 	class x_fast_trie_edge
 	{
@@ -55,6 +57,12 @@ namespace asm_lsw {
 		
 	public:
 		x_fast_trie_edge(): x_fast_trie_edge(0, false) {};
+		
+		x_fast_trie_edge(key_type key):
+			m_key(key),
+			m_is_descendant(false)
+		{
+		}
 
 		x_fast_trie_edge(key_type key, bool is_descendant):
 			m_key(key),
@@ -64,10 +72,34 @@ namespace asm_lsw {
 
 		key_type key() const { return m_key; }
 		key_type level_key(std::size_t level) const { assert(0 <= level); return m_key >> level; }
-		bool is_descendant() const { return m_is_descendant; }	
+		bool is_descendant() const { return m_is_descendant; }
+		
+		// Takes into account all the bits, not just the level-specific ones.
+		bool operator==(x_fast_trie_edge const &other) const
+		{
+			return m_key == other.m_key;
+		}
 	};
-
-
+	
+	
+	template <typename t_key>
+	class x_fast_trie_node : protected std::array <x_fast_trie_edge <t_key>, 2>
+	{
+	protected:
+		typedef std::array <x_fast_trie_edge <t_key>, 2> base_class;
+		
+	public:
+		using base_class::base_class;
+		using base_class::operator[];
+		
+		bool operator==(x_fast_trie_node const &other) const
+		{
+			std::cout << "node equals: (" << +((*this)[0].key()) << ", " << +((*this)[1].key()) << ") other: (" << +(other[0].key()) << ", " << +(other[1].key()) << ")" << std::endl;
+			return (*this)[0] == other[0] && (*this)[1] == other[1];
+		}
+	};
+	
+	
 	// FIXME: used by the base class.
 	template <typename t_key, typename t_value>
 	struct x_fast_trie_leaf_link

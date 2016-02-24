@@ -26,19 +26,33 @@
 
 namespace asm_lsw {
 	
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, typename t_hash>
 	class x_fast_trie;
-		
-		
-	template <typename t_key, typename t_value>
-	using y_fast_trie_spec = y_fast_trie_base_spec <t_key, t_value, std::unordered_map, map_adaptor, x_fast_trie>;
 	
 	
-	template <typename t_key, typename t_value = void>
-	class y_fast_trie : public y_fast_trie_base <y_fast_trie_spec <t_key, t_value>>
+	// Fix hash.
+	template <typename t_hash>
+	struct y_fast_trie_map_adaptor_trait
+	{
+		template <typename t_key, typename t_value>
+		using type = x_fast_trie_map_adaptor_tpl <t_key, t_value, t_hash>;
+	};
+		
+		
+	template <typename t_key, typename t_value, typename t_hash>
+	using y_fast_trie_spec = y_fast_trie_base_spec <
+		t_key,
+		t_value,
+		y_fast_trie_map_adaptor_trait <t_hash>:: template type,
+		x_fast_trie <t_key, void, t_hash>
+	>;
+	
+	
+	template <typename t_key, typename t_value = void, typename t_hash = std::hash <t_key>>
+	class y_fast_trie : public y_fast_trie_base <y_fast_trie_spec <t_key, t_value, t_hash>>
 	{
 	public:
-		typedef y_fast_trie_base <y_fast_trie_spec <t_key, t_value>> base_class;
+		typedef y_fast_trie_base <y_fast_trie_spec <t_key, t_value, t_hash>> base_class;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::size_type size_type;
@@ -100,8 +114,8 @@ namespace asm_lsw {
 	
 	
 	// FIXME: check this.
-	template <typename t_key, typename t_value>
-	auto y_fast_trie <t_key, t_value>::find_subtree(key_type const key) -> typename subtree_map::iterator
+	template <typename t_key, typename t_value, typename t_hash>
+	auto y_fast_trie <t_key, t_value, t_hash>::find_subtree(key_type const key) -> typename subtree_map::iterator
 	{
 		// Find the correct subtree. If the inserted key is smaller than any representative,
 		// just use the first subtree.
@@ -123,8 +137,8 @@ namespace asm_lsw {
 	
 	// Check the size limit.
 	// FIXME: check this.
-	template <typename t_key, typename t_value>
-	void y_fast_trie <t_key, t_value>::check_subtree_size(typename subtree_map::iterator st_it)
+	template <typename t_key, typename t_value, typename t_hash>
+	void y_fast_trie <t_key, t_value, t_hash>::check_subtree_size(typename subtree_map::iterator st_it)
 	{
 		auto const log2M(std::log2(m_max_key));
 		auto const size(st_it->second.size());
@@ -134,10 +148,10 @@ namespace asm_lsw {
 
 	
 	// FIXME: check this.
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, typename t_hash>
 	template <typename T>
 	typename std::enable_if<std::is_void<T>::value, void>::type
-	y_fast_trie <t_key, t_value>::insert(key_type const key)
+	y_fast_trie <t_key, t_value, t_hash>::insert(key_type const key)
 	{
 		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
 		++this->m_size;
@@ -157,9 +171,9 @@ namespace asm_lsw {
 
 	
 	// FIXME: check this.
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, typename t_hash>
 	template <typename T>
-	void y_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val) // FIXME: making a copy of val.
+	void y_fast_trie <t_key, t_value, t_hash>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val) // FIXME: making a copy of val.
 	{
 		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
 		++this->m_size;
@@ -182,8 +196,8 @@ namespace asm_lsw {
 
 	
 	// FIXME: check this.
-	template <typename t_key, typename t_value>
-	bool y_fast_trie <t_key, t_value>::erase(key_type const key)
+	template <typename t_key, typename t_value, typename t_hash>
+	bool y_fast_trie <t_key, t_value, t_hash>::erase(key_type const key)
 	{
 		if (0 == this->m_reps.size())
 			return false;
@@ -220,8 +234,8 @@ namespace asm_lsw {
 	
 	
 	// FIXME: check this (and then the base class methods).
-	template <typename t_key, typename t_value>
-	void y_fast_trie <t_key, t_value>::check_merge_subtree(typename subtree_map::map_type::iterator &st_it)
+	template <typename t_key, typename t_value, typename t_hash>
+	void y_fast_trie <t_key, t_value, t_hash>::check_merge_subtree(typename subtree_map::map_type::iterator &st_it)
 	{
 		auto const log2M(std::log2(m_max_key));
 		auto &tree(st_it->second);
@@ -256,8 +270,8 @@ namespace asm_lsw {
 	
 	
 	// FIXME: check this (and then the base class methods).
-	template <typename t_key, typename t_value>
-	void y_fast_trie <t_key, t_value>::split_subtree(typename subtree_map::map_type::iterator &st_it)
+	template <typename t_key, typename t_value, typename t_hash>
+	void y_fast_trie <t_key, t_value, t_hash>::split_subtree(typename subtree_map::map_type::iterator &st_it)
 	{
 		using std::swap;
 		
@@ -293,22 +307,22 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_key, typename t_value>
-	bool y_fast_trie <t_key, t_value>::find(key_type const key, subtree_iterator &iterator)
+	template <typename t_key, typename t_value, typename t_hash>
+	bool y_fast_trie <t_key, t_value, t_hash>::find(key_type const key, subtree_iterator &iterator)
 	{
 		return find(*this, key, iterator);
 	}
 	
 	
-	template <typename t_key, typename t_value>
-	bool y_fast_trie <t_key, t_value>::find_predecessor(key_type const key, subtree_iterator &iterator, bool allow_equal)
+	template <typename t_key, typename t_value, typename t_hash>
+	bool y_fast_trie <t_key, t_value, t_hash>::find_predecessor(key_type const key, subtree_iterator &iterator, bool allow_equal)
 	{
 		return find_predecessor(*this, key, iterator, allow_equal);
 	}
 	
 	
-	template <typename t_key, typename t_value>
-	bool y_fast_trie <t_key, t_value>::find_successor(key_type const key, subtree_iterator &iterator, bool allow_equal)
+	template <typename t_key, typename t_value, typename t_hash>
+	bool y_fast_trie <t_key, t_value, t_hash>::find_successor(key_type const key, subtree_iterator &iterator, bool allow_equal)
 	{
 		return find_successor(*this, key, iterator, allow_equal);
 	}
