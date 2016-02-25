@@ -260,7 +260,10 @@ void test_adaptors(t_map <t_args ...> const &test_values)
 go_bandit([](){
 	describe("basic", [](){
 		describe("access_key", [](){
-			uint8_t const k_shift_amt(4);
+
+			// Make an access_key that shifts bits to the left by 4
+			// and check that the equivalence classes hold (e.g. 0x10 = 0x11).
+			static uint8_t const s_shift_amt(4);
 
 			class access_key
 			{
@@ -277,13 +280,13 @@ go_bandit([](){
 
 				accessed_type operator()(key_type const &key) const
 				{
-					AssertThat(m_shift_amt, Is().Not().EqualTo(0));
+					AssertThat(m_shift_amt, Equals(s_shift_amt));
 					auto retval(key >> m_shift_amt);
 					return retval;
 				}
 			};
 
-			access_key acc(k_shift_amt);
+			access_key acc(s_shift_amt);
 			AssertThat(acc(0x1f), Equals(0x1));
 
 			typedef test_types <uint8_t, void, access_key>::unordered_set_type set_type;
@@ -301,13 +304,13 @@ go_bandit([](){
 				}
 			});
 
-			it("should propagate access_key_fn", [&](){
+			it("should propagate and use access_key_fn", [&](){
 				asm_lsw::map_adaptor_phf_builder <
 					asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, access_key>,
 					decltype(adaptor)
 				> builder(adaptor, acc);
 				decltype(builder)::adaptor_type adaptor_phf(builder);
-				AssertThat(adaptor_phf.access_key_fn().shift_amt(), Equals(k_shift_amt));
+				AssertThat(adaptor_phf.access_key_fn().shift_amt(), Equals(s_shift_amt));
 				for (uint8_t i(0x0); i <= 0x5; ++i)
 				{
 					auto const it(adaptor_phf.find(i * 0x10));
