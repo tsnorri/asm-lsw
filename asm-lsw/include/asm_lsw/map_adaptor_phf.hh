@@ -84,7 +84,7 @@ namespace asm_lsw {
 		template <typename> class t_allocator,
 		typename t_key,
 		typename t_val,
-		typename t_access_key_fn
+		typename t_access_key_fn = map_adaptor_access_key <t_key>
 	>
 	struct map_adaptor_phf_spec
 	{
@@ -239,6 +239,11 @@ namespace asm_lsw {
 
 		template <template <typename ...> class t_map, typename t_hash, typename t_key_equal>
 		using mutable_map_adaptor_type = map_adaptor <t_map, key_type, value_type, access_key_fn_type, t_hash, t_key_equal>;
+
+		static_assert(
+			std::is_same <typename access_key_fn_type::key_type, key_type>::value,
+			"access_key_fn's operator() should take key_type as parameter"
+		);
 
 	protected:
 		typename base_class::used_indices_type::rank_0_type m_used_indices_rank0_support;
