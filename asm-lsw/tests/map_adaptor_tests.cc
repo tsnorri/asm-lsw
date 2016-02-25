@@ -259,45 +259,48 @@ void test_adaptors(t_map <t_args ...> const &test_values)
 
 go_bandit([](){
 	describe("basic", [](){
-		it("should use and propagate access_key_fn", [](){
-			uint8_t const k_shift_amt(4);
+		uint8_t const k_shift_amt(4);
 
-			class access_key
+		class access_key
+		{
+		protected:
+			uint8_t m_shift_amt{0};
+
+		public:
+			typedef uint8_t key_type;
+			typedef uint8_t accessed_type;
+			
+			access_key(uint8_t amt): m_shift_amt(amt) {}
+
+			uint8_t shift_amt() const { return m_shift_amt; }
+
+			accessed_type operator()(key_type const &key) const
 			{
-			protected:
-				uint8_t m_shift_amt{0};
+				AssertThat(m_shift_amt, Is().Not().EqualTo(0));
+				auto retval(key >> m_shift_amt);
+				return retval;
+			}
+		};
 
-			public:
-				typedef uint8_t key_type;
-				typedef uint8_t accessed_type;
-				
-				access_key(uint8_t amt): m_shift_amt(amt) {}
+		access_key acc(k_shift_amt);
+		AssertThat(acc(0x1f), Equals(0x1));
 
-				uint8_t shift_amt() const { return m_shift_amt; }
+		typedef test_types <uint8_t, void, access_key>::unordered_set_type set_type;
+		set_type::hasher hash(acc);
+		set_type::key_equal key_equal(acc);
+		set_type set({0x8, 0x11, 0x22, 0x33, 0x44, 0x57}, 6, hash, key_equal);
 
-				accessed_type operator()(key_type const &key) const
-				{
-					AssertThat(m_shift_amt, Is().Not().EqualTo(0));
-					auto retval(key >> m_shift_amt);
-					return retval;
-				}
-			};
+		asm_lsw::map_adaptor <std::unordered_set, uint8_t, void, access_key> adaptor(set, acc);
 
-			access_key acc(k_shift_amt);
-			AssertThat(acc(0x1f), Equals(0x1));
-
-			typedef test_types <uint8_t, void, access_key>::unordered_set_type set_type;
-			set_type::hasher hash(acc);
-			set_type::key_equal key_equal(acc);
-			set_type set({0x8, 0x11, 0x22, 0x33, 0x44, 0x57}, 6, hash, key_equal);
-
-			asm_lsw::map_adaptor <std::unordered_set, uint8_t, void, access_key> adaptor(set, acc);
+		it("should use access_key_fn", [&](){
 			for (uint8_t i(0x0); i <= 0x5; ++i)
 			{
 				auto const it(adaptor.find(i * 0x10));
 				AssertThat(it, Is().Not().EqualTo(adaptor.cend()));
 			}
+		});
 
+		it("should propagate access_key_fn", [&](){
 			asm_lsw::map_adaptor_phf_builder <
 				asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, access_key>,
 				decltype(adaptor)
