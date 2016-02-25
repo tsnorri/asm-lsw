@@ -52,19 +52,43 @@ struct pair_access_key
 };
 
 
-template <typename T>
+template <typename t_key, typename t_access_key = asm_lsw::map_adaptor_access_key <t_key>>
 struct test_traits
 {
-	typedef typename asm_lsw::map_adaptor_access_key <T> access_key;
-	typedef std::hash <T> hash;
+	static_assert(std::is_same <t_key, typename t_access_key::key_type>::value, "");
+	typedef t_access_key access_key;
+	typedef typename access_key::accessed_type accessed_type;
+	typedef typename asm_lsw::map_adaptor_hash <access_key, std::hash <accessed_type>> hash;
+	typedef typename asm_lsw::map_adaptor_key_equal <access_key, std::equal_to <accessed_type>> key_equal;
 };
 
 
-template <>
-struct test_traits <pair>
+template <typename t_access_key>
+struct test_traits <pair, t_access_key>
 {
 	typedef pair_access_key access_key;
-	typedef asm_lsw::map_adaptor_hash <pair, access_key> hash;
+	typedef typename asm_lsw::map_adaptor_hash <access_key, std::hash <uint32_t>> hash;
+	typedef typename asm_lsw::map_adaptor_key_equal <access_key, std::equal_to <uint32_t>> key_equal;
+};
+
+
+template <typename t_key, typename t_value, typename t_access_key = asm_lsw::map_adaptor_access_key <t_key>>
+struct test_types
+{
+	typedef test_traits <t_key, t_access_key> trait_type;
+	
+	typedef std::unordered_set <
+		t_key,
+		typename trait_type::hash,
+		typename trait_type::key_equal
+	> unordered_set_type;
+	
+	typedef std::unordered_map <
+		t_key,
+		t_value,
+		typename trait_type::hash,
+		typename trait_type::key_equal
+	> unordered_map_type;
 };
 
 
@@ -73,8 +97,10 @@ struct test_specialization
 {
 };
 
-template <typename t_value>
-struct test_specialization <t_value, collection_kind::set>
+
+// Tests for set-type containers.
+template <typename t_map>
+struct test_specialization <t_map, collection_kind::set>
 {
 	typedef void value_type;
 
@@ -125,10 +151,12 @@ struct test_specialization <t_value, collection_kind::set>
 	}
 };
 
-template <typename t_value>
-struct test_specialization <t_value, collection_kind::map>
+
+// Tests for map-type containers.
+template <typename t_tv_map>
+struct test_specialization <t_tv_map, collection_kind::map>
 {
-	typedef t_value value_type;
+	typedef typename t_tv_map::mapped_type value_type;
 
 	template <typename t_adaptor, typename t_map>
 	void test_find(t_adaptor const &adaptor, t_map const &test_values)
@@ -195,16 +223,17 @@ void phf_tests(t_adaptor const &adaptor, t_map const &test_values, t_test_specia
 }
 
 
-template <collection_kind t_collection_kind, template <typename ...> class t_map, typename t_key, typename t_value>
-void test_adaptors(t_map <t_key, t_value> const &test_values)
+// Copy the test values and create one instance of each map adaptor. Then run the tests.
+template <collection_kind t_collection_kind, template <typename ... > class t_map, class ... t_args>
+void test_adaptors(t_map <t_args ...> const &test_values)
 {
-	test_specialization <t_value, t_collection_kind> test_spec;
+	test_specialization <t_map <t_args ...>, t_collection_kind> test_spec;
+	typedef typename t_map <t_args ...>::key_type key_type;
 	typedef typename decltype(test_spec)::value_type value_type;
-	typedef typename asm_lsw::remove_ref_t <decltype(test_values)> test_values_type;
-	typedef typename test_values_type::hasher hash_type;
+	typedef typename test_traits <key_type>::access_key access_key_fn_type;
 
 	{
-		asm_lsw::map_adaptor <t_map, t_key, value_type, hash_type> adaptor;
+		asm_lsw::map_adaptor <t_map, key_type, value_type, access_key_fn_type> adaptor;
 		auto tv_copy(test_values);
 		describe(boost::str(boost::format("%s:") % typeid(adaptor).name()).c_str(), [&](){
 			adaptor = std::move(decltype(adaptor)(tv_copy));
@@ -214,7 +243,7 @@ void test_adaptors(t_map <t_key, t_value> const &test_values)
 
 	{
 		typedef asm_lsw::map_adaptor_phf_spec <
-			std::vector, asm_lsw::pool_allocator, t_key, value_type, typename test_traits <t_key>::access_key
+			std::vector, asm_lsw::pool_allocator, key_type, value_type, typename test_traits <key_type>::access_key
 		> adaptor_spec;
 		auto tv_copy(test_values);
 		asm_lsw::map_adaptor_phf_builder <adaptor_spec, decltype(test_values)> builder(tv_copy);
@@ -229,18 +258,72 @@ void test_adaptors(t_map <t_key, t_value> const &test_values)
 
 
 go_bandit([](){
+	describe("basic", [](){
+		it("should use and propagate access_key_fn", [](){
+			uint8_t const k_shift_amt(4);
+
+			class access_key
+			{
+			protected:
+				uint8_t m_shift_amt{0};
+
+			public:
+				typedef uint8_t key_type;
+				typedef uint8_t accessed_type;
+				
+				access_key(uint8_t amt): m_shift_amt(amt) {}
+
+				uint8_t shift_amt() const { return m_shift_amt; }
+
+				accessed_type operator()(key_type const &key) const
+				{
+					AssertThat(m_shift_amt, Is().Not().EqualTo(0));
+					auto retval(key >> m_shift_amt);
+					return retval;
+				}
+			};
+
+			access_key acc(k_shift_amt);
+			AssertThat(acc(0x1f), Equals(0x1));
+
+			typedef test_types <uint8_t, void, access_key>::unordered_set_type set_type;
+			set_type::hasher hash(acc);
+			set_type::key_equal key_equal(acc);
+			set_type set({0x8, 0x11, 0x22, 0x33, 0x44, 0x57}, 6, hash, key_equal);
+
+			asm_lsw::map_adaptor <std::unordered_set, uint8_t, void, access_key> adaptor(set, acc);
+			for (uint8_t i(0x0); i <= 0x5; ++i)
+			{
+				auto const it(adaptor.find(i * 0x10));
+				AssertThat(it, Is().Not().EqualTo(adaptor.cend()));
+			}
+
+			asm_lsw::map_adaptor_phf_builder <
+				asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, access_key>,
+				decltype(adaptor)
+			> builder(adaptor, acc);
+			decltype(builder)::adaptor_type adaptor_phf(builder);
+			AssertThat(adaptor_phf.access_key_fn().shift_amt(), Equals(k_shift_amt));
+			for (uint8_t i(0x0); i <= 0x5; ++i)
+			{
+				auto const it(adaptor_phf.find(i * 0x10));
+				AssertThat(it, Is().Not().EqualTo(adaptor_phf.cend()));
+			}
+		});
+	});
+
 	describe("std::unordered_set<uint8_t>:", [](){
-		std::unordered_set<uint8_t, typename test_traits <uint8_t>::hash> set{1, 5, 99, 33, 87, 107, 200};
+		test_types <uint8_t, void>::unordered_set_type set{1, 5, 99, 33, 87, 107, 200};
 		test_adaptors <collection_kind::set>(set);
 	});
 
 	describe("std::unordered_set<uint32_t>:", [](){
-		std::unordered_set<uint32_t, typename test_traits <uint32_t>::hash> set{100, 29813, 1938, 213193, 38921, 547385, 6598, 5462, 54325};
+		test_types <uint32_t, void>::unordered_set_type set{100, 29813, 1938, 213193, 38921, 547385, 6598, 5462, 54325};
 		test_adaptors <collection_kind::set>(set);
 	});
 
 	describe("std::unordered_map<uint8_t, uint8_t>:", [](){
-		std::unordered_map<uint8_t, uint8_t, typename test_traits <uint8_t>::hash> map{
+		test_types <uint8_t, uint8_t>::unordered_map_type map{
 			{1, 2},
 			{5, 12},
 			{99, 3},
@@ -253,7 +336,7 @@ go_bandit([](){
 	});
 
 	describe("std::unordered_map<uint32_t, uint32_t>:", [](){
-		std::unordered_map<uint32_t, uint32_t, typename test_traits <uint32_t>::hash> map{
+		test_types <uint32_t, uint32_t>::unordered_map_type map{
 			{100, 132},
 			{29813, 2313},
 			{1938, 982},
@@ -268,7 +351,7 @@ go_bandit([](){
 	});
 	
 	describe("std::unordered_set<pair>:", [](){
-		std::unordered_set<pair, typename test_traits <pair>::hash> set{
+		test_types <pair, void>::unordered_set_type set{
 			{100, 132},
 			{29813, 2313},
 			{1938, 982},
