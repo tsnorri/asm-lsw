@@ -19,13 +19,12 @@
 #define ASM_LSW_MAP_ADAPTOR_HELPER_HH
 
 #include <array>
+#include <functional>
 
 
 namespace asm_lsw {
 	
 	// FIXME: move to namespace detail.
-	// FIXME: remove unused classes.
-	// Return an unsigned integer type from the key object.
 	template <typename t_key>
 	struct map_adaptor_access_key
 	{
@@ -33,21 +32,42 @@ namespace asm_lsw {
 		typedef t_key accessed_type;
 		accessed_type operator()(key_type const &key) const { return key; }
 	};
-	
-	
-	template <
-		typename t_key,
-		typename t_access_key = map_adaptor_access_key <t_key>,
-		template <typename> class t_hash = std::hash
-	>
-	struct map_adaptor_hash : protected t_access_key, t_hash <typename t_access_key::accessed_type>
+
+
+	// Hash and key_equal assumed stateless here.
+
+	template <typename t_access_key, typename t_hash = std::hash <typename t_access_key::accessed_type>>
+	class map_adaptor_hash : protected t_hash
 	{
-		typedef t_access_key access_key;
-		typedef t_hash <typename access_key::accessed_type> hash;
-		typedef typename hash::argument_type argument_type;
-		typedef typename hash::result_type result_type;
-		
-		std::size_t operator()(t_key const &key) const { return hash::operator()(access_key::operator()(key)); }
+	protected:
+		t_access_key m_access_key;
+
+	public:
+		map_adaptor_hash() = default;
+		map_adaptor_hash(t_access_key const &access_key): m_access_key(access_key) {}
+
+		std::size_t operator()(typename t_access_key::key_type const &key) const
+		{
+			return t_hash::operator()(m_access_key(key));
+		}
+	};
+
+
+	template <typename t_access_key, typename t_key_equal = std::equal_to <typename t_access_key::accessed_type>>
+	class map_adaptor_key_equal : protected t_key_equal
+	{
+	protected:
+		t_access_key m_access_key;
+
+	public:
+		map_adaptor_key_equal() = default;
+		map_adaptor_key_equal(t_access_key const &access_key): m_access_key(access_key) {}
+
+		typedef typename t_access_key::key_type key_type;
+		bool operator()(key_type const &lhs, key_type const &rhs) const
+		{
+			return t_key_equal::operator()(m_access_key(lhs), m_access_key(rhs));
+		}
 	};
 	
 	
@@ -55,21 +75,26 @@ namespace asm_lsw {
 		template <typename ...> class t_map,
 		typename t_key,
 		typename t_value,
-		typename t_hash = std::hash <t_key>
+		typename t_access_key,
+		typename t_hash,
+		typename t_key_equal
 	>
 	struct map_adaptor_trait
 	{
-		typedef t_map <t_key, t_value, t_hash> map_type;
+		typedef t_map <t_key, t_value, t_hash, t_key_equal> map_type;
 	};
 
+	// Specialization for t_value = void.
 	template <
 		template <typename ...> class t_set,
 		typename t_key,
-		typename t_hash
+		typename t_access_key,
+		typename t_hash,
+		typename t_key_equal
 	>
-	struct map_adaptor_trait <t_set, t_key, void, t_hash>
+	struct map_adaptor_trait <t_set, t_key, void, t_access_key, t_hash, t_key_equal>
 	{
-		typedef t_set <t_key, t_hash> map_type;
+		typedef t_set <t_key, t_hash, t_key_equal> map_type;
 	};
 }
 
