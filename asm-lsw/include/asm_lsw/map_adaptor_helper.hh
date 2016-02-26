@@ -45,6 +45,8 @@ namespace asm_lsw {
 	public:
 		map_adaptor_hash() = default;
 		map_adaptor_hash(t_access_key const &access_key): m_access_key(access_key) {}
+		
+		t_access_key const &access_key_fn() { return m_access_key; }
 
 		std::size_t operator()(typename t_access_key::key_type const &key) const
 		{
@@ -62,6 +64,8 @@ namespace asm_lsw {
 	public:
 		map_adaptor_key_equal() = default;
 		map_adaptor_key_equal(t_access_key const &access_key): m_access_key(access_key) {}
+
+		t_access_key const &access_key_fn() { return m_access_key; }
 
 		typedef typename t_access_key::key_type key_type;
 		bool operator()(key_type const &lhs, key_type const &rhs) const
