@@ -33,8 +33,11 @@ namespace asm_lsw {
 	
 	template <typename t_key, typename t_value>
 	class y_fast_trie;
-	
-		
+}
+
+
+namespace asm_lsw { namespace detail {
+
 	template <typename t_key, typename t_value>
 	using y_fast_trie_compact_spec = y_fast_trie_base_spec <
 		t_key,
@@ -42,14 +45,17 @@ namespace asm_lsw {
 		fast_trie_compact_map_adaptor,
 		x_fast_trie_compact <t_key, void>
 	>;
-	
-	
+}}
+
+
+namespace asm_lsw {
+
 	// Use perfect hashing instead of the one provided by STL.
 	template <typename t_key, typename t_value = void>
-	class y_fast_trie_compact : public y_fast_trie_base <y_fast_trie_compact_spec <t_key, t_value>>
+	class y_fast_trie_compact : public y_fast_trie_base <detail::y_fast_trie_compact_spec <t_key, t_value>>
 	{
 	public:
-		typedef y_fast_trie_base <y_fast_trie_compact_spec <t_key, t_value>> base_class;
+		typedef y_fast_trie_base <detail::y_fast_trie_compact_spec <t_key, t_value>> base_class;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::size_type size_type;

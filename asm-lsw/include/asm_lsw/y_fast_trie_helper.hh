@@ -18,11 +18,37 @@
 #ifndef ASM_LSW_Y_FAST_TRIE_HELPER_HH
 #define ASM_LSW_Y_FAST_TRIE_HELPER_HH
 
+#include <asm_lsw/map_adaptor_helper.hh>
 #include <map>
 #include <set>
 
 
 namespace asm_lsw {
+
+	template <typename t_subtree_map>
+	class y_fast_trie_subtree_map_proxy
+	{
+	protected:
+		t_subtree_map const *m_map;
+
+	public:
+		typedef typename t_subtree_map::size_type size_type;
+		typedef typename t_subtree_map::iterator iterator;
+		typedef typename t_subtree_map::const_iterator const_iterator;
+
+	public:
+		y_fast_trie_subtree_map_proxy() = delete;
+		explicit y_fast_trie_subtree_map_proxy(t_subtree_map const *map): m_map(map) {}
+		size_type size() const			{ return m_map->size(); }
+		const_iterator begin() const	{ return m_map->begin(); }
+		const_iterator end() const		{ return m_map->end(); }
+		const_iterator cbegin() const	{ return m_map->cbegin(); }
+		const_iterator cend() const		{ return m_map->cend(); }
+	};
+}
+
+
+namespace asm_lsw { namespace detail {
 	
 	template <typename, typename>
 	struct y_fast_trie_trait;
@@ -101,28 +127,6 @@ namespace asm_lsw {
 			return *it;
 		}
 	};
-
-
-	template <typename t_subtree_map>
-	class y_fast_trie_subtree_map_proxy
-	{
-	protected:
-		t_subtree_map const *m_map;
-
-	public:
-		typedef typename t_subtree_map::size_type size_type;
-		typedef typename t_subtree_map::iterator iterator;
-		typedef typename t_subtree_map::const_iterator const_iterator;
-
-	public:
-		y_fast_trie_subtree_map_proxy() = delete;
-		explicit y_fast_trie_subtree_map_proxy(t_subtree_map const *map): m_map(map) {}
-		size_type size() const			{ return m_map->size(); }
-		const_iterator begin() const	{ return m_map->begin(); }
-		const_iterator end() const		{ return m_map->end(); }
-		const_iterator cbegin() const	{ return m_map->cbegin(); }
-		const_iterator cend() const		{ return m_map->cend(); }
-	};
-}
+}}
 
 #endif

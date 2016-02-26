@@ -28,8 +28,8 @@ namespace asm_lsw {
 		typename t_key,
 		typename t_val = void,
 		typename t_access_key = map_adaptor_access_key <t_key>,
-		typename t_hash = map_adaptor_hash <t_access_key>,
-		typename t_key_equal = map_adaptor_key_equal <t_access_key>
+		typename t_hash = detail::map_adaptor_hash <t_access_key>,
+		typename t_key_equal = detail::map_adaptor_key_equal <t_access_key>
 	>
 	class map_adaptor
 	{
@@ -39,7 +39,7 @@ namespace asm_lsw {
 		typedef t_access_key access_key_fn_type;
 		typedef t_hash hash;
 		typedef t_key_equal key_equal;
-		typedef map_adaptor_trait <t_map, key_type, value_type, access_key_fn_type, hash, key_equal> trait_type;
+		typedef detail::map_adaptor_trait <t_map, key_type, value_type, access_key_fn_type, hash, key_equal> trait_type;
 		typedef typename trait_type::map_type map_type;
 		typedef typename map_type::size_type size_type;
 		typedef typename map_type::iterator iterator;

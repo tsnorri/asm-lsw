@@ -58,8 +58,8 @@ struct test_traits
 	static_assert(std::is_same <t_key, typename t_access_key::key_type>::value, "");
 	typedef t_access_key access_key;
 	typedef typename access_key::accessed_type accessed_type;
-	typedef typename asm_lsw::map_adaptor_hash <access_key, std::hash <accessed_type>> hash;
-	typedef typename asm_lsw::map_adaptor_key_equal <access_key, std::equal_to <accessed_type>> key_equal;
+	typedef typename asm_lsw::detail::map_adaptor_hash <access_key, std::hash <accessed_type>> hash;
+	typedef typename asm_lsw::detail::map_adaptor_key_equal <access_key, std::equal_to <accessed_type>> key_equal;
 };
 
 
@@ -67,8 +67,8 @@ template <typename t_access_key>
 struct test_traits <pair, t_access_key>
 {
 	typedef pair_access_key access_key;
-	typedef typename asm_lsw::map_adaptor_hash <access_key, std::hash <uint32_t>> hash;
-	typedef typename asm_lsw::map_adaptor_key_equal <access_key, std::equal_to <uint32_t>> key_equal;
+	typedef typename asm_lsw::detail::map_adaptor_hash <access_key, std::hash <uint32_t>> hash;
+	typedef typename asm_lsw::detail::map_adaptor_key_equal <access_key, std::equal_to <uint32_t>> key_equal;
 };
 
 

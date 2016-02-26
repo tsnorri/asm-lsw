@@ -24,7 +24,6 @@
 
 namespace asm_lsw {
 	
-	// FIXME: move to namespace detail.
 	template <typename t_key>
 	struct map_adaptor_access_key
 	{
@@ -32,7 +31,10 @@ namespace asm_lsw {
 		typedef t_key accessed_type;
 		accessed_type operator()(key_type const &key) const { return key; }
 	};
+}
 
+
+namespace asm_lsw { namespace detail {
 
 	// Hash and key_equal assumed stateless here.
 
@@ -73,8 +75,8 @@ namespace asm_lsw {
 			return t_key_equal::operator()(m_access_key(lhs), m_access_key(rhs));
 		}
 	};
-	
-	
+
+
 	template <
 		template <typename ...> class t_map,
 		typename t_key,
@@ -88,6 +90,7 @@ namespace asm_lsw {
 		typedef t_map <t_key, t_value, t_hash, t_key_equal> map_type;
 	};
 
+
 	// Specialization for t_value = void.
 	template <
 		template <typename ...> class t_set,
@@ -100,6 +103,6 @@ namespace asm_lsw {
 	{
 		typedef t_set <t_key, t_hash, t_key_equal> map_type;
 	};
-}
+}}
 
 #endif

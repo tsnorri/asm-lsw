@@ -18,6 +18,8 @@
 #ifndef ASM_LSW_MAP_ADAPTOR_PHF_HH
 #define ASM_LSW_MAP_ADAPTOR_PHF_HH
 
+#include <asm_lsw/map_adaptor_helper.hh>
+#include <asm_lsw/map_adaptor_phf_helper.hh>
 #include <asm_lsw/phf_wrapper.hh>
 #include <boost/core/enable_if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
@@ -35,53 +37,6 @@ namespace asm_lsw {
 	class map_adaptor_phf_builder;
 
 
-	// Specialize when t_value = void.
-	template <typename t_spec, bool t_value_is_void = std::is_void <typename t_spec::value_type>::value>
-	struct map_adaptor_phf_trait
-	{
-	};
-
-	template <typename t_spec>
-	struct map_adaptor_phf_trait <t_spec, true>
-	{
-		typedef typename t_spec::access_key_fn_type::key_type	key_type;
-		typedef typename t_spec::value_type						value_type;
-		typedef key_type										kv_type;
-
-		template <typename t_kv>
-		static key_type key(t_kv &kv)
-		{
-			return kv;
-		}
-
-		template <typename t_kv>
-		static kv_type kv(t_kv kv)
-		{
-			return kv;
-		}
-	};
-
-	template <typename t_spec>
-	struct map_adaptor_phf_trait <t_spec, false>
-	{
-		typedef typename t_spec::access_key_fn_type::key_type	key_type;
-		typedef typename t_spec::value_type						value_type;
-		typedef std::pair <key_type, value_type>				kv_type;
-
-		template <typename t_kv>
-		static key_type key(t_kv &kv)
-		{
-			return kv.first;
-		}
-
-		template <typename t_kv>
-		static kv_type kv(t_kv kv)
-		{
-			return std::make_pair(kv.first, std::move(kv.second));
-		}
-	};
-
-	
 	template <
 		template <typename ...> class t_vector,
 		template <typename> class t_allocator,
@@ -106,7 +61,7 @@ namespace asm_lsw {
 		typedef sdsl::bit_vector used_indices_type;
 		
 	public:
-		typedef map_adaptor_phf_trait <t_spec>									trait_type;
+		typedef detail::map_adaptor_phf_trait <t_spec>							trait_type;
 		typedef typename t_spec::key_type										key_type;
 		typedef typename t_spec::value_type										value_type;
 		typedef typename trait_type::kv_type									kv_type;
