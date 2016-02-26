@@ -53,26 +53,17 @@ namespace asm_lsw {
 
 	protected:
 		key_type m_key;			// Key of the child node in LSS.
-		bool m_is_descendant;	// If true, points to m_leaf_links.
 		
 	public:
-		x_fast_trie_edge(): x_fast_trie_edge(0, false) {};
+		x_fast_trie_edge(): x_fast_trie_edge(0) {};
 		
 		x_fast_trie_edge(key_type key):
-			m_key(key),
-			m_is_descendant(false)
-		{
-		}
-
-		x_fast_trie_edge(key_type key, bool is_descendant):
-			m_key(key),
-			m_is_descendant(is_descendant)
+			m_key(key)
 		{
 		}
 
 		key_type key() const { return m_key; }
-		key_type level_key(std::size_t level) const { assert(0 <= level); return m_key >> level; }
-		bool is_descendant() const { return m_is_descendant; }
+		key_type level_key(std::size_t level) const { return m_key >> level; }
 	};
 	
 	
@@ -80,12 +71,30 @@ namespace asm_lsw {
 	class x_fast_trie_node : protected std::array <x_fast_trie_edge <t_key>, 2>
 	{
 	protected:
-		typedef std::array <x_fast_trie_edge <t_key>, 2> base_class;
+		typedef x_fast_trie_edge <t_key> edge_type;
+		typedef std::array <edge_type, 2> base_class;
 		
 	public:
-		using base_class::base_class;
 		using base_class::operator[];
+
+		x_fast_trie_node(): x_fast_trie_node(0, 0) {}
+
+		x_fast_trie_node(edge_type e1, edge_type e2)
+		{
+			(*this)[0] = e1;
+			(*this)[1] = e2;
+		}
 		
+		bool const edge_is_descendant_ptr(uint8_t const level, uint8_t const branch) const
+		{
+			// If the level-th bit from the left is not equal to branch, the edge
+			// contains a descendant pointer.
+			assert(0 == branch || 1 == branch);
+			auto const edge(operator[](branch));
+			bool const retval(branch != (0x1 & edge.level_key(level)));
+			return retval;
+		}
+
 		class access_key
 		{
 		protected:
@@ -99,7 +108,7 @@ namespace asm_lsw {
 			access_key(uint8_t const level): m_level(level) {}
 			
 			uint8_t level() const { return m_level; }
-			
+
 			accessed_type operator()(key_type const &node) const
 			{
 				return node[0].level_key(m_level);

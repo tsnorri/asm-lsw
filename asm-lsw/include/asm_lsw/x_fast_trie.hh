@@ -74,10 +74,7 @@ namespace asm_lsw {
 			t_iterator &out_it
 		)
 		{
-			typename t_lss_acc::node node;
-			node[0] = key;
-			node[1] = 0;
-			
+			typename t_lss_acc::node node(key, 0);
 			t_iterator it(lss.m_lss[level].find(node));
 			if (lss.m_lss[level].cend() == it)
 				return false;

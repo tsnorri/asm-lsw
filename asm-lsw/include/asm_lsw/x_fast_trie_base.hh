@@ -287,11 +287,11 @@ namespace asm_lsw {
 			if (find_node(key, level_idx - 1, node_it))
 			{
 				node node(*node_it);
-				node[next_branch] = edge(key, false);
-				if (node[other_branch].is_descendant())
+				node[next_branch] = edge(key);
+				if (node.edge_is_descendant_ptr(level_idx - 1, other_branch))
 				{
 					auto desc(node[other_branch].key());
-					node[other_branch] = edge(other_branch ? std::max(desc, key) : std::min(desc, key), true);
+					node[other_branch] = edge(other_branch ? std::max(desc, key) : std::min(desc, key));
 				}
 				
 				auto &level_map(level(level_idx - 1));
@@ -300,9 +300,7 @@ namespace asm_lsw {
 			}
 			else
 			{
-				node node;
-				node[next_branch] = edge(key, false);
-				node[other_branch] = edge(key, true);
+				node node(key, key);
 				level_idx_type lss_idx(level_idx - 1);
 				this->m_lss[lss_idx].map().emplace(std::move(node));
 			}
@@ -324,12 +322,12 @@ namespace asm_lsw {
 			key_type const target_branch(0x1 & nlk);
 			key_type const other_branch(!target_branch);
 
-			if (node[other_branch].is_descendant())
+			if (node.edge_is_descendant_ptr(i, other_branch))
 				m_lss[i].map().erase(node_it);
 			else
 			{
 				auto &level_map(level(i));
-				node[target_branch] = edge(target_branch ? prev : next, true);
+				node[target_branch] = edge(target_branch ? prev : next);
 				auto pos(level_map.map().erase(node_it));
 				level_map.map().emplace_hint(pos, std::move(node));
 				break;
@@ -349,9 +347,9 @@ namespace asm_lsw {
 			key_type const target_branch(0x1 & nlk);
 			key_type const other_branch(!target_branch);
 
-			if (node[other_branch].is_descendant())
+			if (node.edge_is_descendant_ptr(i, other_branch))
 			{
-				node[other_branch] = edge(other_branch ? prev : next, true);
+				node[other_branch] = edge(other_branch ? prev : next);
 				auto pos(level_map.map().erase(node_it));
 				level_map.map().emplace_hint(pos, std::move(node));
 			}
@@ -489,10 +487,10 @@ namespace asm_lsw {
 		bool const status(find_lowest_ancestor(trie, key, it, level));
 		assert(status);
 		key_type const next_branch(0x1 & (key >> level));
-		edge const &edge((*it)[next_branch]);
 		
-		assert(1 == level || edge.is_descendant());
+		assert(1 == level || it->edge_is_descendant_ptr(level, next_branch));
 
+		edge const &edge((*it)[next_branch]);
 		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
 		assert(edge.key() == nearest->first);
@@ -590,8 +588,8 @@ namespace asm_lsw {
 					auto const rlk(rhs.level_key(level));
 					auto const lk(lhs.key());
 					auto const rk(rhs.key());
-					bool const l_is_descendant(lhs.is_descendant());
-					bool const r_is_descendant(rhs.is_descendant());
+					bool const l_is_descendant(node.edge_is_descendant_ptr(level, 0));
+					bool const r_is_descendant(node.edge_is_descendant_ptr(level, 1));
 
 					assert(lhs.level_key(1 + level) == key);
 					assert(rhs.level_key(1 + level) == key);
