@@ -73,14 +73,6 @@ namespace asm_lsw {
 		key_type key() const { return m_key; }
 		key_type level_key(std::size_t level) const { assert(0 <= level); return m_key >> level; }
 		bool is_descendant() const { return m_is_descendant; }
-		
-#if 0
-		// FIXME: Takes into account all the bits, not just the level-specific ones.
-		bool operator==(x_fast_trie_edge const &other) const
-		{
-			return m_key == other.m_key;
-		}
-#endif
 	};
 	
 	
@@ -94,14 +86,6 @@ namespace asm_lsw {
 		using base_class::base_class;
 		using base_class::operator[];
 		
-#if 0
-		bool operator==(x_fast_trie_node const &other) const
-		{
-			std::cout << "node equals: (" << +((*this)[0].key()) << ", " << +((*this)[1].key()) << ") other: (" << +(other[0].key()) << ", " << +(other[1].key()) << ")" << std::endl;
-			return (*this)[0] == other[0] && (*this)[1] == other[1];
-		}
-#endif
-
 		class access_key
 		{
 		protected:
