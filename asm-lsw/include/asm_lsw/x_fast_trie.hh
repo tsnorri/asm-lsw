@@ -18,63 +18,31 @@
 #ifndef ASM_LSW_X_FAST_TRIE_HH
 #define ASM_LSW_X_FAST_TRIE_HH
 
+#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/x_fast_trie_base.hh>
-#include <unordered_map>
-#include <unordered_set>
 
 
 namespace asm_lsw {
-	template <typename t_value>
-	struct x_fast_trie_map_adaptor_map
-	{
-		template <typename ... Args>
-		using type = std::unordered_map<Args ...>;
-	};
-	
-	
-	template <>
-	struct x_fast_trie_map_adaptor_map <void>
-	{
-		template <typename ... Args>
-		using type = std::unordered_set<Args ...>;
-	};
-	
-	
-	// x_fast_trie_base stores both t_key and x_fast_trie_node <t_key> in maps.
-	// Hence, partial template specialization is needed, since the same hash
-	// cannot be used for both.
-	// FIXME: determine the set/map parameter from a template.
-	template <typename t_key, typename t_value, typename t_hash = std::hash <t_key>>
+
+	template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
 	struct x_fast_trie_map_adaptor_tpl
 	{
-		typedef map_adaptor <x_fast_trie_map_adaptor_map <t_value>::template type, t_key, t_value, t_hash> type;
+		typedef map_adaptor <fast_trie_map_adaptor_map <t_value>::template type, t_key, t_value, t_access_key> type;
 		static constexpr bool needs_custom_constructor() { return false; }
 	};
 	
 	
 	// Specialization for nodes / edges with a custom hash function.
-	// t_value is ignored.
-	template <typename t_key, typename t_hash>
-	struct x_fast_trie_map_adaptor_tpl <x_fast_trie_node <t_key>, void, t_hash>
+	template <typename t_key, typename t_value>
+	struct x_fast_trie_map_adaptor_tpl <x_fast_trie_node <t_key>, t_value, typename x_fast_trie_node <t_key>::access_key>
 	{
-		class hash : protected t_hash
-		{
-		protected:
-			uint8_t m_level{0};
-			
-		public:
-			hash() = default;
-			hash(uint8_t level): m_level(level) {}
-			
-			std::size_t operator()(x_fast_trie_node <t_key> const &node) const
-			{
-				// FIXME: verify the shift amount.
-				std::cout << "Hash for level " << +m_level << " key: " << +(node[0].key()) << " level key: " << +(node[0].level_key(m_level)) << std::endl;
-				return t_hash::operator()(node[0].level_key(m_level));
-			}
-		};
-		
-		typedef map_adaptor <std::unordered_set, x_fast_trie_node <t_key>, void, hash> type;
+		typedef x_fast_trie_node <t_key> key_type;
+		typedef map_adaptor <
+			fast_trie_map_adaptor_map <t_value>::template type,
+			key_type,
+			t_value,
+			typename key_type::access_key
+		> type;
 
 		static constexpr bool needs_custom_constructor() { return true; }
 		
@@ -85,20 +53,14 @@ namespace asm_lsw {
 			{
 				typedef typename t_array::value_type adaptor_type;
 				typedef typename adaptor_type::map_type map_type;
-				map_type map(0, hash(i));
+				typedef typename adaptor_type::access_key_fn_type access_key_fn_type;
+
+				access_key_fn_type acc(i);
+				map_type map(0, std::move(acc));
 				adaptor_type adaptor(map); // Takes ownership.
 				array[i] = std::move(adaptor);
 			}
 		}
-	};
-	
-	
-	// Fix hash.
-	template <typename t_hash>
-	struct x_fast_trie_map_adaptor
-	{
-		template <typename t_key, typename t_value>
-		using type = x_fast_trie_map_adaptor_tpl <t_key, t_value, t_hash>;
 	};
 	
 	
@@ -125,22 +87,22 @@ namespace asm_lsw {
 	};
 	
 	
-	template <typename t_key, typename t_value, typename t_hash>
+	template <typename t_key, typename t_value>
 	using x_fast_trie_spec = x_fast_trie_base_spec <
 		t_key,
 		t_value,
-		x_fast_trie_map_adaptor <t_hash>::template type,
+		x_fast_trie_map_adaptor_tpl,
 		x_fast_trie_lss_find_fn
 	>;
 	
 	
-	template <typename t_key, typename t_value = void, typename t_hash = std::hash <t_key>>
-	class x_fast_trie : public x_fast_trie_base <x_fast_trie_spec <t_key, t_value, t_hash>>
+	template <typename t_key, typename t_value = void>
+	class x_fast_trie : public x_fast_trie_base <x_fast_trie_spec <t_key, t_value>>
 	{
-		template <typename, typename, typename> friend class x_fast_trie_compact;
+		template <typename, typename> friend class x_fast_trie_compact;
 		
 	protected:
-		typedef x_fast_trie_base <x_fast_trie_spec <t_key, t_value, t_hash>> base_class;
+		typedef x_fast_trie_base <x_fast_trie_spec <t_key, t_value>> base_class;
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::leaf_link_map leaf_link_map;
@@ -165,11 +127,11 @@ namespace asm_lsw {
 		// Conditionally enable either.
 		// (Return type of the first one is void == std::enable_if<...>::type.)
 		template <typename T = value_type>
-		typename std::enable_if<std::is_void<T>::value, void>::type
+		typename std::enable_if <std::is_void <T>::value, void>::type
 		insert(key_type const key);
 		
 		template <typename T = value_type>
-		void insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val);
+		void insert(key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type const val);
 		
 		void erase(key_type const key);
 
@@ -189,10 +151,10 @@ namespace asm_lsw {
 	};
 	
 	
-	template <typename t_key, typename t_value, typename t_hash>
+	template <typename t_key, typename t_value>
 	template <typename T>
-	typename std::enable_if<std::is_void<T>::value, void>::type
-	x_fast_trie <t_key, t_value, t_hash>::insert(key_type const key)
+	typename std::enable_if <std::is_void <T>::value, void>::type
+	x_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
 		// Update leaf links.
 		auto &map(this->m_leaf_links.map());
@@ -238,9 +200,9 @@ namespace asm_lsw {
 	}
 	
 
-	template <typename t_key, typename t_value, typename t_hash>
+	template <typename t_key, typename t_value>
 	template <typename T>
-	void x_fast_trie <t_key, t_value, t_hash>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val)
+	void x_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type const val)
 	{
 		// Update leaf links.
 		auto &map(this->m_leaf_links.map());
@@ -286,8 +248,8 @@ namespace asm_lsw {
 	}
 
 	
-	template <typename t_key, typename t_value, typename t_hash>
-	void x_fast_trie <t_key, t_value, t_hash>::erase(key_type const key)
+	template <typename t_key, typename t_value>
+	void x_fast_trie <t_key, t_value>::erase(key_type const key)
 	{
 		leaf_iterator leaf_it;
 		if (!find(key, leaf_it))
@@ -308,36 +270,36 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_key, typename t_value, typename t_hash>
-	bool x_fast_trie <t_key, t_value, t_hash>::find(key_type const key, leaf_iterator &it)
+	template <typename t_key, typename t_value>
+	bool x_fast_trie <t_key, t_value>::find(key_type const key, leaf_iterator &it)
 	{
 		return find(*this, key, it);
 	}
 
 
-	template <typename t_key, typename t_value, typename t_hash>
-	bool x_fast_trie <t_key, t_value, t_hash>::find_predecessor(key_type const key, leaf_iterator &pred, bool allow_equal)
+	template <typename t_key, typename t_value>
+	bool x_fast_trie <t_key, t_value>::find_predecessor(key_type const key, leaf_iterator &pred, bool allow_equal)
 	{
 		return find_predecessor(*this, key, pred, allow_equal);
 	}
 
 
-	template <typename t_key, typename t_value, typename t_hash>
-	bool x_fast_trie <t_key, t_value, t_hash>::find_successor(key_type const key, leaf_iterator &succ, bool allow_equal)
+	template <typename t_key, typename t_value>
+	bool x_fast_trie <t_key, t_value>::find_successor(key_type const key, leaf_iterator &succ, bool allow_equal)
 	{
 		return find_successor(*this, key, succ, allow_equal);
 	}
 
 
-	template <typename t_key, typename t_value, typename t_hash>
-	void x_fast_trie <t_key, t_value, t_hash>::find_nearest(key_type const key, leaf_iterator &it)
+	template <typename t_key, typename t_value>
+	void x_fast_trie <t_key, t_value>::find_nearest(key_type const key, leaf_iterator &it)
 	{
 		find_nearest(*this, key, it);
 	}
 
 
-	template <typename t_key, typename t_value, typename t_hash>
-	bool x_fast_trie <t_key, t_value, t_hash>::find_lowest_ancestor(
+	template <typename t_key, typename t_value>
+	bool x_fast_trie <t_key, t_value>::find_lowest_ancestor(
 		key_type const key,
 		typename level_map::iterator &it,
 		level_idx_type &level
@@ -347,8 +309,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_key, typename t_value, typename t_hash>
-	bool x_fast_trie <t_key, t_value, t_hash>::find_node(
+	template <typename t_key, typename t_value>
+	bool x_fast_trie <t_key, t_value>::find_node(
 		key_type const key,
 		level_idx_type const level,
 		typename level_map::iterator &node

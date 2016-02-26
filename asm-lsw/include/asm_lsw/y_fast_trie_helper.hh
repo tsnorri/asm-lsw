@@ -31,20 +31,20 @@ namespace asm_lsw {
 	template <
 		typename t_key,
 		typename t_value,
-		template <typename, typename> class t_map_adaptor_trait,
+		template <typename, typename, typename> class t_map_adaptor,
 		typename t_x_fast_trie
 	>
 	struct y_fast_trie_base_spec
 	{
-		typedef t_key key_type;														// Trie key type.
-		typedef t_value value_type;													// Trie value type.
+		typedef t_key key_type;				// Trie key type.
+		typedef t_value value_type;			// Trie value type.
 		
 		// Hash map adaptor. Parameters are map type, key type and value type.
 		// Key type and allocator are supposed to have been fixed earlier.
-		template <typename t_map_key, typename t_map_value>
-		using map_adaptor_trait = t_map_adaptor_trait <t_map_key, t_map_value>;
+		template <typename t_map_key, typename t_map_value, typename t_map_access_key = map_adaptor_access_key <t_key>>
+		using map_adaptor = t_map_adaptor <t_map_key, t_map_value, t_map_access_key>;
 		
-		typedef t_x_fast_trie trie_type;											// Representative trie type.
+		typedef t_x_fast_trie trie_type;	// Representative trie type.
 		
 		// Subtree type.
 		typedef typename y_fast_trie_trait <key_type, value_type>::subtree_type subtree_type;

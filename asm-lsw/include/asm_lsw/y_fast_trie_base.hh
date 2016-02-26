@@ -35,7 +35,7 @@ namespace asm_lsw {
 		static_assert(std::is_integral <typename t_spec::key_type>::value, "Unsigned integer required.");
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
-		template <typename, typename, typename> friend class y_fast_trie_compact;
+		template <typename, typename> friend class y_fast_trie_compact;
 
 	public:
 		typedef typename t_spec::key_type key_type;
@@ -44,7 +44,7 @@ namespace asm_lsw {
 	protected:
 		typedef typename t_spec::trie_type representative_trie;
 		typedef typename t_spec::subtree_type subtree;
-		typedef typename t_spec::template map_adaptor_trait <key_type, subtree>::type subtree_map;
+		typedef typename t_spec::template map_adaptor <key_type, subtree> subtree_map;
 		typedef y_fast_trie_trait<key_type, value_type> trait;
 		
 	public:
