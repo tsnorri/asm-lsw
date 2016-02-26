@@ -32,13 +32,14 @@ namespace asm_lsw {
 	struct x_fast_trie_compact_lss_find_fn
 	{
 		template <typename t_lss, typename t_iterator>
-		bool operator()(t_lss &lss, typename t_lss::level_idx_type const level, typename t_lss::key_type const key, t_iterator &it)
+		bool operator()(t_lss &lss, typename t_lss::level_idx_type const level, typename t_lss::key_type const key, t_iterator &out_it)
 		{
 			typename t_lss::key_type const current_key(lss.level_key(key, 1 + level));
-			it = lss.m_lss[level].find_acc(current_key);
+			t_iterator it(lss.m_lss[level].find_acc(current_key));
 			if (lss.m_lss[level].cend() == it)
 				return false;
 	
+			out_it = it;
 			return true;
 		}
 	};
