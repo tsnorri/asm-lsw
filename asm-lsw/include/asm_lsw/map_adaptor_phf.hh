@@ -83,11 +83,12 @@ namespace asm_lsw {
 		map_adaptor_phf_base(map_adaptor_phf_base &&) = default;
 		map_adaptor_phf_base(
 			phf_wrapper &phf,
+			std::size_t const size,
 			allocator_type const &alloc,
 			access_key_fn_type const &access_key_fn
 		):
 			m_phf(std::move(phf)),
-			m_vector(m_phf.get().m, kv_type(), alloc),
+			m_vector(size, kv_type(), alloc),
 			m_access_key_fn(access_key_fn)
 		{
 		}
@@ -209,7 +210,10 @@ namespace asm_lsw {
 		
 	protected:
 		typename vector_type::size_type adapted_key(typename vector_type::size_type key) const { 
-			return PHF::hash(&this->m_phf.get(), key);
+			if (this->m_phf.is_valid())
+				return PHF::hash(&this->m_phf.get(), key);
+			else
+				return key;
 		}
 		
 		template <typename t_adaptor>
@@ -233,6 +237,7 @@ namespace asm_lsw {
 		template <typename t_map>
 		map_adaptor_phf(
 			t_map &map,
+			std::size_t const size,
 			phf_wrapper &phf,
 			allocator_type const &alloc,
 			access_key_fn_type const &access_key_fn
@@ -281,6 +286,7 @@ namespace asm_lsw {
 		typedef typename adaptor_type::vector_type				vector_type;
 		typedef typename adaptor_type::size_type				size_type;
 		typedef typename adaptor_type::access_key_fn_type		access_key_fn_type;
+		typedef typename adaptor_type::accessed_type			accessed_type;
 
 		template <template <typename ...> class t_adaptor_map, typename t_hash, typename t_key_equal>
 		using mutable_map_adaptor_type = typename adaptor_type::template mutable_map_adaptor_type <t_adaptor_map, t_hash, t_key_equal>;
@@ -289,20 +295,25 @@ namespace asm_lsw {
 		phf_wrapper				m_phf;
 		allocator_type			m_allocator;	// FIXME: always copy?
 		access_key_fn_type		m_access_key_fn;	// FIXME: always copy?
+		std::size_t				m_element_count{0};
 		t_map					&m_map;
 		
 	public:
 		template <typename t_vec>
-		void fill_with_map_keys(t_vec &dst, t_map const &map)
+		void fill_with_map_keys(t_vec &dst, t_map const &map, accessed_type &max_value)
 		{
 			typename t_vec::size_type i{0};
 			for (auto const &kv : map)
-				dst[i++] = this->m_access_key_fn(trait_type::key(kv));
+			{
+				auto const val(this->m_access_key_fn(trait_type::key(kv)));
+				dst[i++] = val;
+				max_value = std::max(max_value, val);
+			}
 		}
 		
 		std::size_t element_count() const
 		{
-			return m_phf.get().m;
+			return m_element_count;
 		}
 		
 		phf_wrapper &phf() { return m_phf; }
@@ -443,7 +454,7 @@ namespace asm_lsw {
 	template <typename t_spec>
 	template <typename t_map>
 	map_adaptor_phf <t_spec>::map_adaptor_phf(map_adaptor_phf_builder <t_spec, t_map> &builder):
-		map_adaptor_phf(builder.map(), builder.phf(), builder.allocator(), builder.access_key_fn())
+		map_adaptor_phf(builder.map(), builder.element_count(), builder.phf(), builder.allocator(), builder.access_key_fn())
 	{
 	}
 	
@@ -452,16 +463,16 @@ namespace asm_lsw {
 	template <typename t_map>
 	map_adaptor_phf <t_spec>::map_adaptor_phf(
 		t_map &map,
+		std::size_t size,
 		phf_wrapper &phf,
 		allocator_type const &alloc,
 		access_key_fn_type const &access_key_fn
-	): base_class(phf, alloc, access_key_fn)
+	): base_class(phf, size, alloc, access_key_fn)
 	{
 		// Reserve the required space for m_used_indices.
 		// Make select1(count) return a value that may be used in the end() itearator.
-		auto const size(this->m_phf.get().m);
-		
 		{
+			assert(size < 1 + size);
 			decltype(this->m_used_indices) tmp(1 + size, 0);
 			tmp[size] = 1;
 			this->m_used_indices = std::move(tmp);
@@ -549,17 +560,31 @@ namespace asm_lsw {
 		// Make a copy of the keys to generate the hash function.
 		// FIXME: check integrality of key_type.
 		typedef typename vector_type::size_type key_type;
+		accessed_type max_value(0);
 		sdsl::int_vector <0> keys(map.size(), 0, std::numeric_limits <key_type>::digits);
-		fill_with_map_keys(keys, map);
+		fill_with_map_keys(keys, map, max_value);
 		
 		// FIXME: consider the parameters below (4, 80, 0).
+		std::size_t const loading_factor(80);
 		int st(PHF::init <key_type, false>(
-			&this->m_phf.get(), reinterpret_cast <key_type *>(keys.data()), keys.size(), 4, 80, 0
+			&this->m_phf.get(), reinterpret_cast <key_type *>(keys.data()), keys.size(), 4, loading_factor, 0
 		));
 		assert(0 == st); // FIXME: throw instead on error. (Or do this in a wrapper for phf.)
 		
 		// Compact.
 		PHF::compact(&this->m_phf.get());
+
+		// If the hashed values take more space than the actual keys,
+		// skip hashing.
+		if (max_value < 1 + max_value && 1 + max_value <= m_phf.get().m)
+		{
+			m_element_count = 1 + max_value;
+			m_phf = phf_wrapper();
+		}
+		else
+		{
+			m_element_count = m_phf.get().m;
+		}
 
 		if (create_allocator)
 		{
