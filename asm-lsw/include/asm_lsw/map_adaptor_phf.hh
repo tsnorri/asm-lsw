@@ -27,6 +27,9 @@
 
 
 namespace asm_lsw {
+
+	template <template <typename ...> class, typename, typename, typename, typename, typename>
+	class map_adaptor;
 	
 	template <typename t_spec, typename t_map>
 	class map_adaptor_phf_builder;
@@ -358,8 +361,8 @@ namespace asm_lsw {
 		map_adaptor_phf_builder(t_map &map, access_key_fn_type const &access_key_fn);
 		map_adaptor_phf_builder(
 			t_map &map,
-			allocator_type const &allocator,
-			access_key_fn_type const &access_key_fn
+			access_key_fn_type const &access_key_fn,
+			allocator_type const &allocator
 		);
 	
 	protected:
@@ -568,8 +571,8 @@ namespace asm_lsw {
 	template <typename t_spec, typename t_map>
 	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(
 		t_map &map,
-		allocator_type const &allocator,
-		access_key_fn_type const &access_key_fn
+		access_key_fn_type const &access_key_fn,
+		allocator_type const &allocator
 	):
 		m_allocator(allocator),
 		m_access_key_fn(access_key_fn),
