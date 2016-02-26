@@ -55,9 +55,9 @@ namespace asm_lsw {
 				typedef typename adaptor_type::map_type map_type;
 				typedef typename adaptor_type::access_key_fn_type access_key_fn_type;
 
-				access_key_fn_type acc(i);
-				map_type map(0, std::move(acc));
-				adaptor_type adaptor(map); // Takes ownership.
+				access_key_fn_type acc(1 + i);
+				map_type map(0, acc, acc);
+				adaptor_type adaptor(map, acc); // Takes ownership.
 				array[i] = std::move(adaptor);
 			}
 		}
@@ -71,17 +71,18 @@ namespace asm_lsw {
 			t_lss_acc &lss,
 			typename t_lss_acc::level_idx_type const level,
 			typename t_lss_acc::key_type const key,
-			t_iterator &it
+			t_iterator &out_it
 		)
 		{
 			typename t_lss_acc::node node;
 			node[0] = key;
 			node[1] = 0;
 			
-			it = lss.m_lss[level].find(node);
+			t_iterator it(lss.m_lss[level].find(node));
 			if (lss.m_lss[level].cend() == it)
 				return false;
 	
+			out_it = it;
 			return true;
 		}
 	};

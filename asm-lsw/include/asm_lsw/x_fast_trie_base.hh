@@ -486,9 +486,8 @@ namespace asm_lsw {
 		// FIXME: return type? if lowest ancestor returns false.
 		level_idx_type level(0);
 		typename iterator_type <level_map, t_trie>::type it;
-		// FIXME: assert true for the following?
-		find_lowest_ancestor(trie, key, it, level);
-		
+		bool const status(find_lowest_ancestor(trie, key, it, level));
+		assert(status);
 		key_type const next_branch(0x1 & (key >> level));
 		edge const &edge((*it)[next_branch]);
 		
@@ -567,10 +566,9 @@ namespace asm_lsw {
 	template <typename t_spec>
 	void x_fast_trie_base <t_spec>::print() const
 	{
-#if 0
 		std::cerr
 			<< "LSS:" << std::endl
-			<< "[level]: key [0x1 & key]: left key (left value) (d if descendant) right key (right value) (d if descendant)" << std::endl;
+			<< "[level]: key [0x1 & key]: left key (left value) [d if descendant] right key (right value) [d if descendant]" << std::endl;
 
 		{
 			remove_c_t <decltype(s_levels)> i(0);
@@ -578,28 +576,35 @@ namespace asm_lsw {
 			{
 				auto const level(s_levels - i - 1);
 				std::cerr << boost::format("[%02x]:") % level;
+				assert(1 + level == lss_it->access_key_fn().level());
 				for (auto node_it(lss_it->cbegin()), node_end(lss_it->cend()); node_it != node_end; ++node_it)
 				{
 					// In case of the PHF map adaptor, node_it->first points to the
 					// first item in the pair (which is the key as expected),
 					// not the vector index.
-					auto const key(node_it->first);
-					auto const &node(node_it->second);
-					auto const left(node[0].key());
-					auto const right(node[1].key());
-					auto const llk(node[0].level_key(level));
-					auto const rlk(node[1].level_key(level));
-					bool const l_is_descendant(node[0].is_descendant());
-					bool const r_is_descendant(node[1].is_descendant());
-					std::cerr << boost::format("\t(%02x [%02x]: %02x (%02x)") % (+key) % (+(0x1 & key)) % (+llk) % (+left);
+					auto const &node(*node_it);
+					auto const &lhs(node[0]);
+					auto const &rhs(node[1]);
+					auto const key(lss_it->access_key_fn()(node));
+					auto const llk(lhs.level_key(level));
+					auto const rlk(rhs.level_key(level));
+					auto const lk(lhs.key());
+					auto const rk(rhs.key());
+					bool const l_is_descendant(lhs.is_descendant());
+					bool const r_is_descendant(rhs.is_descendant());
+
+					assert(lhs.level_key(1 + level) == key);
+					assert(rhs.level_key(1 + level) == key);
+
+					std::cerr << boost::format("\t(%02x [%02x]: %02x (%02x)") % (+key) % (+(0x1 & key)) % (+llk) % (+lk);
 					if (l_is_descendant)
-						std::cerr << " (d) ";
+						std::cerr << " [d] ";
 					else
 						std::cerr << "     ";
 
-					std::cerr << boost::format("%02x (%02x)") % (+rlk) % (+right);
+					std::cerr << boost::format("%02x (%02x)") % (+rlk) % (+rk);
 					if (r_is_descendant)
-						std::cerr << " (d) ";
+						std::cerr << " [d] ";
 					else
 						std::cerr << "     ";
 					std::cerr << ")" << std::endl;
@@ -625,7 +630,6 @@ namespace asm_lsw {
 			auto const min(m_min);
 			std::cerr << boost::format("Min leaf: %02x\n") % (+min);
 		}
-#endif
 	}
 }
 

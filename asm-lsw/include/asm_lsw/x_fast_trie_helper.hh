@@ -110,9 +110,16 @@ namespace asm_lsw {
 		public:
 			typedef x_fast_trie_node <t_key> key_type;
 			typedef t_key accessed_type;
+			
 			access_key(): m_level(0) {}
 			access_key(uint8_t const level): m_level(level) {}
-			accessed_type operator()(key_type const &node) const { return node[0].level_key(m_level); }
+			
+			uint8_t level() const { return m_level; }
+			
+			accessed_type operator()(key_type const &node) const
+			{
+				return node[0].level_key(m_level);
+			}
 		};
 	};
 	
