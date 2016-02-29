@@ -162,7 +162,7 @@ namespace asm_lsw {
 		static bool find_successor(t_trie &trie, key_type const key, t_iterator &succ, bool allow_equal);
 		
 		template <typename t_trie, typename t_iterator>
-		static void find_nearest(t_trie &trie, key_type const key, t_iterator &it);
+		static bool find_nearest(t_trie &trie, key_type const key, t_iterator &it);
 		
 		template <typename t_trie, typename t_iterator>
 		static bool find_lowest_ancestor(t_trie &trie, key_type const key, t_iterator &it, level_idx_type &level);
@@ -197,7 +197,7 @@ namespace asm_lsw {
 		bool find(key_type const key, const_leaf_iterator &it) const;
 		bool find_predecessor(key_type const key, const_leaf_iterator &pred, bool allow_equal = false) const;
 		bool find_successor(key_type const key, const_leaf_iterator &succ, bool allow_equal = false) const;
-		void find_nearest(key_type const key, const_leaf_iterator &it) const;
+		bool find_nearest(key_type const key, const_leaf_iterator &it) const;
 		bool find_lowest_ancestor(key_type const key, typename level_map::const_iterator &it, level_idx_type &level) const;
 		bool find_node(key_type const key, level_idx_type const level, typename level_map::const_iterator &node) const;
 		
@@ -239,10 +239,9 @@ namespace asm_lsw {
 	auto x_fast_trie_base <t_spec>::max_key() const -> key_type
 	{
 		const_leaf_iterator it;
-		if (find_predecessor(m_min, it, false))
-			return iterator_key(it);
-
-		return m_min;
+		bool const status(find(m_min, it));
+		assert(status);
+		return it->second.prev;
 	}
 
 
@@ -411,6 +410,9 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool x_fast_trie_base <t_spec>::find_predecessor(t_trie &trie, key_type const key, t_iterator &pred, bool allow_equal)
 	{
+		if (0 == trie.size())
+			return false;
+		
 		t_iterator it;
 		bool const status(find(trie, key, it));
 
@@ -421,7 +423,8 @@ namespace asm_lsw {
 		}
 		else if (!status)
 		{
-			find_nearest(trie, key, it);
+			bool const status(find_nearest(trie, key, it));
+			assert(status);
 		}
 		
 		if (it->first < key)
@@ -453,6 +456,9 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool x_fast_trie_base <t_spec>::find_successor(t_trie &trie, key_type const key, t_iterator &succ, bool allow_equal)
 	{
+		if (0 == trie.size())
+			return false;
+
 		t_iterator it;
 		bool const status(find(trie, key, it));
 		
@@ -463,7 +469,8 @@ namespace asm_lsw {
 		}
 		else if (!status)
 		{
-			find_nearest(trie, key, it);
+			bool const status(find_nearest(trie, key, it));
+			assert(status);
 		}
 		
 		if (it->first > key)
@@ -485,7 +492,7 @@ namespace asm_lsw {
 
 
 	template <typename t_spec>
-	void x_fast_trie_base <t_spec>::find_nearest(key_type const key, const_leaf_iterator &it) const
+	bool x_fast_trie_base <t_spec>::find_nearest(key_type const key, const_leaf_iterator &it) const
 	{
 		find_nearest(*this, key, it);
 	}
@@ -493,9 +500,12 @@ namespace asm_lsw {
 
 	template <typename t_spec>
 	template <typename t_trie, typename t_iterator>
-	void x_fast_trie_base <t_spec>::find_nearest(t_trie &trie, key_type const key, t_iterator &nearest)
+	bool x_fast_trie_base <t_spec>::find_nearest(t_trie &trie, key_type const key, t_iterator &nearest)
 	{
-		// FIXME: return type? if lowest ancestor returns false.
+		if (0 == trie.size())
+			return false;
+
+		// FIXME: can lowest ancestor return false?
 		level_idx_type level(0);
 		typename iterator_type <level_map, t_trie>::type it;
 		bool const status(find_lowest_ancestor(trie, key, it, level));
@@ -508,6 +518,7 @@ namespace asm_lsw {
 		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
 		assert(edge.key() == nearest->first);
+		return true;
 	}
 
 
