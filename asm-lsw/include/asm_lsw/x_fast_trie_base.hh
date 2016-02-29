@@ -187,9 +187,12 @@ namespace asm_lsw {
 		size_type size() const { return m_leaf_links.size(); }
 		bool contains(key_type const key) const;
 		key_type min_key() const { return m_min; } // Returns a meaningful value if the tree is not empty.
+		key_type max_key() const;
 		
-		const_leaf_iterator cbegin() const { return m_leaf_links.cbegin(); }
-		const_leaf_iterator cend() const { return m_leaf_links.cend(); }
+		const_leaf_iterator begin() const	{ return m_leaf_links.cbegin(); }
+		const_leaf_iterator end() const		{ return m_leaf_links.cend(); }
+		const_leaf_iterator cbegin() const	{ return m_leaf_links.cbegin(); }
+		const_leaf_iterator cend() const	{ return m_leaf_links.cend(); }
 		
 		bool find(key_type const key, const_leaf_iterator &it) const;
 		bool find_predecessor(key_type const key, const_leaf_iterator &pred, bool allow_equal = false) const;
@@ -229,6 +232,17 @@ namespace asm_lsw {
 		assert(0 <= idx);
 		assert(idx < s_levels);
 		return m_lss[idx];
+	}
+
+
+	template <typename t_spec>
+	auto x_fast_trie_base <t_spec>::max_key() const -> key_type
+	{
+		const_leaf_iterator it;
+		if (find_predecessor(m_min, it, false))
+			return iterator_key(it);
+
+		return m_min;
 	}
 
 
