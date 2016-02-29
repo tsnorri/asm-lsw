@@ -118,6 +118,9 @@ namespace asm_lsw {
 
 	protected:
 		typedef detail::x_fast_trie_trait<key_type, value_type> trait;
+		
+	protected:
+		key_type m_offset{0};
 
 	protected:
 		template <typename t_ret_key, typename t_key>
@@ -160,10 +163,18 @@ namespace asm_lsw {
 			}
 		};
 
+	protected:
+		x_fast_trie_compact_as(key_type const offset):
+			m_offset(offset)
+		{
+		}
+		
 	public:
 		template <typename t_key>
 		static x_fast_trie_compact_as *construct(x_fast_trie <t_key, t_value> &);
 
+		key_type offset() const { return m_offset; }
+		
 		virtual size_type key_size() const = 0;
 		virtual size_type size() const = 0;
 		virtual bool contains(key_type const key) const = 0;
@@ -202,20 +213,19 @@ namespace asm_lsw {
 
 	protected:
 		trie_type m_trie;
-		t_max_key m_diff{0};
 
 	public:
 		x_fast_trie_compact_as_tpl(trie_type &trie, t_max_key diff):
-			m_trie(std::move(trie)),
-			m_diff(diff)
+			base_class(diff),
+			m_trie(std::move(trie))
 		{
 		}
 
 		virtual size_type key_size() const override					{ return sizeof(t_key); }
 		virtual size_type size() const override						{ return m_trie.size(); }
-		virtual bool contains(key_type const key) const override	{ return m_trie.contains(m_diff + key); }
-		virtual key_type min_key() const override					{ return m_diff + m_trie.min_key(); }
-		virtual key_type max_key() const override					{ return m_diff + m_trie.max_key(); }
+		virtual bool contains(key_type const key) const override	{ return m_trie.contains(key - this->m_offset); }
+		virtual key_type min_key() const override					{ return this->m_offset + m_trie.min_key(); }
+		virtual key_type max_key() const override					{ return this->m_offset + m_trie.max_key(); }
 
 		virtual const_leaf_iterator cbegin() const override			{ return const_leaf_iterator(*this, 0); }
 		virtual const_leaf_iterator cend() const override			{ return const_leaf_iterator(*this, size()); }
@@ -237,7 +247,7 @@ namespace asm_lsw {
 	) const -> difference_type
 	{
 		assert(m_trie == other.m_trie);
-		return (m_idx <= other.m_idx ? other.m_idx - m_idx : m_idx - other.m_idx);
+		return other.m_idx - m_idx;
 	}
 	
 	
@@ -268,7 +278,8 @@ namespace asm_lsw {
 	{
 		if (res)
 		{
-			out_it = const_leaf_iterator(*this, it - m_trie.cbegin());
+			auto const distance(it - m_trie.cbegin());
+			out_it = const_leaf_iterator(*this, distance);
 			return true;
 		}
 		return false;
@@ -280,8 +291,13 @@ namespace asm_lsw {
 		key_type const key, const_leaf_iterator &out_it
 	) const
 	{
+		if (key < this->m_offset)
+			return false;
+		else if (std::numeric_limits <typename trie_type::key_type>::max() < key - this->m_offset)
+			return false;
+		
 		typename trie_type::const_leaf_iterator it;
-		return check_find_result(m_trie.find(key, it), it, out_it);
+		return check_find_result(m_trie.find(key - this->m_offset, it), it, out_it);
 	}
 
 
@@ -290,8 +306,13 @@ namespace asm_lsw {
 		key_type const key, const_leaf_iterator &out_it, bool allow_equal
 	) const
 	{
+		if (key < this->m_offset)
+			return false;
+		else if (std::numeric_limits <typename trie_type::key_type>::max() < key - this->m_offset)
+			return find(max_key(), out_it);
+
 		typename trie_type::const_leaf_iterator pred;
-		return check_find_result(m_trie.find_predecessor(key, pred, allow_equal), pred, out_it);
+		return check_find_result(m_trie.find_predecessor(key - this->m_offset, pred, allow_equal), pred, out_it);
 	}
 
 
@@ -300,8 +321,13 @@ namespace asm_lsw {
 		key_type const key, const_leaf_iterator &out_it, bool allow_equal
 	) const
 	{
+		if (key < this->m_offset)
+			return find(min_key(), out_it);
+		else if (std::numeric_limits <typename trie_type::key_type>::max() < key - this->m_offset)
+			return false;
+
 		typename trie_type::const_leaf_iterator succ;
-		return check_find_result(m_trie.find_successor(key, succ, allow_equal), succ, out_it);
+		return check_find_result(m_trie.find_successor(key - this->m_offset, succ, allow_equal), succ, out_it);
 	}
 
 
@@ -310,7 +336,9 @@ namespace asm_lsw {
 	{
 		auto const &leaf_link(m_trie.leaf_link(idx));
 		typename leaf_it_val::second_type ret_link(leaf_link.second);
-		leaf_it_val retval{leaf_link.first, ret_link};
+		ret_link.prev += this->m_offset;
+		ret_link.next += this->m_offset;
+		leaf_it_val retval{this->m_offset + leaf_link.first, ret_link};
 		return retval;
 	}
 
@@ -336,6 +364,9 @@ namespace asm_lsw {
 		x_fast_trie <t_key, t_value> &trie
 	)
 	{
+		if (0 == trie.size())
+			return x_fast_trie_compact_as::construct_specific <uint8_t>(trie, 0);
+		
 		auto const min(trie.min_key());
 		auto const max(trie.max_key());
 		auto const ret_max(max - min);
