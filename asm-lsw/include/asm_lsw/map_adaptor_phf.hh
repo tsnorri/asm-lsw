@@ -374,7 +374,7 @@ namespace asm_lsw {
 	auto map_iterator_phf_tpl <t_adaptor, t_it_val>::distance_to(map_iterator_phf_tpl <t_adaptor, t_other_val> const &other) const -> difference_type
 	{
 		assert(m_adaptor == other.m_adaptor);
-		return (m_idx <= other.m_idx ? other.m_idx - m_idx : m_idx - other.m_idx);
+		return other.m_idx - m_idx;
 	}
 	
 	
@@ -553,6 +553,9 @@ namespace asm_lsw {
 	template <typename t_spec, typename t_map>
 	void map_adaptor_phf_builder <t_spec, t_map>::post_init(t_map &map, bool const call_post_init_map, bool const create_allocator)
 	{
+		if (0 == map.size())
+			return;
+		
 		if (call_post_init_map)
 		{
 			post_init_map <t_map> pi;
