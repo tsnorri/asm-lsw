@@ -98,6 +98,7 @@ namespace asm_lsw {
 	};
 	
 	
+	// FIXME: move to namespace detail.
 	template <typename t_adaptor, typename t_it_val>
 	class map_iterator_phf_tpl : public boost::iterator_facade <
 		map_iterator_phf_tpl <t_adaptor, t_it_val>,
@@ -266,6 +267,7 @@ namespace asm_lsw {
 		iterator end()											{ return iterator(this, this->m_vector.size()); }
 		const_iterator end() const								{ return const_iterator(this, this->m_vector.size()); }
 		const_iterator cend() const								{ return const_iterator(this, this->m_vector.size()); }
+		kv_type const &operator[](size_type const idx) const	{ return this->m_vector[idx]; }
 	};
 
 
@@ -372,7 +374,7 @@ namespace asm_lsw {
 	auto map_iterator_phf_tpl <t_adaptor, t_it_val>::distance_to(map_iterator_phf_tpl <t_adaptor, t_other_val> const &other) const -> difference_type
 	{
 		assert(m_adaptor == other.m_adaptor);
-		return std::abs(m_idx - other.m_idx);
+		return (m_idx <= other.m_idx ? other.m_idx - m_idx : m_idx - other.m_idx);
 	}
 	
 	
