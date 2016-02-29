@@ -33,6 +33,9 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value = void>
 	class x_fast_trie_compact : public x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value>>
 	{
+		template <typename, typename, typename>
+		friend class x_fast_trie_compact_as_tpl;
+
 	protected:
 		typedef x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value>> base_class;
 		
@@ -58,6 +61,9 @@ namespace asm_lsw {
 		x_fast_trie_compact &operator=(x_fast_trie_compact &&) & = default;
 		
 		explicit x_fast_trie_compact(x_fast_trie <key_type, value_type> &other);
+
+	protected:
+		typename leaf_link_map::kv_type const &leaf_link(typename leaf_link_map::size_type const idx) const { return this->m_leaf_links[idx]; }
 	};
 	
 	

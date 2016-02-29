@@ -131,6 +131,20 @@ namespace asm_lsw { namespace detail {
 		// FIXME: movability for val?
 		x_fast_trie_leaf_link(): prev(0), next(0) {}
 		x_fast_trie_leaf_link(t_key p, t_key n, t_value val): prev(p), next(n), value(val) {}
+
+		template <typename t_other_key, typename t_other_value>
+		explicit x_fast_trie_leaf_link(x_fast_trie_leaf_link <t_other_key, t_other_value> const &other):
+			prev(other.prev),
+			next(other.next),
+			value(other.value)
+		{
+			static_assert(std::is_same <
+				remove_c_t <remove_ref_t <t_value>>,
+				remove_c_t <remove_ref_t <t_other_value>>
+			>::value, "");
+			assert(other.prev <= std::numeric_limits <t_key>::max());
+			assert(other.next <= std::numeric_limits <t_key>::max());
+		}
 	};
 	
 	
@@ -144,6 +158,15 @@ namespace asm_lsw { namespace detail {
 		
 		x_fast_trie_leaf_link(): x_fast_trie_leaf_link(0, 0) {}
 		x_fast_trie_leaf_link(t_key p, t_key n): prev(p), next(n) {}
+
+		template <typename t_other_key>
+		explicit x_fast_trie_leaf_link(x_fast_trie_leaf_link <t_other_key, void> const &other):
+			prev(other.prev),
+			next(other.prev)
+		{
+			assert(other.prev <= std::numeric_limits <t_key>::max());
+			assert(other.next <= std::numeric_limits <t_key>::max());
+		}
 	};
 	
 	

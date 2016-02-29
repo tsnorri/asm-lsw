@@ -20,5 +20,6 @@
 
 #include <asm_lsw/x_fast_trie.hh>
 #include <asm_lsw/x_fast_trie_compact.hh>
+#include <asm_lsw/x_fast_trie_compact_as.hh>
 
 #endif

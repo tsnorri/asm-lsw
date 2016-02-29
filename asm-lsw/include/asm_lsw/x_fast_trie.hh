@@ -52,14 +52,22 @@ namespace asm_lsw {
 		x_fast_trie &operator=(x_fast_trie const &) & = default;
 		x_fast_trie &operator=(x_fast_trie &&) & = default;
 		
-		// Conditionally enable either.
+		// Conditionally enable either two of the following.
 		// (Return type of the first one is void == std::enable_if<...>::type.)
 		template <typename T = value_type>
 		typename std::enable_if <std::is_void <T>::value, void>::type
 		insert(key_type const key);
+
+		template <typename t_iterator, typename T = value_type>
+		typename std::enable_if <std::is_void <T>::value, void>::type
+		insert_it(t_iterator first, t_iterator last);
 		
 		template <typename T = value_type>
 		void insert(key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type const val);
+
+		template <typename t_iterator, typename T = value_type>
+		typename std::enable_if <!std::is_void <T>::value, void>::type
+		insert_it(t_iterator first, t_iterator last);
 		
 		void erase(key_type const key);
 
@@ -173,6 +181,29 @@ namespace asm_lsw {
 			}
 		}
 		this->m_lss.update_levels(key);
+	}
+
+
+	template <typename t_key, typename t_value>
+	template <typename t_iterator, typename T>
+	typename std::enable_if <std::is_void <T>::value, void>::type
+	x_fast_trie <t_key, t_value>::insert_it(t_iterator first, t_iterator last)
+	{
+		while (first != last)
+			insert(*first++);
+	}
+
+
+	template <typename t_key, typename t_value>
+	template <typename t_iterator, typename T>
+	typename std::enable_if <!std::is_void <T>::value, void>::type
+	x_fast_trie <t_key, t_value>::insert_it(t_iterator first, t_iterator last)
+	{
+		while (first != last)
+		{
+			insert(first->first, first->second);
+			++first;
+		}
 	}
 
 	
