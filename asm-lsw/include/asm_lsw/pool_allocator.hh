@@ -64,6 +64,7 @@ namespace asm_lsw {
 
 
 namespace asm_lsw { namespace detail {
+	
 	class pool_allocator_impl
 	{
 	protected:

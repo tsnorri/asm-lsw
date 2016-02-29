@@ -19,131 +19,80 @@
 #define ASM_LSW_X_FAST_TRIE_HELPER_HH
 
 #include <array>
+#include <asm_lsw/fast_trie_common.hh>
+#include <asm_lsw/x_fast_trie_base.hh>
 
 
-namespace asm_lsw {
+namespace asm_lsw { namespace detail {
 
-	template <
-		typename t_key,
-		typename t_value,
-		template <typename ...> class t_map,
-		template <template <typename ...> class, typename, typename> class t_map_adaptor
-	>
-	struct x_fast_trie_base_spec
+	template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
+	struct x_fast_trie_map_adaptor_tpl
 	{
-		typedef t_key key_type;														// Trie key type.
-		typedef t_value value_type;													// Trie value type.
-
-		template <typename ... Args>
-		using map_type = t_map <Args ...>;											// Hash set / map type.
-		
-		template <typename t_map_key, typename t_map_value>
-		using map_adaptor_type = t_map_adaptor <map_type, t_map_key, t_map_value>;	// Hash map adaptor. Parameters are map type, key type and value type.
+		typedef map_adaptor <fast_trie_map_adaptor_map <t_value>::template type, t_key, t_value, t_access_key> type;
+		static constexpr bool needs_custom_constructor() { return false; }
 	};
-
-
-	// FIXME: used by the base class.
-	template <typename t_key>
-	class x_fast_trie_edge
+	
+	
+	// Specialization for nodes / edges with a custom hash function.
+	template <typename t_key, typename t_value>
+	struct x_fast_trie_map_adaptor_tpl <x_fast_trie_node <t_key>, t_value, typename x_fast_trie_node <t_key>::access_key>
 	{
-	protected:
-		typedef t_key key_type;
+		typedef x_fast_trie_node <t_key> key_type;
+		typedef map_adaptor <
+			fast_trie_map_adaptor_map <t_value>::template type,
+			key_type,
+			t_value,
+			typename key_type::access_key
+		> type;
 
-	protected:
-		key_type m_key;			// Key of the child node in LSS.
-		bool m_is_descendant;	// If true, points to m_leaf_links.
+		static constexpr bool needs_custom_constructor() { return true; }
 		
-	public:
-		x_fast_trie_edge(): x_fast_trie_edge(0, false) {};
-
-		x_fast_trie_edge(key_type key, bool is_descendant):
-			m_key(key),
-			m_is_descendant(is_descendant)
+		template <typename t_array>
+		static void construct_map_adaptors(t_array &array)
 		{
+			for (typename t_array::size_type i(0), count(array.size()); i < count; ++i)
+			{
+				typedef typename t_array::value_type adaptor_type;
+				typedef typename adaptor_type::map_type map_type;
+				typedef typename adaptor_type::access_key_fn_type access_key_fn_type;
+
+				access_key_fn_type acc(1 + i);
+				map_type map(0, acc, acc);
+				adaptor_type adaptor(map, acc); // Takes ownership.
+				array[i] = std::move(adaptor);
+			}
 		}
-
-		key_type key() const { return m_key; }
-		key_type level_key(std::size_t level) const { assert(0 <= level); return m_key >> level; }
-		bool is_descendant() const { return m_is_descendant; }	
-	};
-
-
-	// FIXME: used by the base class.
-	template <typename t_key, typename t_value>
-	struct x_fast_trie_leaf_link
-	{
-		// FIXME: use iterators instead for prev and next?
-		t_key prev;
-		t_key next;
-		t_value value;
-		
-		// FIXME: movability for val?
-		x_fast_trie_leaf_link(): prev(0), next(0) {}
-		x_fast_trie_leaf_link(t_key p, t_key n, t_value val): prev(p), next(n), value(val) {}
 	};
 	
 	
-	// Specialization for a set type collection.
-	template <typename t_key>
-	struct x_fast_trie_leaf_link <t_key, void>
+	struct x_fast_trie_lss_find_fn
 	{
-		// FIXME: use iterators instead for prev and next?
-		t_key prev;
-		t_key next;
-		
-		x_fast_trie_leaf_link(): x_fast_trie_leaf_link(0, 0) {}
-		x_fast_trie_leaf_link(t_key p, t_key n): prev(p), next(n) {}
-	};
-	
-	
-	template <typename t_key, typename t_value>
-	struct x_fast_trie_trait
-	{
-		typedef t_key key_type;
-		typedef t_value value_type;
-
-		constexpr bool has_value() const
+		template <typename t_lss_acc, typename t_iterator>
+		bool operator()(
+			t_lss_acc &lss,
+			typename t_lss_acc::level_idx_type const level,
+			typename t_lss_acc::key_type const key,
+			t_iterator &out_it
+		)
 		{
+			typename t_lss_acc::node node(key, 0);
+			t_iterator it(lss.m_lss[level].find(node));
+			if (lss.m_lss[level].cend() == it)
+				return false;
+	
+			out_it = it;
 			return true;
 		}
-		
-		template <typename t_iterator>
-		key_type key(t_iterator it) const
-		{
-			return it->first;
-		}
-
-		template <typename t_iterator>
-		value_type const &value(t_iterator it) const
-		{
-			return it->second.value;
-		}
 	};
-	
-	
-	template <typename t_key>
-	struct x_fast_trie_trait <t_key, void>
-	{
-		typedef t_key key_type;
-		typedef t_key value_type;
-		
-		constexpr bool has_value() const
-		{
-			return false;
-		}
 
-		template <typename t_iterator>
-		key_type key(t_iterator it)
-		{
-			return it->first;
-		}
 
-		template <typename t_iterator>
-		value_type const &value(t_iterator it)
-		{
-			return it->first;
-		}
-	};
-}
+	template <typename t_key, typename t_value>
+	using x_fast_trie_spec = x_fast_trie_base_spec <
+		t_key,
+		t_value,
+		x_fast_trie_map_adaptor_tpl,
+		x_fast_trie_lss_find_fn
+	>;
+}}
 
 #endif

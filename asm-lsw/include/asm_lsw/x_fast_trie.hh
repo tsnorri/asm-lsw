@@ -19,22 +19,18 @@
 #define ASM_LSW_X_FAST_TRIE_HH
 
 #include <asm_lsw/x_fast_trie_base.hh>
-#include <unordered_map>
-
-
-namespace asm_lsw {
+#include <asm_lsw/x_fast_trie_helper.hh>
 	
-	template <typename t_key, typename t_value>
-	using x_fast_trie_spec = x_fast_trie_base_spec <t_key, t_value, std::unordered_map, map_adaptor>;
-
 	
+namespace asm_lsw {	
+
 	template <typename t_key, typename t_value = void>
-	class x_fast_trie : public x_fast_trie_base <x_fast_trie_spec <t_key, t_value>>
+	class x_fast_trie : public x_fast_trie_base <detail::x_fast_trie_spec <t_key, t_value>>
 	{
 		template <typename, typename> friend class x_fast_trie_compact;
 		
 	protected:
-		typedef x_fast_trie_base <x_fast_trie_spec <t_key, t_value>> base_class;
+		typedef x_fast_trie_base <detail::x_fast_trie_spec <t_key, t_value>> base_class;
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::leaf_link_map leaf_link_map;
@@ -59,11 +55,11 @@ namespace asm_lsw {
 		// Conditionally enable either.
 		// (Return type of the first one is void == std::enable_if<...>::type.)
 		template <typename T = value_type>
-		typename std::enable_if<std::is_void<T>::value, void>::type
+		typename std::enable_if <std::is_void <T>::value, void>::type
 		insert(key_type const key);
 		
 		template <typename T = value_type>
-		void insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val);
+		void insert(key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type const val);
 		
 		void erase(key_type const key);
 
@@ -78,14 +74,14 @@ namespace asm_lsw {
 		bool find_predecessor(key_type const key, leaf_iterator &pred, bool allow_equal = false);
 		bool find_successor(key_type const key, leaf_iterator &succ, bool allow_equal = false);
 		void find_nearest(key_type const key, leaf_iterator &it);
-		void find_lowest_ancestor(key_type const key, typename level_map::iterator &it, level_idx_type &level);
+		bool find_lowest_ancestor(key_type const key, typename level_map::iterator &it, level_idx_type &level);
 		bool find_node(key_type const key, level_idx_type const level, typename level_map::iterator &node);
 	};
 	
 	
 	template <typename t_key, typename t_value>
 	template <typename T>
-	typename std::enable_if<std::is_void<T>::value, void>::type
+	typename std::enable_if <std::is_void <T>::value, void>::type
 	x_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
 		// Update leaf links.
@@ -134,7 +130,7 @@ namespace asm_lsw {
 
 	template <typename t_key, typename t_value>
 	template <typename T>
-	void x_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val)
+	void x_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type const val)
 	{
 		// Update leaf links.
 		auto &map(this->m_leaf_links.map());
@@ -231,13 +227,13 @@ namespace asm_lsw {
 
 
 	template <typename t_key, typename t_value>
-	void x_fast_trie <t_key, t_value>::find_lowest_ancestor(
+	bool x_fast_trie <t_key, t_value>::find_lowest_ancestor(
 		key_type const key,
 		typename level_map::iterator &it,
 		level_idx_type &level
 	)
 	{
-		find_lowest_ancestor(*this, key, it, level);
+		return find_lowest_ancestor(*this, key, it, level);
 	}
 
 

@@ -18,27 +18,24 @@
 #ifndef ASM_LSW_X_FAST_TRIE_COMPACT_HH
 #define ASM_LSW_X_FAST_TRIE_COMPACT_HH
 
-#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/pool_allocator.hh>
 #include <asm_lsw/util.hh>
 #include <asm_lsw/x_fast_trie_base.hh>
+#include <asm_lsw/x_fast_trie_compact_helper.hh>
 
 
 namespace asm_lsw {
-	
 	template <typename t_key, typename t_value>
 	class x_fast_trie;
 	
-	// FIXME: move to namespace detail.
-	template <typename t_key, typename t_value>
-	using x_fast_trie_compact_spec = x_fast_trie_base_spec <t_key, t_value, std::vector, fast_trie_compact_map_adaptor>;
 	
-	// Use perfect hashing instead of the one provided by STL.
+	// Uses perfect hashing instead of the one provided by STL.
 	template <typename t_key, typename t_value = void>
-	class x_fast_trie_compact : public x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value>>
+	class x_fast_trie_compact : public x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value>>
 	{
 	protected:
-		typedef x_fast_trie_base <x_fast_trie_compact_spec <t_key, t_value>> base_class;
+		typedef x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value>> base_class;
+		
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
 		typedef typename base_class::leaf_link_map leaf_link_map;
@@ -88,14 +85,17 @@ namespace asm_lsw {
 		lss_builders.reserve(base_class::s_levels);
 		for (level_idx_type i(0); i < base_class::s_levels; ++i)
 		{
+			typename level_map::access_key_fn_type acc(i);
+			
 			// Move the contents of the other map.
-			auto &map(other.m_lss.level(i).map());
-			lss_builder_type builder(map, allocator);
+			// Use the adaptor to move access_key.
+			auto &adaptor(other.m_lss.level(i));
+			lss_builder_type builder(adaptor.map(), adaptor.access_key_fn(), allocator);
 		
 			lss_builders.emplace_back(std::move(builder));
 		}
 		
-		leaf_link_map_builder_type leaf_link_map_builder(other.m_leaf_links.map(), allocator);
+		leaf_link_map_builder_type leaf_link_map_builder(other.m_leaf_links.map(), other.m_leaf_links.access_key_fn(), allocator);
 		
 		// Calculate the space needed.
 		// Since new allocates space with correct alignment w.r.t. all fundamental types,
@@ -116,6 +116,7 @@ namespace asm_lsw {
 			for (auto &builder : lss_builders)
 			{
 				lss_adaptor_type adaptor(builder);
+				
 				this->m_lss.level(i) = std::move(adaptor);
 				++i;
 			}

@@ -19,6 +19,7 @@
 #define ASM_LSW_Y_FAST_TRIE_HH
 
 #include <asm_lsw/exception_tpl.hh>
+#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/util.hh>
 #include <asm_lsw/y_fast_trie_base.hh>
 #include <unordered_map>
@@ -28,17 +29,37 @@ namespace asm_lsw {
 	
 	template <typename t_key, typename t_value>
 	class x_fast_trie;
-		
-		
+}
+
+
+namespace asm_lsw { namespace detail {
+
+	template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
+	using y_fast_trie_map_adaptor = map_adaptor <
+		fast_trie_map_adaptor_map <t_value>::template type,
+		t_key,
+		t_value,
+		t_access_key
+	>;
+
+
 	template <typename t_key, typename t_value>
-	using y_fast_trie_spec = y_fast_trie_base_spec <t_key, t_value, std::unordered_map, map_adaptor, x_fast_trie>;
+	using y_fast_trie_spec = y_fast_trie_base_spec <
+		t_key,
+		t_value,
+		y_fast_trie_map_adaptor,
+		x_fast_trie <t_key, void>
+	>;
+}}	
 	
-	
+
+namespace asm_lsw {
+
 	template <typename t_key, typename t_value = void>
-	class y_fast_trie : public y_fast_trie_base <y_fast_trie_spec <t_key, t_value>>
+	class y_fast_trie : public y_fast_trie_base <detail::y_fast_trie_spec <t_key, t_value>>
 	{
 	public:
-		typedef y_fast_trie_base <y_fast_trie_spec <t_key, t_value>> base_class;
+		typedef y_fast_trie_base <detail::y_fast_trie_spec <t_key, t_value>> base_class;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::size_type size_type;
@@ -136,7 +157,7 @@ namespace asm_lsw {
 	// FIXME: check this.
 	template <typename t_key, typename t_value>
 	template <typename T>
-	typename std::enable_if<std::is_void<T>::value, void>::type
+	typename std::enable_if <std::is_void <T>::value, void>::type
 	y_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
 		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
@@ -159,7 +180,9 @@ namespace asm_lsw {
 	// FIXME: check this.
 	template <typename t_key, typename t_value>
 	template <typename T>
-	void y_fast_trie <t_key, t_value>::insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val) // FIXME: making a copy of val.
+	void y_fast_trie <t_key, t_value>::insert(
+		key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type val
+	) // FIXME: making a copy of val.
 	{
 		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
 		++this->m_size;

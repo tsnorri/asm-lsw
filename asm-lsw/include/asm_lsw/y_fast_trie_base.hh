@@ -44,8 +44,8 @@ namespace asm_lsw {
 	protected:
 		typedef typename t_spec::trie_type representative_trie;
 		typedef typename t_spec::subtree_type subtree;
-		typedef typename t_spec::template map_adaptor_type <key_type, subtree> subtree_map;
-		typedef y_fast_trie_trait<key_type, value_type> trait;
+		typedef typename t_spec::template map_adaptor <key_type, subtree> subtree_map;
+		typedef detail::y_fast_trie_trait<key_type, value_type> trait;
 		
 	public:
 		typedef size_t size_type;

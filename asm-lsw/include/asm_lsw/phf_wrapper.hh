@@ -27,11 +27,12 @@ namespace asm_lsw {
 	class phf_wrapper
 	{
 	protected:
-		struct phf m_phf;
+		struct phf m_phf{};
 		
 	public:
 		phf_wrapper() {}
-		~phf_wrapper() { PHF::destroy(&m_phf); }
+                
+		~phf_wrapper() { if (is_valid()) PHF::destroy(&m_phf); }
 		
 		phf_wrapper(phf_wrapper const &) = delete;
 		phf_wrapper &operator=(phf_wrapper const &) & = delete;
@@ -48,6 +49,9 @@ namespace asm_lsw {
 			memset(&other.m_phf, 0, sizeof(struct phf));
 			return *this;
 		}
+
+		// Checked from PHF source that g is freed in PHF::destroy.
+		bool is_valid() const { return (nullptr != m_phf.g); }
 		
 		struct phf &get()				{ return m_phf; }
 		struct phf const &get() const	{ return m_phf; }
