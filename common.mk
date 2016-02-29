@@ -32,6 +32,10 @@ else
 	OPT_FLAGS	= $(OPT_FLAGS_DEBUG)
 endif
 
+ifeq ($(EXTRA_WARNINGS),1)
+	WARNING_FLAGS += -Wextra
+endif
+
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $<
