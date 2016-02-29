@@ -27,6 +27,9 @@ namespace asm_lsw {
 
 	template <typename T>
 	using remove_ref_t = typename std::remove_reference <T>::type;
+
+	template <typename T>
+	using remove_c_ref_t = remove_c_t <remove_ref_t <T>>;
 }
 
 #endif
