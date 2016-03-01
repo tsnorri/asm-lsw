@@ -353,11 +353,13 @@ void compact_any_type_tests()
 }
 
 
+template <typename t_trie, typename t_as_trie>
 void common_as_type_tests()
 {
+	typedef t_trie trie_type;
+	typedef t_as_trie ct_type;
+
 	it("should be possible to construct one from an empty trie", [](){
-		typedef asm_lsw::x_fast_trie <uint32_t> trie_type;
-		typedef asm_lsw::x_fast_trie_compact_as <uint32_t> ct_type;
 		
 		trie_type trie;
 		std::unique_ptr <ct_type> ct(ct_type::construct(trie));
@@ -366,9 +368,6 @@ void common_as_type_tests()
 	});
 	
 	it("should choose the correct key size", [](){
-		typedef asm_lsw::x_fast_trie <uint32_t> trie_type;
-		typedef asm_lsw::x_fast_trie_compact_as <uint32_t> ct_type;
-		
 		trie_type trie;
 		trie.insert(0x10001);
 		trie.insert(0x10002);
@@ -376,15 +375,13 @@ void common_as_type_tests()
 		trie.insert(0x10004);
 		
 		std::unique_ptr <ct_type> ct(ct_type::construct(trie));
+		AssertThat(trie.key_size(), Is().GreaterThan(1));
 		AssertThat(ct->key_size(), Equals(1));
 		AssertThat(ct->min_key(), Equals(0x10001));
 		AssertThat(ct->max_key(), Equals(0x10004));
 	});
 	
 	it("should handle values outside the allowed range", [](){
-		typedef asm_lsw::x_fast_trie <uint32_t> trie_type;
-		typedef asm_lsw::x_fast_trie_compact_as <uint32_t> ct_type;
-		
 		trie_type trie;
 		trie.insert(0x10000);
 		trie.insert(0x10001);
@@ -393,10 +390,11 @@ void common_as_type_tests()
 		trie.insert(0x10004);
 		
 		std::unique_ptr <ct_type> ct(ct_type::construct(trie));
+		AssertThat(trie.key_size(), Is().GreaterThan(1));
 		AssertThat(ct->key_size(), Equals(1));
 		AssertThat(ct->offset(), Equals(0x10000));
 		
-		ct_type::const_iterator it;
+		typename ct_type::const_iterator it;
 		
 		AssertThat(ct->find_predecessor(0x10, it, false), Equals(false));
 		AssertThat(ct->find_successor(0x10, it, false), Equals(true));
@@ -537,7 +535,7 @@ go_bandit([](){
 
 	// Compact X-fast tries (AS)
 	describe("compact AS trie:", [](){
-		common_as_type_tests();
+		common_as_type_tests <asm_lsw::x_fast_trie <uint32_t>, asm_lsw::x_fast_trie_compact_as <uint32_t>>();
 	});
 
 	describe("compact X-fast trie <uint8_t> (AS):", [](){
