@@ -90,7 +90,8 @@ namespace asm_lsw {
 		{
 		}
 		
-		auto size() const -> size_type;
+		std::size_t constexpr key_size() const { return sizeof(key_type); }
+		size_type size() const;
 		bool contains(key_type const key) const;
 		
 		bool find(key_type const key, const_subtree_iterator &iterator) const;

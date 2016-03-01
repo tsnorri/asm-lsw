@@ -184,6 +184,7 @@ namespace asm_lsw {
 		x_fast_trie_base &operator=(x_fast_trie_base const &) & = default;
 		x_fast_trie_base &operator=(x_fast_trie_base &&) & = default;
 
+		std::size_t constexpr key_size() const { return sizeof(key_type); }
 		size_type size() const { return m_leaf_links.size(); }
 		bool contains(key_type const key) const;
 		key_type min_key() const { return m_min; } // Returns a meaningful value if the tree is not empty.
