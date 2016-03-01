@@ -20,6 +20,7 @@
 
 #include <array>
 #include <asm_lsw/map_adaptor_helper.hh>
+#include <asm_lsw/util.hh>
 #include <cassert>
 
 

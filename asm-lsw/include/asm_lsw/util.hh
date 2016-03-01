@@ -18,7 +18,9 @@
 #ifndef ASM_LSW_UTIL_HH
 #define ASM_LSW_UTIL_HH
 
+#include <limits>
 #include <type_traits>
+ 
 
 namespace asm_lsw { namespace util {
 	// Preserve C++11 compatibility.
