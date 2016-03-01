@@ -494,7 +494,7 @@ namespace asm_lsw {
 	template <typename t_spec>
 	bool x_fast_trie_base <t_spec>::find_nearest(key_type const key, const_leaf_iterator &it) const
 	{
-		find_nearest(*this, key, it);
+		return find_nearest(*this, key, it);
 	}
 
 

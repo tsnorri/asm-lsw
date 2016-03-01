@@ -126,7 +126,7 @@ namespace asm_lsw {
 
 				auto const &bps(ce.bps());
 				auto const count(bps.rank(bps.size() - 1)); // Number of (opening) parentheses.
-				for (remove_c_t<decltype(count)> i{1}; i <= count; ++i)
+				for (util::remove_c_t<decltype(count)> i{1}; i <= count; ++i)
 				{
 					// Find the index of each opening parenthesis and its counterpart,
 					// then convert to sparse index.
@@ -354,7 +354,7 @@ namespace asm_lsw {
 				
 				// Dense representation of the balanced parentheses.
 				decltype(path_count) j{0};
-				for (remove_c_t<decltype(node_count)> i{0}; i < node_count; ++i)
+				for (util::remove_c_t<decltype(node_count)> i{0}; i < node_count; ++i)
 				{
 					if (opening[i])
 					{
@@ -370,7 +370,7 @@ namespace asm_lsw {
 
 				// Mask of the sparse representation.
 				// Somehow |= is not ok.
-				for (remove_c_t<decltype(node_count)> i{0}; i < node_count; ++i)
+				for (util::remove_c_t<decltype(node_count)> i{0}; i < node_count; ++i)
 					opening[i] = opening[i] | closing[i];
 
 				mask = std::move(opening);
@@ -852,7 +852,7 @@ namespace asm_lsw {
 			cst_type::node_type u(cst.root());
 			cst_type::node_type core_path_beginning(u);
 			auto const patlen(pattern.size());
-			remove_c_t<decltype(patlen)> i(0);
+			util::remove_c_t<decltype(patlen)> i(0);
 
 			while (i < patlen)
 			{
