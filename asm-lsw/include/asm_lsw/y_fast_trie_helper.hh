@@ -127,6 +127,58 @@ namespace asm_lsw { namespace detail {
 			return *it;
 		}
 	};
+	
+	
+	template <typename, typename>
+	class y_fast_trie_base_subtree_iterator_wrapper_impl;
+		
+		
+	template <typename t_reference>
+	class y_fast_trie_base_subtree_iterator_wrapper
+	{
+	protected:
+		typedef y_fast_trie_base_subtree_iterator_wrapper <t_reference> this_class;
+		
+	public:
+		virtual void advance(std::ptrdiff_t const) = 0;
+		virtual std::ptrdiff_t distance_to(this_class const &other) const = 0;
+		virtual bool equal(this_class const &other) const = 0;
+		virtual t_reference dereference() const = 0;
+		
+		template <typename t_iterator>
+		static this_class *construct(t_iterator &it)
+		{
+			return new y_fast_trie_base_subtree_iterator_wrapper_impl <t_iterator, t_reference>(it);
+		}
+	};
+	
+	
+	template <typename t_iterator, typename t_reference>
+	class y_fast_trie_base_subtree_iterator_wrapper_impl : public y_fast_trie_base_subtree_iterator_wrapper <t_reference>
+	{
+	protected:
+		typedef y_fast_trie_base_subtree_iterator_wrapper <t_reference> base_class;
+		typedef y_fast_trie_base_subtree_iterator_wrapper_impl <t_iterator, t_reference> this_class;
+		
+	protected:
+		t_iterator m_it;
+		
+	public:
+		y_fast_trie_base_subtree_iterator_wrapper_impl(t_iterator &it): m_it(std::move(it)) {}
+
+		virtual void advance(std::ptrdiff_t const size) override { m_it += size; }
+		virtual t_reference dereference() const override { return *m_it; }
+
+		virtual bool equal(base_class const &other) const override
+		{
+			return dynamic_cast <this_class const &>(other).m_it == m_it;
+		}
+
+		virtual std::ptrdiff_t distance_to(base_class const &other) const override
+		{
+			return dynamic_cast <this_class const &>(other).m_it - m_it;
+		}
+	};
 }}
 
 #endif
