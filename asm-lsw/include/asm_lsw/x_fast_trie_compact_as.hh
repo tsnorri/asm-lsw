@@ -111,9 +111,7 @@ namespace asm_lsw {
 			typename value_ref <value_type>::type>
 		> leaf_it_val;
 
-		typedef x_fast_trie_compact_as_leaf_link_iterator_tpl <x_fast_trie_compact_as, leaf_it_val>			leaf_iterator;
 		typedef x_fast_trie_compact_as_leaf_link_iterator_tpl <x_fast_trie_compact_as, leaf_it_val const>	const_leaf_iterator;
-		typedef leaf_iterator iterator;
 		typedef const_leaf_iterator const_iterator;
 
 	protected:
@@ -126,44 +124,6 @@ namespace asm_lsw {
 		template <typename t_ret_key, typename t_key>
 		static x_fast_trie_compact_as *construct_specific(x_fast_trie <t_key, t_value> &, key_type const);
 
-		template <typename t_dst, typename t_src, typename T = typename t_dst::value_type>
-		struct fill_trie
-		{
-			static_assert(std::is_same <
-				typename remove_ref_t <t_src>::value_type,
-				typename remove_ref_t <t_dst>::value_type
-			>::value, "");
-
-			void operator()(t_dst &dst, t_src const &src, key_type const diff) const
-			{
-				for (auto const &kv : src)
-				{
-					typename t_dst::key_type key(kv.first - diff);
-					typename t_dst::value_type value(kv.second.value);
-					dst.insert(key, value);
-				}
-			}
-		};
-
-		template <typename t_dst, typename t_src>
-		struct fill_trie <t_dst, t_src, void>
-		{
-			static_assert(std::is_same <
-				typename remove_ref_t <t_src>::value_type,
-				typename remove_ref_t <t_dst>::value_type
-			>::value, "");
-
-			void operator()(t_dst &dst, t_src const &src, key_type const diff) const
-			{
-				for (auto const &kv : src)
-				{
-					typename t_dst::key_type key(kv.first - diff);
-					dst.insert(key);
-				}
-			}
-		};
-
-	protected:
 		x_fast_trie_compact_as(key_type const offset):
 			m_offset(offset)
 		{
@@ -188,6 +148,8 @@ namespace asm_lsw {
 		virtual bool find_predecessor(key_type const key, const_leaf_iterator &pred, bool allow_equal = false) const = 0;
 		virtual bool find_successor(key_type const key, const_leaf_iterator &succ, bool allow_equal = false) const = 0;
 		
+		virtual void print() const = 0;
+		
 		typename trait::key_type const iterator_key(const_leaf_iterator const &it) const { trait t; return t.key(it); }
 		typename trait::value_type const &iterator_value(const_leaf_iterator const &it) const { trait t; return t.value(it); }
 
@@ -208,15 +170,14 @@ namespace asm_lsw {
 	public:
 		typedef typename base_class::size_type size_type;
 		typedef typename base_class::key_type key_type;
-		typedef typename base_class::leaf_iterator leaf_iterator;
 		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 
 	protected:
 		trie_type m_trie;
 
 	public:
-		x_fast_trie_compact_as_tpl(trie_type &trie, t_max_key diff):
-			base_class(diff),
+		x_fast_trie_compact_as_tpl(trie_type &trie, t_max_key offset):
+			base_class(offset),
 			m_trie(std::move(trie))
 		{
 		}
@@ -233,6 +194,8 @@ namespace asm_lsw {
 		virtual bool find(key_type const key, const_leaf_iterator &it) const override;
 		virtual bool find_predecessor(key_type const key, const_leaf_iterator &pred, bool allow_equal = false) const override;
 		virtual bool find_successor(key_type const key, const_leaf_iterator &succ, bool allow_equal = false) const override;
+		
+		virtual void print() const override							{ m_trie.print(); }
 		
 	protected:
 		virtual leaf_it_val leaf_link(size_type idx) const override;
@@ -347,14 +310,14 @@ namespace asm_lsw {
 	template <typename t_ret_key, typename t_key>
 	x_fast_trie_compact_as <t_max_key, t_value> *x_fast_trie_compact_as <t_max_key, t_value>::construct_specific(
 		x_fast_trie <t_key, t_value> &trie,
-		key_type const diff
+		key_type const offset
 	)
 	{
 		x_fast_trie <t_ret_key, t_value> temp_trie;
-		fill_trie <decltype(temp_trie), decltype(trie)> ft;
-		ft(temp_trie, trie, diff);
+		util::fill_trie <decltype(temp_trie), decltype(trie), key_type> ft;
+		ft(temp_trie, trie, offset);
 		x_fast_trie_compact <t_ret_key, t_value> ct(temp_trie);
-		return new x_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value>(ct, diff);
+		return new x_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value>(ct, offset);
 	}
 
 

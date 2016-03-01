@@ -291,7 +291,7 @@ namespace asm_lsw {
 
 		auto const log2M(std::log2(m_max_key));
 		auto it(t1.cbegin());
-		for (remove_c_t<decltype(log2M)> i(0); i < log2M; ++i)
+		for (util::remove_c_t<decltype(log2M)> i(0); i < log2M; ++i)
 		{
 			hint = t2.emplace_hint(hint, *it);
 			++it;

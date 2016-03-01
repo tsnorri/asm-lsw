@@ -184,7 +184,7 @@ namespace asm_lsw {
 		typedef typename std::underlying_type<input_value>::type input_value_u;
 		
 		auto const len(dst.size());
-		for (remove_c_t<decltype(len)> i(0); i < len; ++i)
+		for (util::remove_c_t<decltype(len)> i(0); i < len; ++i)
 		{
 			input_value value(input_value::Space);
 			switch (src[i])

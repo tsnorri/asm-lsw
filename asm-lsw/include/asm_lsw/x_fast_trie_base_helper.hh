@@ -139,8 +139,8 @@ namespace asm_lsw { namespace detail {
 			value(other.value)
 		{
 			static_assert(std::is_same <
-				remove_c_t <remove_ref_t <t_value>>,
-				remove_c_t <remove_ref_t <t_other_value>>
+				util::remove_c_t <util::remove_ref_t <t_value>>,
+				util::remove_c_t <util::remove_ref_t <t_other_value>>
 			>::value, "");
 			assert(other.prev <= std::numeric_limits <t_key>::max());
 			assert(other.next <= std::numeric_limits <t_key>::max());

@@ -25,6 +25,7 @@
 
 
 namespace asm_lsw {
+	
 	template <typename t_key, typename t_value>
 	class x_fast_trie;
 	
@@ -71,7 +72,7 @@ namespace asm_lsw {
 	x_fast_trie_compact <t_key, t_value>::x_fast_trie_compact(x_fast_trie <key_type, value_type> &other):
 		x_fast_trie_compact()
 	{
-		typedef remove_ref_t <decltype(other)> other_adaptor_type;
+		typedef util::remove_ref_t <decltype(other)> other_adaptor_type;
 		typedef typename level_map::template builder_type <
 			typename other_adaptor_type::level_map::map_type
 		> lss_builder_type;
@@ -85,7 +86,7 @@ namespace asm_lsw {
 		pool_allocator <typename level_map::kv_type> allocator;
 		
 		// Create the builders.
-		assert(remove_ref_t <decltype(other)>::s_levels == base_class::s_levels);
+		assert(util::remove_ref_t <decltype(other)>::s_levels == base_class::s_levels);
 		
 		std::vector <lss_builder_type> lss_builders;
 		lss_builders.reserve(base_class::s_levels);

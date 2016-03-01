@@ -594,7 +594,7 @@ namespace asm_lsw {
 			<< "[level]: key [0x1 & key]: left key (left value) [d if descendant] right key (right value) [d if descendant]" << std::endl;
 
 		{
-			remove_c_t <decltype(s_levels)> i(0);
+			util::remove_c_t <decltype(s_levels)> i(0);
 			for (auto lss_it(m_lss.crbegin()), lss_end(m_lss.crend()); lss_it != lss_end; ++lss_it)
 			{
 				auto const level(s_levels - i - 1);
