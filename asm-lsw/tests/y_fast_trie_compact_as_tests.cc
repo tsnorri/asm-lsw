@@ -22,6 +22,18 @@ go_bandit([](){
 	// Compact Y-fast tries (AS)
 	describe("compact AS trie:", [](){
 		common_as_type_tests <asm_lsw::y_fast_trie <uint32_t>, asm_lsw::y_fast_trie_compact_as <uint32_t>>();
+
+		it("can be constructed with a vector", [](){
+			typedef asm_lsw::y_fast_trie_compact_as <uint32_t> trie_type;
+			std::vector <uint32_t> vec{5, 18, 22, 35, 108};
+
+			std::unique_ptr <trie_type> trie_ptr(trie_type::construct(vec, 5, 108));
+			AssertThat(trie_ptr->key_size(), Equals(1));
+			AssertThat(trie_ptr->size(), Equals(vec.size()));
+
+			for (auto const k : vec)
+				AssertThat(trie_ptr->contains(k), Equals(true));
+		});
 	});
 	
 	describe("compact Y-fast trie <uint8_t> (AS):", [](){
