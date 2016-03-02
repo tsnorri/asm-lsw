@@ -121,6 +121,45 @@ namespace asm_lsw {
 		key_type m_offset{0};
 
 	protected:
+		template <typename t_dst, typename t_src, typename T = typename t_dst::mapped_type>
+		struct fill_trie
+		{
+			static_assert(std::is_same <
+				typename util::remove_ref_t <t_src>::mapped_type,
+				typename util::remove_ref_t <t_dst>::mapped_type
+			>::value, "");
+
+			void operator()(t_dst &dst, t_src const &src, key_type const offset) const
+			{
+				for (auto const &kv : src)
+				{
+					assert(kv.first - offset < std::numeric_limits <typename t_dst::key_type>::max());
+					typename t_dst::key_type key(kv.first - offset);
+					typename t_dst::value_type value(kv.second.value);
+					dst.insert(key, value);
+				}
+			}
+		};
+
+		template <typename t_dst, typename t_src>
+		struct fill_trie <t_dst, t_src, void>
+		{
+			static_assert(std::is_same <
+				typename util::remove_ref_t <t_src>::mapped_type,
+				typename util::remove_ref_t <t_dst>::mapped_type
+			>::value, "");
+
+			void operator()(t_dst &dst, t_src const &src, key_type const offset) const
+			{
+				for (auto const &kv : src)
+				{
+					assert(kv.first - offset < std::numeric_limits <typename t_dst::key_type>::max());
+					typename t_dst::key_type key(kv.first - offset);
+					dst.insert(key);
+				}
+			}
+		};
+		
 		template <typename t_ret_key, typename t_key>
 		static x_fast_trie_compact_as *construct_specific(x_fast_trie <t_key, t_value> &, key_type const);
 
@@ -314,7 +353,7 @@ namespace asm_lsw {
 	)
 	{
 		x_fast_trie <t_ret_key, t_value> temp_trie;
-		util::fill_trie <decltype(temp_trie), decltype(trie), key_type> ft;
+		fill_trie <decltype(temp_trie), decltype(trie)> ft;
 		ft(temp_trie, trie, offset);
 		x_fast_trie_compact <t_ret_key, t_value> ct(temp_trie);
 		return new x_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value>(ct, offset);
