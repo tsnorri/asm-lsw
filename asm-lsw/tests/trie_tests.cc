@@ -448,7 +448,7 @@ void y_fast_set_tests()
 		t_trie t2(6);
 
 		t1 = std::move(t2);
-		AssertThat(t1.max_key(), Equals(6));
+		AssertThat(t1.key_limit(), Equals(6));
 	});
 
 	it("should enforce key limit", [&](){
@@ -626,5 +626,38 @@ go_bandit([](){
 		typedef asm_lsw::y_fast_trie_compact <uint32_t, uint32_t> ct_type;
 		common_any_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
+	});
+	
+	// Compact Y-fast tries (AS)
+	describe("compact AS trie:", [](){
+		common_as_type_tests <asm_lsw::y_fast_trie <uint32_t>, asm_lsw::y_fast_trie_compact_as <uint32_t>>();
+	});
+	
+	describe("compact Y-fast trie <uint8_t>:", [](){
+		typedef asm_lsw::y_fast_trie <uint8_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint8_t> ct_type;
+		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		common_set_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+	});
+
+	describe("compact Y-fast trie <uint32_t>:", [](){
+		typedef asm_lsw::y_fast_trie <uint32_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint32_t> ct_type;
+		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		common_set_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+	});
+
+	describe("compact Y-fast trie <uint8_t, uint8_t>:", [](){
+		typedef asm_lsw::y_fast_trie <uint8_t, uint8_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint8_t, uint8_t> ct_type;
+		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		common_map_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+	});
+
+	describe("compact Y-fast trie <uint32_t, uint32_t>:", [](){
+		typedef asm_lsw::y_fast_trie <uint32_t, uint32_t> trie_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t> ct_type;
+		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		common_map_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 	});
 });
