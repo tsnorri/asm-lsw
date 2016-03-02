@@ -13,7 +13,12 @@ LDFLAGS		+= $(LDFLAGS_COVERAGE)
 OBJECTS		=	bp_support_sparse_tests.o \
 				map_adaptor_tests.o \
 				pool_allocator_tests.o \
-				trie_tests.o \
+				x_fast_trie_tests.o \
+				x_fast_trie_compact_tests.o \
+				x_fast_trie_compact_as_tests.o \
+				y_fast_trie_tests.o \
+				y_fast_trie_compact_tests.o \
+				y_fast_trie_compact_as_tests.o \
 				test_main.o
 
 all: tests
