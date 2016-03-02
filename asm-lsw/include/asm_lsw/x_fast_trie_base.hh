@@ -46,7 +46,8 @@ namespace asm_lsw {
 	
 	public:
 		typedef typename t_spec::key_type key_type;
-		typedef typename t_spec::value_type value_type;
+		typedef typename t_spec::value_type value_type; // FIXME: change to something meaningful (pair for mutable).
+		typedef typename t_spec::value_type mapped_type;
 		static std::size_t const s_levels{std::numeric_limits <key_type>::digits};
 
 	protected:
