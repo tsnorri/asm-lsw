@@ -90,13 +90,13 @@ namespace asm_lsw { namespace detail {
 		}
 		
 		template <typename t_iterator>
-		key_type key(t_iterator it) const
+		key_type key(t_iterator const &it) const
 		{
 			return it->first;
 		}
 
 		template <typename t_iterator>
-		value_type const &value(t_iterator it) const
+		value_type const &value(t_iterator const &it) const
 		{
 			return it->second;
 		}
@@ -116,13 +116,13 @@ namespace asm_lsw { namespace detail {
 		}
 
 		template <typename t_iterator>
-		key_type key(t_iterator it)
+		key_type key(t_iterator const &it)
 		{
 			return *it;
 		}
 
 		template <typename t_iterator>
-		value_type const &value(t_iterator it)
+		value_type const &value(t_iterator const &it)
 		{
 			return *it;
 		}
@@ -166,7 +166,7 @@ namespace asm_lsw { namespace detail {
 	public:
 		y_fast_trie_base_subtree_iterator_wrapper_impl(t_iterator &it): m_it(std::move(it)) {}
 
-		virtual void advance(std::ptrdiff_t const size) override { m_it += size; }
+		virtual void advance(std::ptrdiff_t const size) override { std::advance(m_it, size); }
 		virtual t_reference dereference() const override { return *m_it; }
 
 		virtual bool equal(base_class const &other) const override
@@ -176,7 +176,7 @@ namespace asm_lsw { namespace detail {
 
 		virtual std::ptrdiff_t distance_to(base_class const &other) const override
 		{
-			return dynamic_cast <this_class const &>(other).m_it - m_it;
+			return std::distance(dynamic_cast <this_class const &>(other).m_it, m_it);
 		}
 	};
 }}

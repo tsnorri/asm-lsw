@@ -58,6 +58,8 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value = void>
 	class y_fast_trie : public y_fast_trie_base <detail::y_fast_trie_spec <t_key, t_value>>
 	{
+		template <typename, typename> friend class y_fast_trie_compact_as;
+
 	public:
 		typedef y_fast_trie_base <detail::y_fast_trie_spec <t_key, t_value>> base_class;
 		typedef typename base_class::key_type key_type;
@@ -81,7 +83,7 @@ namespace asm_lsw {
 		};
 		
 	protected:
-		key_type m_max_key{std::numeric_limits <key_type>::max()};
+		key_type m_key_limit{std::numeric_limits <key_type>::max()};
 
 	protected:
 		void check_merge_subtree(typename subtree_map::map_type::iterator &st_it);
@@ -95,9 +97,9 @@ namespace asm_lsw {
 		y_fast_trie(y_fast_trie &&) = default;
 		y_fast_trie &operator=(y_fast_trie const &) & = default;
 		y_fast_trie &operator=(y_fast_trie &&) & = default;
-		y_fast_trie(key_type const max_key): m_max_key(max_key) {}
+		y_fast_trie(key_type const key_limit): m_key_limit(key_limit) {}
 
-		key_type max_key() const { return m_max_key; }
+		key_type key_limit() const { return m_key_limit; }
 		
 		// Conditionally enable either.
 		// (Return type of the first one is void == std::enable_if<...>::type.)
@@ -147,7 +149,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	void y_fast_trie <t_key, t_value>::check_subtree_size(typename subtree_map::iterator st_it)
 	{
-		auto const log2M(std::log2(m_max_key));
+		auto const log2M(std::log2(m_key_limit));
 		auto const size(st_it->second.size());
 		if (2 * log2M < size)
 			split_subtree(st_it);
@@ -160,7 +162,7 @@ namespace asm_lsw {
 	typename std::enable_if <std::is_void <T>::value, void>::type
 	y_fast_trie <t_key, t_value>::insert(key_type const key)
 	{
-		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
+		asm_lsw_assert(key <= m_key_limit, std::invalid_argument, error::out_of_range);
 		++this->m_size;
 
 		if (0 == this->m_reps.size())
@@ -184,7 +186,7 @@ namespace asm_lsw {
 		key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type val
 	) // FIXME: making a copy of val.
 	{
-		asm_lsw_assert(key <= m_max_key, std::invalid_argument, error::out_of_range);
+		asm_lsw_assert(key <= m_key_limit, std::invalid_argument, error::out_of_range);
 		++this->m_size;
 
 		if (0 == this->m_reps.size())
@@ -246,7 +248,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	void y_fast_trie <t_key, t_value>::check_merge_subtree(typename subtree_map::map_type::iterator &st_it)
 	{
-		auto const log2M(std::log2(m_max_key));
+		auto const log2M(std::log2(m_key_limit));
 		auto &tree(st_it->second);
 		if (! (tree.size() < log2M / 4))
 			return;
@@ -289,7 +291,7 @@ namespace asm_lsw {
 		swap(t1, st_it->second);
 		subtree_iterator hint(t2.begin());
 
-		auto const log2M(std::log2(m_max_key));
+		auto const log2M(std::log2(m_key_limit));
 		auto it(t1.cbegin());
 		for (util::remove_c_t<decltype(log2M)> i(0); i < log2M; ++i)
 		{

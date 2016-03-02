@@ -36,10 +36,12 @@ namespace asm_lsw {
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
 		template <typename, typename> friend class y_fast_trie_compact;
+		template <typename, typename, typename> friend class y_fast_trie_compact_as_tpl;
 
 	public:
 		typedef typename t_spec::key_type key_type;
-		typedef typename t_spec::value_type value_type;
+		typedef typename t_spec::value_type value_type; // FIXME: change to something meaningful (pair for mutable).
+		typedef typename t_spec::value_type mapped_type;
 		
 	protected:
 		typedef typename t_spec::trie_type representative_trie;
@@ -51,8 +53,12 @@ namespace asm_lsw {
 		typedef size_t size_type;
 		typedef typename subtree::iterator subtree_iterator;
 		typedef typename subtree::const_iterator const_subtree_iterator;
+		typedef typename subtree::reverse_iterator reverse_subtree_iterator;
+		typedef typename subtree::const_reverse_iterator const_reverse_subtree_iterator;
 		typedef subtree_iterator iterator;
 		typedef const_subtree_iterator const_iterator;
+		typedef reverse_subtree_iterator reverse_iterator;
+		typedef const_reverse_subtree_iterator const_reverse_iterator;
 		
 		
 	protected:
@@ -93,6 +99,8 @@ namespace asm_lsw {
 		std::size_t constexpr key_size() const { return sizeof(key_type); }
 		size_type size() const;
 		bool contains(key_type const key) const;
+		key_type min_key() const { return m_reps.min_key(); } // Returns a meaningful value if the tree is not empty.
+		key_type max_key() const;
 		
 		bool find(key_type const key, const_subtree_iterator &iterator) const;
 		bool find_predecessor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const;
@@ -107,6 +115,8 @@ namespace asm_lsw {
 		
 		typename trait::key_type const iterator_key(const_subtree_iterator const &it) const { trait t; return t.key(it); }
 		typename trait::value_type const &iterator_value(const_subtree_iterator const &it) const { trait t; return t.value(it); }
+		typename trait::key_type const iterator_key(const_reverse_subtree_iterator const &it) const { trait t; return t.key(it); }
+		typename trait::value_type const &iterator_value(const_reverse_subtree_iterator const &it) const { trait t; return t.value(it); }
 	};
 	
 	
@@ -122,6 +132,21 @@ namespace asm_lsw {
 	{
 		const_subtree_iterator iterator;
 		return find(key, iterator);
+	}
+	
+	
+	template <typename t_spec>
+	auto y_fast_trie_base <t_spec>::max_key() const -> key_type
+	{
+		if (this->size() == 0)
+			return 0;
+		
+		auto const max(this->m_reps.max_key());
+		auto st_it(this->m_subtrees.find(max));
+		assert(this->m_subtrees.cend() != st_it);
+		auto const &subtree(st_it->second);
+		assert(subtree.size());
+		return this->iterator_key(subtree.crbegin());
 	}
 	
 	
@@ -356,10 +381,8 @@ namespace asm_lsw {
 			auto const key(st_it->first);
 			std::cerr << boost::format("\t%02x: ") % (+key);
 			for (auto it(st_it->second.cbegin()), end(st_it->second.cend()); it != end; ++it)
-			{
-				auto const val(*it);
-				std::cerr << boost::format("%02x ") % (+val);
-			}
+				std::cerr << boost::format("%02x ") % (+iterator_value(it));
+
 			std::cerr << "\n";
 		}
 	}
