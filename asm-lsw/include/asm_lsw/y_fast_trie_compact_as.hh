@@ -187,10 +187,48 @@ namespace asm_lsw {
 				}
 			}
 		};
+
+		struct fill_with_trie
+		{
+			template <typename t_dst, typename t_src>
+			void operator()(
+				t_dst &dst,
+				t_src const &src,
+				key_type const offset
+			) const
+			{
+				fill_trie <t_dst, typename util::remove_ref_t <t_src>::subtree> ft;
+				auto const proxy(src.subtree_map_proxy());
+				for (auto const &st : proxy)
+					ft(dst, st.second, offset);
+			}
+		};
+
+		struct fill_with_collection
+		{
+			template <typename t_dst, typename t_src>
+			void operator()(
+				t_dst &dst,
+				t_src const &src,
+				key_type const offset
+			) const
+			{
+				fill_trie <t_dst, t_src> ft;
+				ft(dst, src, offset);
+			}
+		};
 		
-		template <typename t_ret_key, typename t_key>
-		static y_fast_trie_compact_as *construct_specific(y_fast_trie <t_key, t_value> &, key_type const);
-		
+		template <typename t_ret_key, typename t_collection, typename t_fill>
+		static y_fast_trie_compact_as *construct_specific(t_collection const &, t_fill const &, key_type const, key_type const);
+
+		template <typename t_collection, typename t_fill>
+		static y_fast_trie_compact_as *construct(
+			t_collection const &collection,
+			t_fill const &fill,
+			t_max_key const min,
+			t_max_key const max
+		);
+
 		y_fast_trie_compact_as(key_type const offset):
 			m_offset(offset)
 		{
@@ -200,6 +238,9 @@ namespace asm_lsw {
 		template <typename t_key>
 		static y_fast_trie_compact_as *construct(y_fast_trie <t_key, t_value> &);
 		
+		template <typename t_collection>
+		static y_fast_trie_compact_as *construct(t_collection const &, key_type const min, key_type const max);
+
 		key_type offset() const { return m_offset; }
 
 		virtual size_type key_size() const = 0;
@@ -326,21 +367,18 @@ namespace asm_lsw {
 	
 	
 	template <typename t_max_key, typename t_value>
-	template <typename t_ret_key, typename t_key>
+	template <typename t_ret_key, typename t_collection, typename t_fill>
 	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct_specific(
-		y_fast_trie <t_key, t_value> &trie,
-		key_type const offset
+		t_collection const &collection,
+		t_fill const &fill,
+		key_type const offset,
+		key_type const limit
 	)
 	{
 		// Set the domain limit.
-		y_fast_trie <t_ret_key, t_value> temp_trie(trie.max_key() - offset);
+		y_fast_trie <t_ret_key, t_value> temp_trie(limit);
 		
-		fill_trie <decltype(temp_trie), typename util::remove_ref_t <decltype(trie)>::subtree> ft;
-
-		auto const proxy(trie.subtree_map_proxy());
-		for (auto const &st : proxy)
-			ft(temp_trie, st.second, offset);
-		
+		fill(temp_trie, collection, offset);
 		y_fast_trie_compact <t_ret_key, t_value> ct(temp_trie);
 		return new y_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value>(ct, offset);
 	}
@@ -352,22 +390,60 @@ namespace asm_lsw {
 		y_fast_trie <t_key, t_value> &trie
 	)
 	{
+		fill_with_trie fill;
 		if (0 == trie.size())
-			return y_fast_trie_compact_as::construct_specific <uint8_t>(trie, 0);
+			return y_fast_trie_compact_as::construct_specific <uint8_t>(trie, fill, 0, 0);
 		
 		auto const min(trie.min_key());
 		auto const max(trie.max_key());
+		return construct(trie, fill, min, max);
+	}
+
+
+	template <typename t_max_key, typename t_value>
+	template <typename t_collection>
+	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
+		t_collection const &collection,
+		t_max_key const min,
+		t_max_key const max
+	)
+	{
+		fill_with_collection fill;
+		if (0 == collection.size())
+			return y_fast_trie_compact_as::construct_specific <uint8_t>(collection, fill, 0, 0);
+
+#ifndef NDEBUG
+		{
+			auto const res(std::minmax_element(collection.cbegin(), collection.cend()));
+			assert(*res.first == min);
+			assert(*res.second == max);
+		}
+#endif
+
+		return construct(collection, fill, min, max);
+	}
+
+
+	template <typename t_max_key, typename t_value>
+	template <typename t_collection, typename t_fill>
+	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
+		t_collection const &collection,
+		t_fill const &fill,
+		t_max_key const min,
+		t_max_key const max
+	)
+	{
 		auto const ret_max(max - min);
-
 		if (ret_max <= std::numeric_limits <uint8_t>::max())
-			return y_fast_trie_compact_as::construct_specific <uint8_t>(trie, min);
+			return y_fast_trie_compact_as::construct_specific <uint8_t>(collection, fill, min, ret_max);
 		else if (ret_max <= std::numeric_limits <uint16_t>::max())
-			return y_fast_trie_compact_as::construct_specific <uint16_t>(trie, min);
+			return y_fast_trie_compact_as::construct_specific <uint16_t>(collection, fill, min, ret_max);
 		else if (ret_max <= std::numeric_limits <uint32_t>::max())
-			return y_fast_trie_compact_as::construct_specific <uint32_t>(trie, min);
+			return y_fast_trie_compact_as::construct_specific <uint32_t>(collection, fill, min, ret_max);
 		else if (ret_max <= std::numeric_limits <uint64_t>::max())
-			return y_fast_trie_compact_as::construct_specific <uint64_t>(trie, min);
+			return y_fast_trie_compact_as::construct_specific <uint64_t>(collection, fill, min, ret_max);
 
+		// Require one of the types to match.
 		assert(0);
 	}
 }
