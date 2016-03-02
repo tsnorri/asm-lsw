@@ -128,12 +128,16 @@ void set_type_tests()
 		trie.insert('k');
 		trie.insert('j');
 
+		AssertThat(trie.size(), Equals(4));
+
 		AssertThat(trie.contains('a'), Equals(true));
 		AssertThat(trie.contains('b'), Equals(true));
 		AssertThat(trie.contains('k'), Equals(true));
 		AssertThat(trie.contains('j'), Equals(true));
 
 		trie.erase('j');
+
+		AssertThat(trie.size(), Equals(3));
 
 		AssertThat(trie.contains('a'), Equals(true));
 		AssertThat(trie.contains('b'), Equals(true));
@@ -154,6 +158,7 @@ void common_set_type_tests()
 		trie.insert('a');
 
 		typename t_adaptor::return_type ct((adaptor(trie)));
+		AssertThat(ct.size(), Equals(1));
 		AssertThat(ct.contains('a'), Equals(true));
 		AssertThat(ct.contains('b'), Equals(false));
 	});
@@ -165,6 +170,7 @@ void common_set_type_tests()
 		trie.insert('b');
 
 		typename t_adaptor::return_type ct((adaptor(trie)));
+		AssertThat(ct.size(), Equals(2));
 		AssertThat(ct.contains('a'), Equals(true));
 		AssertThat(ct.contains('b'), Equals(true));
 	});
@@ -175,8 +181,11 @@ void common_set_type_tests()
 		trie.insert('b');
 		trie.insert('k');
 
+
 		typename t_adaptor::return_type ct((adaptor(trie)));
 		typename t_adaptor::trie_type::const_iterator succ;
+		AssertThat(ct.size(), Equals(3));
+
 		AssertThat(ct.find_successor('i', succ), Equals(true));
 		auto s(ct.iterator_key(succ));
 		AssertThat('k', Equals(s));
@@ -192,6 +201,7 @@ void common_set_type_tests()
 		{
 			typename t_adaptor::return_type ct((adaptor(trie)));
 			typename t_adaptor::trie_type::const_iterator succ;
+			AssertThat(ct.size(), Equals(4));
 			AssertThat(ct.find_successor('i', succ), Equals(true));
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals('j'));
@@ -202,6 +212,7 @@ void common_set_type_tests()
 		{
 			typename t_adaptor::return_type ct((adaptor(trie)));
 			typename t_adaptor::trie_type::const_iterator succ;
+			AssertThat(ct.size(), Equals(3));
 			AssertThat(ct.find_successor('i', succ), Equals(true));
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals('k'));
@@ -219,10 +230,13 @@ void common_set_type_tests()
 		trie.insert(132);
 		trie.insert(133);
 
+		AssertThat(trie.size(), Equals(6));
+
 		for (auto const i : boost::irange(128, 134, 1))
 		{
 			typename t_adaptor::return_type ct((adaptor(trie)));
 			typename t_adaptor::trie_type::const_iterator succ;
+			AssertThat(ct.size(), Equals(trie.size()));
 			AssertThat(ct.find_successor(1, succ), Equals(true));
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals(i));
@@ -248,6 +262,9 @@ void common_set_type_tests()
 		for (auto const val : test_values)
 			trie.insert(val);
 		ct_var_type ct((adaptor(trie)));
+
+		AssertThat(trie.size(), Equals(test_values.size()));
+		AssertThat(ct.size(), Equals(trie.size()));
 
 		// The test loop. Call to the trie's member function to be tested is packed into cb.
 		// Zero in the expected values indicates that the tested function should return false.
@@ -331,6 +348,8 @@ void common_map_type_tests()
 		typename t_adaptor::return_type ct((adaptor(trie)));
 		typename t_adaptor::trie_type::const_iterator it;
 
+		AssertThat(ct.size(), Equals(2));
+
 		AssertThat(ct.find('a', it), Equals(true));
 		AssertThat(ct.iterator_value(it), Equals('k'));
 
@@ -377,6 +396,8 @@ void common_as_type_tests()
 		trie.insert(0x10004);
 		
 		std::unique_ptr <ct_type> ct(ct_type::construct(trie));
+		AssertThat(ct->size(), Equals(4));
+
 		AssertThat(trie.key_size(), Is().GreaterThan(1));
 		AssertThat(ct->key_size(), Equals(1));
 		AssertThat(ct->min_key(), Equals(0x10001));
@@ -392,6 +413,8 @@ void common_as_type_tests()
 		trie.insert(0x10004);
 		
 		std::unique_ptr <ct_type> ct(ct_type::construct(trie));
+		AssertThat(ct->size(), Equals(5));
+
 		AssertThat(trie.key_size(), Is().GreaterThan(1));
 		AssertThat(ct->key_size(), Equals(1));
 		AssertThat(ct->offset(), Equals(0x10000));
