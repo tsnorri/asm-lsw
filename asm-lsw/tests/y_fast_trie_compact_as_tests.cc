@@ -34,6 +34,24 @@ go_bandit([](){
 			for (auto const k : vec)
 				AssertThat(trie_ptr->contains(k), Equals(true));
 		});
+
+		it("can be constructed with a map", [](){
+			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t> trie_type;
+			std::map <uint32_t, uint32_t> map{{5, 8}, {18, 21}, {22, 3}, {35, 7}, {108, 99}};
+
+			std::unique_ptr <trie_type> trie_ptr(trie_type::construct(map, 5, 108));
+			AssertThat(trie_ptr->key_size(), Equals(1));
+			AssertThat(trie_ptr->size(), Equals(map.size()));
+
+			for (auto const &kv : map)
+			{
+				trie_type::const_iterator it;
+				bool st(trie_ptr->find(kv.first, it));
+				AssertThat(st, Equals(true));
+				AssertThat(it->first, Equals(kv.first));
+				AssertThat(it->second, Equals(kv.second));
+			}
+		});
 	});
 	
 	describe("compact Y-fast trie <uint8_t> (AS):", [](){

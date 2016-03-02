@@ -414,9 +414,10 @@ namespace asm_lsw {
 
 #ifndef NDEBUG
 		{
+			util::iterator_access <t_value> acc;
 			auto const res(std::minmax_element(collection.cbegin(), collection.cend()));
-			assert(*res.first == min);
-			assert(*res.second == max);
+			assert(acc.key(res.first) == min);
+			assert(acc.key(res.second) == max);
 		}
 #endif
 

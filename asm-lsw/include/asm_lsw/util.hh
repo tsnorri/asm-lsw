@@ -32,6 +32,20 @@ namespace asm_lsw { namespace util {
 
 	template <typename T>
 	using remove_c_ref_t = remove_c_t <remove_ref_t <T>>;
+
+	template <typename t_value>
+	struct iterator_access
+	{
+		template <typename t_iterator>
+		auto key(t_iterator const &it) const -> decltype(it->first) & { return it->first; }
+	};
+
+	template <>
+	struct iterator_access <void>
+	{
+		template <typename t_iterator>
+		auto key(t_iterator const &it) const -> decltype(*it) & { return *it; }
+	};
 }}
 
 #endif
