@@ -206,7 +206,10 @@ namespace asm_lsw {
 			assert(trie.m_subtrees.cend() != st_it);
 			it = st_it->second.find(key);
 			if (st_it->second.cend() != it)
+			{
+				assert(0);
 				return true;
+			}
 		}
 		
 		return false;

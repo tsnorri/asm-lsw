@@ -150,9 +150,12 @@ namespace asm_lsw {
 	void y_fast_trie <t_key, t_value>::check_subtree_size(typename subtree_map::iterator st_it)
 	{
 		auto const log2M(std::log2(m_key_limit));
-		auto const size(st_it->second.size());
-		if (2 * log2M < size)
-			split_subtree(st_it);
+		if (log2M)
+		{
+			auto const size(st_it->second.size());
+			if (2 * log2M < size)
+				split_subtree(st_it);
+		}
 	}
 
 	
@@ -285,19 +288,22 @@ namespace asm_lsw {
 	void y_fast_trie <t_key, t_value>::split_subtree(typename subtree_map::map_type::iterator &st_it)
 	{
 		using std::swap;
+
+		auto const log2M(std::log2(m_key_limit));
+		assert(log2M);
 		
 		// Create a new tree, move half of the contents.
 		subtree t1, t2;
 		swap(t1, st_it->second);
 		subtree_iterator hint(t2.begin());
 
-		auto const log2M(std::log2(m_key_limit));
 		auto it(t1.cbegin());
 		for (util::remove_c_t<decltype(log2M)> i(0); i < log2M; ++i)
 		{
 			hint = t2.emplace_hint(hint, *it);
 			++it;
 		}
+		assert(t2.size());
 		t1.erase(t1.cbegin(), it);
 
 		// Choose new representatives and store the trees.
