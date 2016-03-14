@@ -25,7 +25,7 @@ CPPFLAGS	=	-I../include \
 LDFLAGS		=	-L../../lib/sdsl/build/lib \
 				-L../../lib/sdsl/build/external/libdivsufsort/lib \
 				-L../../lib/phf \
-				$(OPT_FLAGS) $(LOCAL_LDFLAGS) -ldivsufsort -lphf -lsdsl
+				$(OPT_FLAGS) $(LOCAL_LDFLAGS) -ldivsufsort -ldivsufsort64 -lphf -lsdsl
 
 ifeq ($(BUILD_STYLE),release)
 	OPT_FLAGS	= $(OPT_FLAGS_RELEASE)
