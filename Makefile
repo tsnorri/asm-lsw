@@ -18,7 +18,13 @@ clean-dependencies:
 dependencies: lib/phf/libphf.a lib/sdsl/build/lib/libsdsl.a
 
 cloc:
-	$(CLOC) asm-lsw/include lib/sdsl/include/sdsl/csa_rao*.hpp
+	$(CLOC) \
+		asm-lsw/include \
+		lib/sdsl/include/sdsl/csa_rao*.hpp \
+		lib/sdsl/include/sdsl/elias_inventory.hpp \
+		lib/sdsl/include/sdsl/isa_lsw.hpp \
+		lib/sdsl/include/sdsl/isa_simple.hpp \
+		lib/sdsl/include/sdsl/psi_k_support*.hpp
 
 lib/phf/libphf.a:
 	CC="$(CC)" \
