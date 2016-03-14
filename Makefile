@@ -42,5 +42,5 @@ lib/sdsl/build/lib/libsdsl.a:
 	CFLAGS="$(LOCAL_CFLAGS) $(LOCAL_CPPFLAGS)" \
 	CXXFLAGS="$(LOCAL_CXXFLAGS) $(LOCAL_CPPFLAGS)" \
 	LDFLAGS="$(LOCAL_LDFLAGS)" \
-	cmake ..
-	$(MAKE) -C lib/sdsl/build
+	cmake -DCMAKE_BUILD_TYPE=RelWithDebAndAssert ..
+	$(MAKE) -C lib/sdsl/build VERBOSE=1
