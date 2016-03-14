@@ -7,7 +7,8 @@ GCOVR	?= gcovr
 MKDIR	?= mkdir
 CLOC	?= cloc
 
-WARNING_FLAGS	= -Wall -Werror -Wno-unused -Wno-missing-braces
+WARNING_FLAGS	= -Wall -Werror -Wno-unused -Wno-missing-braces \
+	-Wno-deprecated-declarations -Wno-sign-compare # for Bandit
 
 LOCAL_CXXFLAGS		?= -std=c++14
 OPT_FLAGS_DEBUG		?= -ggdb -O0
