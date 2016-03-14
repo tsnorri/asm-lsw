@@ -16,7 +16,9 @@ OPT_FLAGS_RELEASE	?= -march=native -O2 -ftree-vectorize -foptimize-sibling-calls
 
 CFLAGS		= -c -std=c99 $(OPT_FLAGS) $(WARNING_FLAGS)
 CXXFLAGS	= -c $(OPT_FLAGS) $(LOCAL_CXXFLAGS) $(WARNING_FLAGS)
-CPPFLAGS	=	-I../include \
+CPPFLAGS	=	-DMODE_TI \
+				-DHAVE_ATTRIBUTE_HOT \
+				-I../include \
 				-I../../lib/bandit \
 				-I../../lib/sdsl/build/include \
 				-I../../lib/sdsl/build/external/libdivsufsort/include \
