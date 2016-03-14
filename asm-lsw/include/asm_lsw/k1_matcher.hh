@@ -26,7 +26,6 @@
 #include <sdsl/cst_sada.hpp>
 #include <sdsl/int_vector.hpp>
 #include <sdsl/isa_lsw.hpp>
-#include <sdsl/rrr_vector.hpp>
 #include <unordered_set>
 
 
@@ -42,7 +41,7 @@ namespace asm_lsw {
 		typedef sdsl::cst_sada<csa_type>								cst_type;
 		typedef y_fast_trie<csa_type::value_type>						gamma_v_type;
 		typedef std::unordered_map<cst_type::node_type, gamma_v_type>	gamma_type;				// FIXME: use a map with perfect hashing instead.
-		typedef sdsl::rrr_vector<>										core_nodes_type;
+		typedef sdsl::int_vector<>										core_nodes_type;
 		typedef bp_support_sparse<>										core_endpoints_type;	// FIXME: check parameters.
 		typedef sdsl::rmq_succinct_sct<>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
 		typedef std::pair<csa_type::size_type, csa_type::size_type>		csa_range;
