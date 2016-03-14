@@ -12,7 +12,7 @@ WARNING_FLAGS	= -Wall -Werror -Wno-unused -Wno-missing-braces \
 
 LOCAL_CXXFLAGS		?= -std=c++14
 OPT_FLAGS_DEBUG		?= -ggdb -O0
-OPT_FLAGS_RELEASE	?= -O2 -ftree-vectorize
+OPT_FLAGS_RELEASE	?= -march=native -O2 -ftree-vectorize -foptimize-sibling-calls
 
 CFLAGS		= -c -std=c99 $(OPT_FLAGS) $(WARNING_FLAGS)
 CXXFLAGS	= -c $(OPT_FLAGS) $(LOCAL_CXXFLAGS) $(WARNING_FLAGS)
