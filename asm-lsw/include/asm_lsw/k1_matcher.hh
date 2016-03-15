@@ -159,8 +159,9 @@ namespace asm_lsw {
 			h_type(cst_type const &cst, core_endpoints_type const &ce, lcp_rmq_type const &lcp_rmq)
 			{
 				auto const n(cst.size());						// Text length.
-				auto const logn(std::log2(n));
-				auto const log2n(std::pow(logn, 2));			// FIXME: check integrality.
+				auto const logn(sdsl::util::log2_floor(n));
+				auto const log2n(logn * logn);
+				assert(logn);
 				m_diff = log2n;
 
 				auto const &bps(ce.bps());
@@ -445,8 +446,8 @@ namespace asm_lsw {
 			// Γ_v = {ISA[SA[i] + plen(u) + 1] | i ≡ 1 (mod log₂²n) and v_le ≤ i ≤ v_ri}.
 
 			auto const n(cst.size());
-			auto const logn(std::log2(n));
-			auto const log2n(std::pow(logn, 2)); // FIXME: check integrality.
+			auto const logn(sdsl::util::log2_floor(n));
+			auto const log2n(logn * logn);
 			auto const &csa(cst.csa);
 			auto const &isa(csa.isa);
 
@@ -472,7 +473,7 @@ namespace asm_lsw {
 					// In case lb = 0, the inequality above yields 1 for the right side and j ← 0.
 					cst_type::size_type i(0), j(0);
 					if (lb)
-						j = std::ceil((lb - 1) / log2n); // FIXME: verify integrality.
+						j = (lb - 1) / log2n;
 					
 					while ((i = 1 + j * log2n) <= rb)
 					{
