@@ -108,7 +108,8 @@ namespace asm_lsw {
 		bool find_nearest_subtrees(key_type const key, key_type &k1, key_type &k2) const;
 		void print() const;
 
-		y_fast_trie_subtree_map_proxy <subtree_map> subtree_map_proxy() const { return y_fast_trie_subtree_map_proxy <subtree_map>(&m_subtrees); }
+		y_fast_trie_subtree_map_proxy <subtree_map> subtree_map_proxy() { return y_fast_trie_subtree_map_proxy <subtree_map>(&m_subtrees); }
+		y_fast_trie_subtree_map_proxy <subtree_map const> subtree_map_proxy() const { return y_fast_trie_subtree_map_proxy <subtree_map const>(&m_subtrees); }
 
 		typename subtree_map::const_iterator subtree_cbegin() const { return m_subtrees.cbegin(); }
 		typename subtree_map::const_iterator subtree_cend() const { return m_subtrees.cend(); }

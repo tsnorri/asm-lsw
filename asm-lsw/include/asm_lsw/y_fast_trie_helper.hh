@@ -29,7 +29,7 @@ namespace asm_lsw {
 	class y_fast_trie_subtree_map_proxy
 	{
 	protected:
-		t_subtree_map const *m_map;
+		t_subtree_map *m_map;
 
 	public:
 		typedef typename t_subtree_map::size_type size_type;
@@ -38,8 +38,10 @@ namespace asm_lsw {
 
 	public:
 		y_fast_trie_subtree_map_proxy() = delete;
-		explicit y_fast_trie_subtree_map_proxy(t_subtree_map const *map): m_map(map) {}
+		explicit y_fast_trie_subtree_map_proxy(t_subtree_map *map): m_map(map) {}
 		size_type size() const			{ return m_map->size(); }
+		iterator begin()				{ return m_map->begin(); }
+		iterator end()					{ return m_map->end(); }
 		const_iterator begin() const	{ return m_map->begin(); }
 		const_iterator end() const		{ return m_map->end(); }
 		const_iterator cbegin() const	{ return m_map->cbegin(); }

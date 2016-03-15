@@ -162,14 +162,14 @@ namespace asm_lsw {
 				typename util::remove_ref_t <t_dst>::mapped_type
 			>::value, "");
 
-			void operator()(t_dst &dst, t_src const &src, key_type const offset) const
+			void operator()(t_dst &dst, t_src &src, key_type const offset) const
 			{
-				for (auto const &kv : src)
+				for (auto &kv : src)
 				{
 					assert(kv.first - offset < std::numeric_limits <typename t_dst::key_type>::max());
 					typename t_dst::key_type key(kv.first - offset);
-					typename t_dst::value_type value(kv.second);
-					dst.insert(key, value);
+					typename t_dst::value_type value(std::move(kv.second));
+					dst.insert(key, std::move(value));
 				}
 			}
 		};
@@ -188,28 +188,30 @@ namespace asm_lsw {
 			}
 		};
 
+		// FIXME: make t_src const & if t_value is void.
 		struct fill_with_trie
 		{
 			template <typename t_dst, typename t_src>
 			void operator()(
 				t_dst &dst,
-				t_src const &src,
+				t_src &src,
 				key_type const offset
 			) const
 			{
 				fill_trie <t_dst, typename util::remove_ref_t <t_src>::subtree> ft;
-				auto const proxy(src.subtree_map_proxy());
-				for (auto const &st : proxy)
+				auto proxy(src.subtree_map_proxy());
+				for (auto &st : proxy)
 					ft(dst, st.second, offset);
 			}
 		};
 
+		// FIXME: make t_src const & if t_value is void.
 		struct fill_with_collection
 		{
 			template <typename t_dst, typename t_src>
 			void operator()(
 				t_dst &dst,
-				t_src const &src,
+				t_src &src,
 				key_type const offset
 			) const
 			{
@@ -219,11 +221,11 @@ namespace asm_lsw {
 		};
 		
 		template <typename t_ret_key, typename t_collection, typename t_fill>
-		static y_fast_trie_compact_as *construct_specific(t_collection const &, t_fill const &, key_type const, key_type const);
+		static y_fast_trie_compact_as *construct_specific(t_collection &, t_fill const &, key_type const, key_type const);
 
 		template <typename t_collection, typename t_fill>
 		static y_fast_trie_compact_as *construct(
-			t_collection const &collection,
+			t_collection &collection,
 			t_fill const &fill,
 			t_max_key const min,
 			t_max_key const max
@@ -239,7 +241,7 @@ namespace asm_lsw {
 		static y_fast_trie_compact_as *construct(y_fast_trie <t_key, t_value> &);
 		
 		template <typename t_collection>
-		static y_fast_trie_compact_as *construct(t_collection const &, key_type const min, key_type const max);
+		static y_fast_trie_compact_as *construct(t_collection &, key_type const min, key_type const max);
 
 		key_type offset() const { return m_offset; }
 
@@ -369,7 +371,7 @@ namespace asm_lsw {
 	template <typename t_max_key, typename t_value>
 	template <typename t_ret_key, typename t_collection, typename t_fill>
 	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct_specific(
-		t_collection const &collection,
+		t_collection &collection,
 		t_fill const &fill,
 		key_type const offset,
 		key_type const limit
@@ -384,6 +386,7 @@ namespace asm_lsw {
 	}
 
 
+	// FIXME: change the trie type to const or non-const based on t_value (void or non-void).
 	template <typename t_max_key, typename t_value>
 	template <typename t_key>
 	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
@@ -400,10 +403,11 @@ namespace asm_lsw {
 	}
 
 
+	// FIXME: change the collection type to const or non-const based on t_value (void or non-void).
 	template <typename t_max_key, typename t_value>
 	template <typename t_collection>
 	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
-		t_collection const &collection,
+		t_collection &collection,
 		t_max_key const min,
 		t_max_key const max
 	)
@@ -425,10 +429,11 @@ namespace asm_lsw {
 	}
 
 
+	// FIXME: change the trie type to const or non-const based on t_value (void or non-void).
 	template <typename t_max_key, typename t_value>
 	template <typename t_collection, typename t_fill>
 	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
-		t_collection const &collection,
+		t_collection &collection,
 		t_fill const &fill,
 		t_max_key const min,
 		t_max_key const max
