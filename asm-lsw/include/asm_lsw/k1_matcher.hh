@@ -45,8 +45,8 @@ namespace asm_lsw {
 		typedef sdsl::csa_rao<>											csa_type;				// FIXME: correct parameters.
 		typedef sdsl::cst_sada<csa_type>								cst_type;
 		
-		typedef std::set<csa_type::value_type>							gamma_v_intermediate_type;
-		typedef std::unordered_map<
+		typedef std::set <csa_type::value_type>							gamma_v_intermediate_type;
+		typedef std::map <
 			cst_type::node_type,
 			gamma_v_intermediate_type
 		> gamma_intermediate_type;
@@ -72,16 +72,24 @@ namespace asm_lsw {
 		class h_type
 		{
 		public:
-			typedef y_fast_trie<csa_type::size_type, csa_type::size_type>	h_u_type;				// FIXME: check that LCP returns size_type (for key).
+			typedef std::map<
+				csa_type::size_type,
+				csa_type::size_type
+			> h_u_intermediate_type;
+			typedef y_fast_trie_compact_as<
+				csa_type::size_type,
+				csa_type::size_type
+			> h_u_type;
 
 			struct h_pair
 			{
-				h_u_type l;
-				h_u_type r;
+				std::unique_ptr <h_u_type> l;
+				std::unique_ptr <h_u_type> r;
 			};
 
 		protected:
-			typedef std::unordered_map<cst_type::node_type, h_pair>			h_map;					// FIXME: use a map with perfect hashing instead.
+			typedef unordered_map <cst_type::node_type, h_pair> h_map;
+			typedef std::map <cst_type::node_type, h_pair> h_map_intermediate;
 
 		protected:
 			h_map m_maps;
@@ -95,8 +103,8 @@ namespace asm_lsw {
 				lcp_rmq_type const &lcp_rmq,
 				cst_type::node_type const u,
 				cst_type::size_type const log2n,
-				h_u_type &hl,
-				h_u_type &hr)
+				h_pair &h
+			)
 			{
 				auto const v(ce.find_open(u));					// Core path beginning.
 				auto const k(cst.lb(u));						// Left bound (leftmost leaf index) in SA.
@@ -104,6 +112,8 @@ namespace asm_lsw {
 				
 				auto const leaf_count(cst.size());
 				cst_type::size_type i(0), j(0);
+				h_u_intermediate_type hl_tmp, hr_tmp;
+				
 				while ((i = 1 + j * log2n) < leaf_count)
 				{
 					// Now i is an SA index s.t.
@@ -113,22 +123,30 @@ namespace asm_lsw {
 					
 					// Check |lcp(k, i)| ≥ plen(v).
 					auto const lcp_len(lcp_rmq(k, i));
+					
+					// Check that LCP returns csa_type::size_type (for key).
+					{
+						typedef h_u_intermediate_type::key_type hu_key_type;
+						static_assert(
+							std::numeric_limits <decltype(lcp_len)>::max() <= std::numeric_limits <hu_key_type>::max(),
+							""
+						);
+					}
+					
 					if (lcp_len >= plen_v)
 					{
 						if (i <= k)
-							hl.insert(lcp_len, i);
+							hl_tmp.insert(std::make_pair(lcp_len, i));
 						else if (i > k)
-							hr.insert(lcp_len, i);
+							hr_tmp.insert(std::make_pair(lcp_len, i));
 					}
 					
 					++j;
 				}
 				
-				// FIXME: change the above s.t. insertions are made
-				// to hl_tmp and hr_tmp std::sets which are then used
-				// to construct y_fast_trie_as for both sides.
-				// An alternative is to use a value transformer in the
-				// constructor below.
+				// Another option would be using a value transformer similar to transform_gamma_v.
+				h.l.reset(h_u_type::construct(hl_tmp, hl_tmp.cbegin()->first, hl_tmp.crbegin()->first));
+				h.r.reset(h_u_type::construct(hr_tmp, hr_tmp.cbegin()->first, hr_tmp.crbegin()->first));
 			}
 
 		public:
@@ -138,7 +156,7 @@ namespace asm_lsw {
 			h_type() {}
 			
 			// Section 3.1, Lemma 17.
-			h_type(cst_type const &cst, core_endpoints_type const &ce, lcp_rmq_type const &lcp_rmq, h_type &h)
+			h_type(cst_type const &cst, core_endpoints_type const &ce, lcp_rmq_type const &lcp_rmq)
 			{
 				auto const n(cst.size());						// Text length.
 				auto const logn(std::log2(n));
@@ -147,6 +165,7 @@ namespace asm_lsw {
 
 				auto const &bps(ce.bps());
 				auto const count(bps.rank(bps.size() - 1)); // Number of (opening) parentheses.
+				h_map_intermediate maps_i;
 				for (util::remove_c_t<decltype(count)> i{1}; i <= count; ++i)
 				{
 					// Find the index of each opening parenthesis and its counterpart,
@@ -157,9 +176,13 @@ namespace asm_lsw {
 					
 					// u is now a core leaf node.
 					h_pair h_u;
-					construct_hl_hr(cst, ce, lcp_rmq, u, log2n, h_u.l, h_u.r);
-					m_maps[u] = std::move(h_u);
+					construct_hl_hr(cst, ce, lcp_rmq, u, log2n, h_u);
+					maps_i[u] = std::move(h_u);
 				}
+				
+				h_map::builder_type <h_map_intermediate> builder(maps_i);
+				h_map maps_tmp(builder);
+				m_maps = std::move(maps_tmp);
 			}
 		};
 
@@ -297,7 +320,7 @@ namespace asm_lsw {
 		// FIXME: calculate time complexity.
 		static void construct_core_paths(cst_type const &cst, core_nodes_type &cn)
 		{
-			std::unordered_map<cst_type::node_type, cst_type::size_type> node_depths;
+			std::map <cst_type::node_type, cst_type::size_type> node_depths;
 			sdsl::bit_vector core_nodes(cst.nodes(), 0); // Nodes with incoming core edges.
 			
 			// Count node depths from the bottom and choose the greatest.
@@ -568,9 +591,9 @@ namespace asm_lsw {
 			h_type::h_u_type::const_subtree_iterator it;
 
 			// Try i^l.
-			if (hx.l.find_successor(r_len, it, true))
+			if (hx.l->find_successor(r_len, it, true))
 			{
-				r = hx.l.iterator_value(it);
+				r = hx.l->iterator_value(it);
 				assert(r >= h.diff());
 				l = r - h.diff();
 				if (l <= r_len && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
@@ -578,9 +601,9 @@ namespace asm_lsw {
 			}
 
 			// Try i^r.
-			if (hx.r.find_predecessor(r_len, it, true))
+			if (hx.r->find_predecessor(r_len, it, true))
 			{
-				l = hx.r.iterator_value(it);
+				l = hx.r->iterator_value(it);
 				r = l + h.diff();
 				if (r_len <= r && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
 					return true;
@@ -718,7 +741,7 @@ namespace asm_lsw {
 				auto const h_it(h.maps().find(x));
 				assert(h.maps().cend() != h_it);
 				auto const &hx(h_it->second);
-				if (hx.l.size() == 0 && hx.r.size() == 0)
+				if (hx.l->size() == 0 && hx.r->size() == 0)
 				{
 					// Case 1.
 					// The number of leaves hanging from the core path is < log₂²n.
@@ -790,7 +813,7 @@ namespace asm_lsw {
 
 						return false;
 					}
-				}				
+				}
 			}
 			else if (tree_search_side_node(cst, *(g_it->second), u, v, st, ed, i))
 			{
