@@ -108,7 +108,7 @@ namespace asm_lsw {
 		insert(key_type const key);
 		
 		template <typename T = value_type>
-		void insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type val);
+		void insert(key_type const key, typename std::enable_if<!std::is_void<T>::value, T>::type const val); // FIXME: add emplace.
 
 		bool erase(key_type const key);
 		
@@ -186,8 +186,8 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value>
 	template <typename T>
 	void y_fast_trie <t_key, t_value>::insert(
-		key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type val
-	) // FIXME: making a copy of val.
+		key_type const key, typename std::enable_if <!std::is_void <T>::value, T>::type const val
+	)
 	{
 		asm_lsw_assert(key <= m_key_limit, std::invalid_argument, error::out_of_range);
 		++this->m_size;
