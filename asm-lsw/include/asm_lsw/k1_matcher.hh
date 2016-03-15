@@ -29,19 +29,35 @@
 #include <unordered_set>
 
 
+// FIXME: use integer functions for logarithm and power.
 namespace asm_lsw {
 
 	class k1_matcher
 	{
+	protected:
+		template <typename t_key, typename t_value>
+		using unordered_map = map_adaptor_phf<map_adaptor_phf_spec<std::vector, pool_allocator, t_key, t_value>>;
+		
 	public:
 		typedef sdsl::int_vector<>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
 		typedef sdsl::int_vector<>										pattern_type;			// FIXME: correct parameters.
 		typedef int_vector_type											f_vector_type;
 		typedef sdsl::csa_rao<>											csa_type;				// FIXME: correct parameters.
 		typedef sdsl::cst_sada<csa_type>								cst_type;
-		typedef y_fast_trie<csa_type::value_type>						gamma_v_type;
-		typedef std::unordered_map<cst_type::node_type, gamma_v_type>	gamma_type;				// FIXME: use a map with perfect hashing instead.
-		typedef sdsl::int_vector<>										core_nodes_type;
+		
+		typedef std::set<csa_type::value_type>							gamma_v_intermediate_type;
+		typedef std::unordered_map<
+			cst_type::node_type,
+			gamma_v_intermediate_type
+		> gamma_intermediate_type;
+			
+		typedef y_fast_trie_compact_as<csa_type::value_type>			gamma_v_type;
+		typedef unordered_map<
+			cst_type::node_type,
+			std::unique_ptr<gamma_v_type>
+		> gamma_type;
+		
+		typedef sdsl::bit_vector										core_nodes_type;
 		typedef bp_support_sparse<>										core_endpoints_type;	// FIXME: check parameters.
 		typedef sdsl::rmq_succinct_sct<>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
 		typedef std::pair<csa_type::size_type, csa_type::size_type>		csa_range;
@@ -107,6 +123,12 @@ namespace asm_lsw {
 					
 					++j;
 				}
+				
+				// FIXME: change the above s.t. insertions are made
+				// to hl_tmp and hr_tmp std::sets which are then used
+				// to construct y_fast_trie_as for both sides.
+				// An alternative is to use a value transformer in the
+				// constructor below.
 			}
 
 		public:
@@ -221,6 +243,20 @@ namespace asm_lsw {
 			}
 		};
 
+	protected:
+		struct transform_gamma_v
+		{
+			gamma_type::kv_type operator()(gamma_intermediate_type::value_type &kv)
+			{
+				gamma_type::mapped_type value(gamma_v_type::construct(
+					kv.second,
+					*kv.second.cbegin(),
+					*kv.second.crbegin()
+				));
+				return std::make_pair(kv.first, std::move(value));
+			}
+		};
+
 	public:
 		// Find the path for the given pattern.
 		// Set node to the final node if found.
@@ -303,8 +339,7 @@ namespace asm_lsw {
 				}
 			}
 			
-			core_nodes_type tmp_cn(core_nodes);
-			cn = std::move(tmp_cn);
+			cn = std::move(core_nodes);
 		}
 		
 		
@@ -382,7 +417,7 @@ namespace asm_lsw {
 		}
 
 
-		static void construct_gamma_sets(cst_type const &cst, core_nodes_type const &cn, gamma_type &gamma)
+		static void construct_uncompressed_gamma_sets(cst_type const &cst, core_nodes_type const &cn, gamma_intermediate_type &gamma)
 		{
 			// Γ_v = {ISA[SA[i] + plen(u) + 1] | i ≡ 1 (mod log₂²n) and v_le ≤ i ≤ v_ri}.
 
@@ -426,6 +461,17 @@ namespace asm_lsw {
 					}
 				}
 			}
+		}
+		
+		
+		static void construct_gamma_sets(cst_type const &cst, core_nodes_type const &cn, gamma_type &gamma)
+		{
+			gamma_intermediate_type gamma_i;
+			construct_uncompressed_gamma_sets(cst, cn, gamma_i);
+			
+			gamma_type::builder_type <gamma_intermediate_type, transform_gamma_v> builder(gamma_i);
+			gamma_type gamma_tmp(builder);
+			gamma = std::move(gamma_tmp);
 		}
 		
 		
@@ -732,7 +778,7 @@ namespace asm_lsw {
 							{
 								auto const g_it(gamma.find(child));
 								if (gamma.cend() != g_it &&
-									tree_search_side_node(cst, g_it->second, r, child, st, ed, i))
+									tree_search_side_node(cst, *(g_it->second), r, child, st, ed, i))
 								{
 									left = i;
 									right = i;
@@ -746,7 +792,7 @@ namespace asm_lsw {
 					}
 				}				
 			}
-			else if (tree_search_side_node(cst, g_it->second, u, v, st, ed, i))
+			else if (tree_search_side_node(cst, *(g_it->second), u, v, st, ed, i))
 			{
 				left = i;
 				right = i;
