@@ -199,7 +199,8 @@ void common_set_type_tests()
 		trie.insert('j');
 
 		{
-			typename t_adaptor::return_type ct((adaptor(trie)));
+			t_trie tmp_trie(trie); // Copy since the compact trie takes ownership of the values.
+			typename t_adaptor::return_type ct((adaptor(tmp_trie)));
 			typename t_adaptor::trie_type::const_iterator succ;
 			AssertThat(ct.size(), Equals(4));
 			AssertThat(ct.find_successor('i', succ), Equals(true));
@@ -208,6 +209,7 @@ void common_set_type_tests()
 		}
 
 		trie.erase('j');
+		AssertThat(trie.size(), Equals(3));
 
 		{
 			typename t_adaptor::return_type ct((adaptor(trie)));
@@ -234,7 +236,8 @@ void common_set_type_tests()
 
 		for (auto const i : boost::irange(128, 134, 1))
 		{
-			typename t_adaptor::return_type ct((adaptor(trie)));
+			t_trie tmp_trie(trie); // Copy since the compact trie takes ownership of the values.
+			typename t_adaptor::return_type ct((adaptor(tmp_trie)));
 			typename t_adaptor::trie_type::const_iterator succ;
 			AssertThat(ct.size(), Equals(trie.size()));
 			AssertThat(ct.find_successor(1, succ), Equals(true));
