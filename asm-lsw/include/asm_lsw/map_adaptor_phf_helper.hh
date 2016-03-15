@@ -68,6 +68,19 @@ namespace asm_lsw { namespace detail {
 			return std::make_pair(kv.first, std::move(kv.second));
 		}
 	};
+	
+	
+	template <typename t_spec>
+	struct map_adaptor_phf_access_value
+	{
+		typedef typename map_adaptor_phf_trait <t_spec>::kv_type kv_type;
+		
+		template <typename t_kv>
+		kv_type operator()(t_kv kv)
+		{
+			return map_adaptor_phf_trait <t_spec>::kv(kv);
+		}
+	};
 }}
 
 #endif

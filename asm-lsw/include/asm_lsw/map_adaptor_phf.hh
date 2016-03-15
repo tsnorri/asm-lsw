@@ -33,7 +33,7 @@ namespace asm_lsw {
 	template <template <typename ...> class, typename, typename, typename, typename, typename>
 	class map_adaptor;
 	
-	template <typename t_spec, typename t_map>
+	template <typename t_spec, typename t_map, typename t_access_value_fn>
 	class map_adaptor_phf_builder;
 
 
@@ -63,7 +63,8 @@ namespace asm_lsw {
 	public:
 		typedef detail::map_adaptor_phf_trait <t_spec>							trait_type;
 		typedef typename t_spec::key_type										key_type;
-		typedef typename t_spec::value_type										value_type;
+		typedef typename t_spec::value_type										value_type; //FIXME: replace this with kv_type.
+		typedef typename t_spec::value_type										mapped_type;
 		typedef typename trait_type::kv_type									kv_type;
 		typedef typename t_spec::template allocator_type <kv_type>				allocator_type;
 		typedef typename t_spec::template vector_type <kv_type, allocator_type>	vector_type;
@@ -88,7 +89,7 @@ namespace asm_lsw {
 			access_key_fn_type const &access_key_fn
 		):
 			m_phf(std::move(phf)),
-			m_vector(size, kv_type(), alloc),
+			m_vector(size, alloc),	// Default-insertion requires C++14.
 			m_access_key_fn(access_key_fn)
 		{
 		}
@@ -174,7 +175,7 @@ namespace asm_lsw {
 	class map_adaptor_phf : public map_adaptor_phf_base <t_spec>
 	{
 		template <typename, typename> friend class map_iterator_phf_tpl;
-		template <typename, typename> friend class map_adaptor_phf_builder;
+		template <typename, typename, typename> friend class map_adaptor_phf_builder;
 
 	protected:
 		typedef map_adaptor_phf_base <t_spec> base_class;
@@ -191,8 +192,8 @@ namespace asm_lsw {
 		typedef map_iterator_phf_tpl <map_adaptor_phf, kv_type>			iterator;
 		typedef map_iterator_phf_tpl <map_adaptor_phf, kv_type const>	const_iterator;
 		
-		template <typename t_map>
-		using builder_type = map_adaptor_phf_builder <t_spec, t_map>;
+		template <typename t_map, typename t_access_value_fn = detail::map_adaptor_phf_access_value <t_spec>>
+		using builder_type = map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>;
 
 		typedef typename base_class::access_key_fn_type					access_key_fn_type;
 		typedef typename access_key_fn_type::accessed_type				accessed_type;
@@ -231,17 +232,18 @@ namespace asm_lsw {
 		map_adaptor_phf(map_adaptor_phf const &) = delete;
 		map_adaptor_phf(map_adaptor_phf &&other);
 		
-		template <typename t_map>
-		explicit map_adaptor_phf(map_adaptor_phf_builder <t_spec, t_map> &builder);
+		template <typename t_map, typename t_access_value_fn>
+		explicit map_adaptor_phf(map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn> &builder);
 		
 		// Move the values in map to the one owned by this adaptor.
-		template <typename t_map>
+		template <typename t_map, typename t_access_value_fn>
 		map_adaptor_phf(
 			t_map &map,
 			std::size_t const size,
 			phf_wrapper &phf,
 			allocator_type const &alloc,
-			access_key_fn_type const &access_key_fn
+			access_key_fn_type const &access_key_fn,
+			t_access_value_fn &access_value_fn
 		);
 
 		// Move the values in map to the one owned by this adaptor.
@@ -271,7 +273,7 @@ namespace asm_lsw {
 	};
 
 
-	template <typename t_spec, typename t_map>
+	template <typename t_spec, typename t_map, typename t_access_value_fn = detail::map_adaptor_phf_access_value <t_spec>>
 	class map_adaptor_phf_builder
 	{
 	protected:
@@ -297,6 +299,7 @@ namespace asm_lsw {
 		phf_wrapper				m_phf;
 		allocator_type			m_allocator;	// FIXME: always copy?
 		access_key_fn_type		m_access_key_fn;	// FIXME: always copy?
+		t_access_value_fn		m_access_value_fn;	// FIXME: add a constructor parameter for this.
 		std::size_t				m_element_count{0};
 		t_map					&m_map;
 		
@@ -322,6 +325,7 @@ namespace asm_lsw {
 		allocator_type &allocator() { return m_allocator; }
 		t_map &map() { return m_map; }
 		access_key_fn_type &access_key_fn() { return m_access_key_fn; }
+		t_access_value_fn &access_value_fn() { return m_access_value_fn; }
 
 		map_adaptor_phf_builder();
 		explicit map_adaptor_phf_builder(t_map &map);
@@ -454,21 +458,29 @@ namespace asm_lsw {
 	
 	
 	template <typename t_spec>
-	template <typename t_map>
-	map_adaptor_phf <t_spec>::map_adaptor_phf(map_adaptor_phf_builder <t_spec, t_map> &builder):
-		map_adaptor_phf(builder.map(), builder.element_count(), builder.phf(), builder.allocator(), builder.access_key_fn())
+	template <typename t_map, typename t_access_value_fn>
+	map_adaptor_phf <t_spec>::map_adaptor_phf(map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn> &builder):
+		map_adaptor_phf(
+			builder.map(),
+			builder.element_count(),
+			builder.phf(),
+			builder.allocator(),
+			builder.access_key_fn(),
+			builder.access_value_fn()
+		)
 	{
 	}
 	
 	
 	template <typename t_spec>
-	template <typename t_map>
+	template <typename t_map, typename t_access_value_fn>
 	map_adaptor_phf <t_spec>::map_adaptor_phf(
 		t_map &map,
 		std::size_t size,
 		phf_wrapper &phf,
 		allocator_type const &alloc,
-		access_key_fn_type const &access_key_fn
+		access_key_fn_type const &access_key_fn,
+		t_access_value_fn &access_value_fn
 	): base_class(phf, size, alloc, access_key_fn)
 	{
 		// Reserve the required space for m_used_indices.
@@ -485,13 +497,13 @@ namespace asm_lsw {
 		// FIXME: since the template parameter of PHF::hash is independent of that of PHF::init,
 		// the function may return incorrect hashes thus making its use rather error-prone.
 		// For now, using the same type with PHF::init and adapted_key() needs to be ensured.
-		for (auto const &kv : map)
+		for (auto &kv : map)
 		{
 			auto const key(this->m_access_key_fn(trait_type::key(kv)));
 			auto const hash(this->adapted_key(key));
 			assert(!this->m_used_indices[hash]);
 
-			this->m_vector[hash] = std::move(trait_type::kv(kv));
+			this->m_vector[hash] = std::move(access_value_fn(kv));
 			this->m_used_indices[hash] = 1;
 			++this->m_size;
 		}
@@ -510,16 +522,18 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_spec, typename t_map>
-	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(t_map &map):
+	template <typename t_spec, typename t_map, typename t_access_value_fn>
+	map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>::map_adaptor_phf_builder(t_map &map):
 		m_map(map)
 	{
 		post_init(map, true, true);
 	}
 	
 	
-	template <typename t_spec, typename t_map>
-	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(t_map &map, allocator_type const &allocator):
+	template <typename t_spec, typename t_map, typename t_access_value_fn>
+	map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>::map_adaptor_phf_builder(
+		t_map &map, allocator_type const &allocator
+	):
 		m_allocator(allocator),
 		m_map(map)
 	{
@@ -527,8 +541,10 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_spec, typename t_map>
-	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(t_map &map, access_key_fn_type const &access_key_fn):
+	template <typename t_spec, typename t_map, typename t_access_value_fn>
+	map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>::map_adaptor_phf_builder(
+		t_map &map, access_key_fn_type const &access_key_fn
+	):
 		m_access_key_fn(access_key_fn),
 		m_map(map)
 	{
@@ -536,8 +552,8 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_spec, typename t_map>
-	map_adaptor_phf_builder <t_spec, t_map>::map_adaptor_phf_builder(
+	template <typename t_spec, typename t_map, typename t_access_value_fn>
+	map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>::map_adaptor_phf_builder(
 		t_map &map,
 		access_key_fn_type const &access_key_fn,
 		allocator_type const &allocator
@@ -550,8 +566,10 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_spec, typename t_map>
-	void map_adaptor_phf_builder <t_spec, t_map>::post_init(t_map &map, bool const call_post_init_map, bool const create_allocator)
+	template <typename t_spec, typename t_map, typename t_access_value_fn>
+	void map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>::post_init(
+		t_map &map, bool const call_post_init_map, bool const create_allocator
+	)
 	{
 		if (0 == map.size())
 			return;
