@@ -43,7 +43,7 @@ namespace asm_lsw { namespace detail {
 		}
 
 		template <typename t_kv>
-		static kv_type kv(t_kv kv)
+		static kv_type kv(t_kv &kv)
 		{
 			return kv;
 		}
@@ -63,7 +63,7 @@ namespace asm_lsw { namespace detail {
 		}
 
 		template <typename t_kv>
-		static kv_type kv(t_kv kv)
+		static kv_type kv(t_kv &kv)
 		{
 			return std::make_pair(kv.first, std::move(kv.second));
 		}
@@ -76,7 +76,7 @@ namespace asm_lsw { namespace detail {
 		typedef typename map_adaptor_phf_trait <t_spec>::kv_type kv_type;
 		
 		template <typename t_kv>
-		kv_type operator()(t_kv kv)
+		kv_type operator()(t_kv &kv)
 		{
 			return map_adaptor_phf_trait <t_spec>::kv(kv);
 		}
