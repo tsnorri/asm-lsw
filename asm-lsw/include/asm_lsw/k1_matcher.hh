@@ -32,6 +32,7 @@
 // FIXME: use integer functions for logarithm and power.
 namespace asm_lsw {
 
+	template <typename t_cst>
 	class k1_matcher
 	{
 	protected:
@@ -39,46 +40,52 @@ namespace asm_lsw {
 		using unordered_map = map_adaptor_phf<map_adaptor_phf_spec<std::vector, pool_allocator, t_key, t_value>>;
 		
 	public:
-		typedef sdsl::int_vector<>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
-		typedef sdsl::int_vector<>										pattern_type;			// FIXME: correct parameters.
+		typedef sdsl::int_vector <>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
+		typedef sdsl::int_vector <>										pattern_type;			// FIXME: correct parameters.
 		typedef int_vector_type											f_vector_type;
-		typedef sdsl::csa_rao<>											csa_type;				// FIXME: correct parameters.
-		typedef sdsl::cst_sada<csa_type>								cst_type;
+		typedef t_cst													cst_type;
+		typedef typename cst_type::csa_type								csa_type;
 		
-		typedef std::set <csa_type::value_type>							gamma_v_intermediate_type;
+		typedef std::set <typename csa_type::value_type>				gamma_v_intermediate_type;
 		typedef std::map <
-			cst_type::node_type,
+			typename cst_type::node_type,
 			gamma_v_intermediate_type
-		> gamma_intermediate_type;
+		>																gamma_intermediate_type;
 			
-		typedef y_fast_trie_compact_as<csa_type::value_type>			gamma_v_type;
-		typedef unordered_map<
-			cst_type::node_type,
-			std::unique_ptr<gamma_v_type>
-		> gamma_type;
+		typedef y_fast_trie_compact_as <typename csa_type::value_type>	gamma_v_type;
+		typedef unordered_map <
+			typename cst_type::node_type,
+			std::unique_ptr <gamma_v_type>
+		>																gamma_type;
 		
 		typedef sdsl::bit_vector										core_nodes_type;
-		typedef bp_support_sparse<>										core_endpoints_type;	// FIXME: check parameters.
-		typedef sdsl::rmq_succinct_sct<>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
-		typedef std::pair<csa_type::size_type, csa_type::size_type>		csa_range;
-		typedef std::unordered_set<
+		typedef bp_support_sparse <>									core_endpoints_type;	// FIXME: check parameters.
+		typedef sdsl::rmq_succinct_sct <>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
+		typedef std::pair <
+			typename csa_type::size_type,
+			typename csa_type::size_type
+		>																csa_range;
+		typedef std::unordered_set <
 			csa_range,
-			boost::hash<csa_range>
+			boost::hash <csa_range>
 		>																csa_range_set;
 
-		static_assert(std::is_integral<cst_type::node_type>::value, "Integer required for cst_type::node_type.");
+		static_assert(
+			std::is_unsigned <typename cst_type::node_type>::value,
+			"Unsigned integer required for cst_type::node_type."
+		);
 		
 	public:
 		class h_type
 		{
 		public:
 			typedef std::map<
-				csa_type::size_type,
-				csa_type::size_type
+				typename csa_type::size_type,
+				typename csa_type::size_type
 			> h_u_intermediate_type;
 			typedef y_fast_trie_compact_as<
-				csa_type::size_type,
-				csa_type::size_type
+				typename csa_type::size_type,
+				typename csa_type::size_type
 			> h_u_type;
 
 			struct h_pair
@@ -88,12 +95,12 @@ namespace asm_lsw {
 			};
 
 		protected:
-			typedef unordered_map <cst_type::node_type, h_pair> h_map;
-			typedef std::map <cst_type::node_type, h_pair> h_map_intermediate;
+			typedef unordered_map <typename cst_type::node_type, h_pair> h_map;
+			typedef std::map <typename cst_type::node_type, h_pair> h_map_intermediate;
 
 		protected:
 			h_map m_maps;
-			cst_type::size_type m_diff;
+			typename cst_type::size_type m_diff;
 
 		protected:
 			// Section 3.1, Lemma 17.
@@ -101,8 +108,8 @@ namespace asm_lsw {
 				cst_type const &cst,
 				core_endpoints_type const &ce,
 				lcp_rmq_type const &lcp_rmq,
-				cst_type::node_type const u,
-				cst_type::size_type const log2n,
+				typename cst_type::node_type const u,
+				typename cst_type::size_type const log2n,
 				h_pair &h
 			)
 			{
@@ -111,7 +118,7 @@ namespace asm_lsw {
 				auto const plen_v(cst.depth(v));				// FIXME: check that this actually is plen(v).
 				
 				auto const leaf_count(cst.size());
-				cst_type::size_type i(0), j(0);
+				typename cst_type::size_type i(0), j(0);
 				h_u_intermediate_type hl_tmp, hr_tmp;
 				
 				while ((i = 1 + j * log2n) < leaf_count)
@@ -126,7 +133,7 @@ namespace asm_lsw {
 					
 					// Check that LCP returns csa_type::size_type (for key).
 					{
-						typedef h_u_intermediate_type::key_type hu_key_type;
+						typedef typename h_u_intermediate_type::key_type hu_key_type;
 						static_assert(
 							std::numeric_limits <decltype(lcp_len)>::max() <= std::numeric_limits <hu_key_type>::max(),
 							""
@@ -151,7 +158,7 @@ namespace asm_lsw {
 
 		public:
 			h_map const &maps() const { return m_maps; }
-			cst_type::size_type diff() const { return m_diff; }
+			typename cst_type::size_type diff() const { return m_diff; }
 
 			h_type() {}
 			
@@ -181,7 +188,7 @@ namespace asm_lsw {
 					maps_i[u] = std::move(h_u);
 				}
 				
-				h_map::builder_type <h_map_intermediate> builder(maps_i);
+				typename h_map::template builder_type <h_map_intermediate> builder(maps_i);
 				h_map maps_tmp(builder);
 				m_maps = std::move(maps_tmp);
 			}
@@ -224,7 +231,7 @@ namespace asm_lsw {
 			{
 				auto const m(pattern.size());
 				pattern_type::size_type i(0);
-				cst_type::node_type node;
+				typename cst_type::node_type node;
 
 				f_vector_type st(m, 0);
 				f_vector_type ed(m, 0);
@@ -270,9 +277,9 @@ namespace asm_lsw {
 	protected:
 		struct transform_gamma_v
 		{
-			gamma_type::kv_type operator()(gamma_intermediate_type::value_type &kv)
+			typename gamma_type::kv_type operator()(typename gamma_intermediate_type::value_type &kv)
 			{
-				gamma_type::mapped_type value(gamma_v_type::construct(
+				typename gamma_type::mapped_type value(gamma_v_type::construct(
 					kv.second,
 					*kv.second.cbegin(),
 					*kv.second.crbegin()
@@ -289,7 +296,7 @@ namespace asm_lsw {
 			cst_type const &cst,
 			pattern_type const &pattern,
 			pattern_type::size_type const start_idx,
-			cst_type::node_type &node // inout
+			typename cst_type::node_type &node // inout
 		)
 		{
 			auto const begin(pattern.cbegin() + start_idx);
@@ -309,7 +316,9 @@ namespace asm_lsw {
 		
 		// Check if the given node is a side node as per section 2.5.
 		// FIXME: calculate time complexity.
-		static bool is_side_node(cst_type const &cst, core_nodes_type const &cn, cst_type::node_type const node)
+		static bool is_side_node(
+			cst_type const &cst, core_nodes_type const &cn, typename cst_type::node_type const node
+		)
 		{
 			auto node_id(cst.id(node));
 			return cn[node_id];
@@ -321,13 +330,16 @@ namespace asm_lsw {
 		// FIXME: calculate time complexity.
 		static void construct_core_paths(cst_type const &cst, core_nodes_type &cn)
 		{
-			std::map <cst_type::node_type, cst_type::size_type> node_depths;
+			std::map <
+				typename cst_type::node_type,
+				typename cst_type::size_type
+			> node_depths;
 			sdsl::bit_vector core_nodes(cst.nodes(), 0); // Nodes with incoming core edges.
 			
 			// Count node depths from the bottom and choose the greatest.
 			for (auto it(cst.begin_bottom_up()), end(cst.end_bottom_up()); it != end; ++it)
 			{
-				cst_type::node_type node(*it);
+				typename cst_type::node_type node(*it);
 				if (cst.is_leaf(node))
 				{
 					auto res(node_depths.emplace(std::make_pair(node, 1)));
@@ -336,8 +348,8 @@ namespace asm_lsw {
 				else
 				{
 					// Not a leaf, iterate the children and choose.
-					cst_type::size_type max_nd(0);
-					cst_type::node_type argmax_nd(cst.root());
+					typename cst_type::size_type max_nd(0);
+					typename cst_type::node_type argmax_nd(cst.root());
 					
 					auto children(cst.children(node));
 					for (auto it(children.begin()), end(children.end()); it != end; ++it)
@@ -384,9 +396,9 @@ namespace asm_lsw {
 				// Find the '(' endpoint for each of the ')' endpoints in the leaves and count the paths.
 				// The '(' endpoint will not have a bit set in cn.
 				// Documentation for inv_id: identifiers are in range [0, nodes() - 1].
-				for (cst_type::size_type i(0); i < leaf_count; ++i)
+				for (typename cst_type::size_type i(0); i < leaf_count; ++i)
 				{
-					cst_type::node_type node(cst.inv_id(i));
+					typename cst_type::node_type node(cst.inv_id(i));
 					if (cn[node])
 					{
 						++path_count;
@@ -455,8 +467,8 @@ namespace asm_lsw {
 			{
 				if (is_side_node(cst, cn, *it))
 				{
-					cst_type::node_type const v(*it);
-					cst_type::node_type const u(cst.parent(v));
+					typename cst_type::node_type const v(*it);
+					typename cst_type::node_type const u(cst.parent(v));
 
 					// Find the SA indices of the leftmost and rightmost leaves.
 					auto const lb(cst.lb(v));
@@ -471,7 +483,7 @@ namespace asm_lsw {
 					// = {i | i = 1 + j log₂²n, j ∈ ℕ and lb ≤ i ≤ rb}
 					// Now lb ≤ 1 + j log₂²n <=> (lb - 1) / log₂²n ≤ j.
 					// In case lb = 0, the inequality above yields 1 for the right side and j ← 0.
-					cst_type::size_type i(0), j(0);
+					typename cst_type::size_type i(0), j(0);
 					if (lb)
 						j = (lb - 1) / log2n;
 					
@@ -493,7 +505,7 @@ namespace asm_lsw {
 			gamma_intermediate_type gamma_i;
 			construct_uncompressed_gamma_sets(cst, cn, gamma_i);
 			
-			gamma_type::builder_type <gamma_intermediate_type, transform_gamma_v> builder(gamma_i);
+			typename gamma_type::template builder_type <gamma_intermediate_type, transform_gamma_v> builder(gamma_i);
 			gamma_type gamma_tmp(builder);
 			gamma = std::move(gamma_tmp);
 		}
@@ -511,11 +523,11 @@ namespace asm_lsw {
 		static bool find_pattern_occurrence(
 			csa_type const &csa,
 			pattern_type::size_type const pat1_len,
-			csa_type::size_type const st,
-			csa_type::size_type const ed,
-			csa_type::size_type const lb,
-			csa_type::size_type const rb,
-			csa_type::size_type &i
+			typename csa_type::size_type const st,
+			typename csa_type::size_type const ed,
+			typename csa_type::size_type const lb,
+			typename csa_type::size_type const rb,
+			typename csa_type::size_type &i
 		)
 		{
 			if (rb < lb)
@@ -545,11 +557,11 @@ namespace asm_lsw {
 		// Find SA index i s.t. |lcp(i, k)| = |P₁| + q + 1 using binary search.
 		static bool find_node_ilr_bin(
 			lcp_rmq_type const &lcp_rmq,
-			csa_type::size_type const k,
-			cst_type::size_type const r_len,
-			csa_type::size_type const l,
-			csa_type::size_type const r,
-			csa_type::size_type &i
+			typename csa_type::size_type const k,
+			typename cst_type::size_type const r_len,
+			typename csa_type::size_type const l,
+			typename csa_type::size_type const r,
+			typename csa_type::size_type &i
 		)
 		{
 			if (r < l)
@@ -582,14 +594,14 @@ namespace asm_lsw {
 		static bool find_node_ilr(
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
-			h_type::h_pair const &hx,
-			csa_type::size_type const k,
-			cst_type::size_type const r_len,	// cst.depth returns size_type.
-			csa_type::size_type &i
+			typename h_type::h_pair const &hx,
+			typename csa_type::size_type const k,
+			typename cst_type::size_type const r_len,	// cst.depth returns size_type.
+			typename csa_type::size_type &i
 		)
 		{
-			csa_type::size_type l(0), r(0);
-			h_type::h_u_type::const_subtree_iterator it;
+			typename csa_type::size_type l(0), r(0);
+			typename h_type::h_u_type::const_subtree_iterator it;
 
 			// Try i^l.
 			if (hx.l->find_successor(r_len, it, true))
@@ -625,10 +637,10 @@ namespace asm_lsw {
 		static void extend_range(
 			cst_type const &cst,
 			pattern_type::size_type const pat1_len,
-			csa_type::size_type const st,
-			csa_type::size_type const ed,
-			csa_type::size_type &left,
-			csa_type::size_type &right
+			typename csa_type::size_type const st,
+			typename csa_type::size_type const ed,
+			typename csa_type::size_type &left,
+			typename csa_type::size_type &right
 		)
 		{
 			auto const &csa(cst.csa);
@@ -646,11 +658,11 @@ namespace asm_lsw {
 		static bool tree_search_side_node(
 			cst_type const &cst,
 			gamma_v_type const &gamma_v,
-			cst_type::node_type const u,
-			cst_type::node_type const v,
-			csa_type::size_type const st,
-			csa_type::size_type const ed,
-			csa_type::size_type &i
+			typename cst_type::node_type const u,
+			typename cst_type::node_type const v,
+			typename csa_type::size_type const st,
+			typename csa_type::size_type const ed,
+			typename csa_type::size_type &i
 		)
 		{
 			// v is a side node.
@@ -668,7 +680,7 @@ namespace asm_lsw {
 			else
 			{
 				// Find a j s.t. st ≤ j ≤ ed by allowing equality and checking the upper bound.
-				gamma_v_type::const_subtree_iterator it;
+				typename gamma_v_type::const_subtree_iterator it;
 				if (gamma_v.find_successor(st, it, true) && *it <= ed)
 				{
 					// Case 2.
@@ -684,8 +696,8 @@ namespace asm_lsw {
 				{
 					// Case 3.
 					// Extend the range slightly if possible.
-					gamma_v_type::const_subtree_iterator a_it, b_it;
-					csa_type::size_type a(st), b(ed);
+					typename gamma_v_type::const_subtree_iterator a_it, b_it;
+					typename csa_type::size_type a(st), b(ed);
 					
 					if (gamma_v.find_predecessor(st, a_it))
 						a = *a_it;
@@ -713,23 +725,23 @@ namespace asm_lsw {
 			core_endpoints_type const &core_endpoints,
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
-			cst_type::node_type const u,
-			cst_type::node_type const core_path_beginning,
-			cst_type::char_type const c,
-			csa_type::size_type const st,
-			csa_type::size_type const ed,
-			csa_type::size_type &left,
-			csa_type::size_type &right
+			typename cst_type::node_type const u,
+			typename cst_type::node_type const core_path_beginning,
+			typename cst_type::char_type const c,
+			typename csa_type::size_type const st,
+			typename csa_type::size_type const ed,
+			typename csa_type::size_type &left,
+			typename csa_type::size_type &right
 		)
 		{
-			cst_type::size_type pos(0);
+			typename cst_type::size_type pos(0);
 			auto const v(cst.child(u, c, pos));
 			
 			// Check if found.
 			if (cst.root() == v)
 				return false;
 			
-			csa_type::size_type i(0);
+			typename csa_type::size_type i(0);
 			
 			auto const g_it(gamma.find(v));
 			auto const pat1_len(cst.depth(u));
@@ -738,7 +750,7 @@ namespace asm_lsw {
 				// No Γ_v with this node so it must be a core node. Find the
 				// core leaf node x at the end of the core path.
 				// Every core leaf node is supposed to have a set H associated with it.
-				cst_type::node_type x(core_endpoints.find_close(core_path_beginning));
+				typename cst_type::node_type x(core_endpoints.find_close(core_path_beginning));
 				auto const h_it(h.maps().find(x));
 				assert(h.maps().cend() != h_it);
 				auto const &hx(h_it->second);
@@ -778,7 +790,7 @@ namespace asm_lsw {
 						// Since x is a core leaf node, we have (some of) the indices
 						// of the suitable lcp values stored in hx.l and hx.r.
 						auto const r_len(pat1_len + q + 1);
-						csa_type::size_type ilr(0);
+						typename csa_type::size_type ilr(0);
 						if (!find_node_ilr(lcp_rmq, h, hx, k, r_len, ilr))
 							return false;
 						
@@ -838,14 +850,14 @@ namespace asm_lsw {
 			core_endpoints_type const &core_endpoints,
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
-			cst_type::node_type const u,
-			cst_type::node_type const core_path_beginning,
+			typename cst_type::node_type const u,
+			typename cst_type::node_type const core_path_beginning,
 			pattern_type const &pattern,
 			pattern_type::size_type const i,
 			csa_range_set &ranges
 		)
 		{
-			csa_type::size_type left{0}, right{0};
+			typename csa_type::size_type left{0}, right{0};
 
 			// 1. Deletion
 			// Needn't be checked if P[i] == P[i + 1].
@@ -918,8 +930,8 @@ namespace asm_lsw {
 			csa_range_set &ranges
 		)
 		{
-			cst_type::node_type u(cst.root());
-			cst_type::node_type core_path_beginning(u);
+			typename cst_type::node_type u(cst.root());
+			typename cst_type::node_type core_path_beginning(u);
 			auto const patlen(pattern.size());
 			util::remove_c_t<decltype(patlen)> i(0);
 
@@ -930,7 +942,7 @@ namespace asm_lsw {
 
 				// 4. Exact match.
 				auto const cc(cst.csa.comp2char[pattern[i]]);
-				cst_type::size_type char_pos{0};
+				typename cst_type::size_type char_pos{0};
 				auto const v(cst.child(u, cc, char_pos));
 				if (cst.root() != v)
 				{
