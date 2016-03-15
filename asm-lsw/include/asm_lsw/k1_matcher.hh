@@ -968,20 +968,4 @@ namespace asm_lsw {
 	};
 }
 
-
-void test(std::string const &input)
-{
-#if 0 
-	std::string filename("@input.iv8");
-	sdsl::store_to_file(input.c_str(), file);
-
-	sdsl::csa_rao<t_spec> csa;
-	sdsl::construct(csa, file, 1);
-	std::cout << "---------" << std::endl;
-
-	sdsl::csa_rao<t_spec> csa2;
-	csa2 = std::move(csa);
-#endif
-}
-
 #endif
