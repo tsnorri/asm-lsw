@@ -217,6 +217,7 @@ namespace asm_lsw {
 		class f_type
 		{
 		public:
+			typedef f_vector_type::size_type size_type;
 			static f_vector_type::value_type const not_found{std::numeric_limits<f_vector_type::value_type>::max()};
 
 		protected:
@@ -877,8 +878,15 @@ namespace asm_lsw {
 					auto const &isa(csa.isa);
 					auto const x(node_inv_id(cst, x_id));
 					assert(cst.is_leaf(x));
+					
 					auto const k(cst.id(x)); // Get the suffix array index.
-					auto const isa_val(isa[csa[k] + pat1_len + 1]);
+					auto const isa_idx(csa[k] + pat1_len + 1);
+					
+					// Check if the pattern may still be found in the suffix tree.
+					if (! (isa_idx < isa.size()))
+						return false;
+					
+					auto const isa_val(isa[isa_idx]);
 					auto const q(lcp_rmq(std::min(isa_val, st), std::max(isa_val, st)));
 					auto const pat2_len(lcp_rmq(st, ed));
 					if (q >= pat2_len)
@@ -961,91 +969,30 @@ namespace asm_lsw {
 			h_type const &h,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type const core_path_beginning,
-			pattern_type const &pattern,
-			pattern_type::size_type const i,
+			typename f_type::size_type const i,
+			typename cst_type::char_type const cc,
 			csa_range_set &ranges
 		)
 		{
 			typename csa_type::size_type left{0}, right{0};
+			auto const st(f.st(cst, i));
+			auto const ed(f.ed(cst, i));
 
-			// 1. Deletion
-			// Needn't be checked if P[i] == P[i + 1].
-			if (pattern[i] != pattern[1 + i])
+			// [st, ed] = [F_st[j], F_ed[j]] = range(cst, pattern[j, m]) = range(cst, pattern[1 + i, m]),
+			// where m is the pattern length. If pattern[1 + i, m] isn't a prefix of any suffix in cst,
+			// there aren't any occurrences of P₁cP₂ (as defined in Lemma 19) in cst.
+			if (st != f_type::not_found)
 			{
-				auto const cc(pattern[1 + i]);
-				auto const st(f.st(cst, 2 + i));
-				auto const ed(f.ed(cst, 2 + i));
-
-				// [st, ed] = [F_st[j], F_ed[j]] = range(cst, pattern[j, m]) = range(cst, pattern[1 + i, m]),
-				// where m is the pattern length. If pattern[1 + i, m] isn't a prefix of any suffix in cst,
-				// there aren't any occurrences of P₁cP₂ (as defined in Lemma 19) in cst.
-				if (st != f_type::not_found)
+				assert (ed != f_type::not_found);
+				if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
 				{
-					assert (ed != f_type::not_found);
-					if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
-					{
-						csa_range range(left, right);
-						ranges.emplace(std::move(range));
-					}
-				}
-				else
-				{
-					assert (ed == f_type::not_found);
+					csa_range range(left, right);
+					ranges.emplace(std::move(range));
 				}
 			}
-
-			// 2. Substitution.
-			// Test with all the characteres in Sigma.
-			for (typename cst_type::sigma_type c(0); c < cst.csa.sigma; ++c)
+			else
 			{
-				auto const cc(cst.csa.comp2char[c]);
-				if (pattern[i] != cc)
-				{
-					auto const st(f.st(cst, 1 + i));
-					auto const ed(f.ed(cst, 1 + i));
-					
-					// See case 1 for rationale.
-					if (st != f_type::not_found)
-					{
-						assert (ed != f_type::not_found);
-						if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
-						{
-							csa_range range(left, right);
-							ranges.emplace(std::move(range));
-						}
-					}
-					else
-					{
-						assert (ed == f_type::not_found);
-					}
-				}
-			}
-
-			// 3. Insertion.
-			// Allow insertion of the same character to the end of the string.
-			for (typename cst_type::sigma_type c(0); c < cst.csa.sigma; ++c)
-			{
-				auto const cc(cst.csa.comp2char[c]);
-				if (1 + i == pattern.size() || pattern[i] != cc)
-				{
-					auto const st(f.st(cst, i));
-					auto const ed(f.ed(cst, i));
-
-					// See case 1 for rationale.
-					if (st != f_type::not_found)
-					{
-						assert(ed != f_type::not_found);
-						if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
-						{
-							csa_range range(left, right);
-							ranges.emplace(std::move(range));
-						}
-					}
-					else
-					{
-						assert (ed == f_type::not_found);
-					}
-				}
+				assert (ed == f_type::not_found);
 			}
 		}
 		
@@ -1119,8 +1066,41 @@ namespace asm_lsw {
 
 			while (i < patlen)
 			{
-				// Cases 1, 2, 3.
-				find_1_approximate_at_i(cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, pattern, i, ranges);
+				// 1. Deletion
+				// Needn't be checked if P[i] == P[i + 1].
+				if (pattern[i] != pattern[1 + i])
+				{
+					auto const cc(pattern[1 + i]);
+					find_1_approximate_at_i(
+						cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, 2 + i, cc, ranges
+					);
+				}
+				
+				// 2. Substitution.
+				// Test with all the characteres in Sigma.
+				for (typename cst_type::sigma_type c(0); c < cst.csa.sigma; ++c)
+				{
+					auto const cc(cst.csa.comp2char[c]);
+					if (pattern[i] != cc)
+					{
+						find_1_approximate_at_i(
+							cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, 1 + i, cc, ranges
+						);
+					}
+				}
+				
+				// 3. Insertion.
+				// Allow insertion of the same character to the end of the string.
+				for (typename cst_type::sigma_type c(0); c < cst.csa.sigma; ++c)
+				{
+					auto const cc(cst.csa.comp2char[c]);
+					if (1 + i == pattern.size() || pattern[i] != cc)
+					{
+						find_1_approximate_at_i(
+							cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, i, cc, ranges
+						);
+					}
+				}
 
 				// 4. Exact match.
 				auto const cc(pattern[i]);
@@ -1138,7 +1118,7 @@ namespace asm_lsw {
 					// If the end of the pattern is reached, stop.
 					if (patlen == k)
 					{
-						csa_range range(cst.lb(k), cst.rb(k));
+						csa_range range(cst.lb(v), cst.rb(v));
 						ranges.emplace(std::move(range));
 						return;
 					}
@@ -1181,6 +1161,7 @@ namespace asm_lsw {
 				// FIXME: shouldn't be reached now.
 				if (cst.is_leaf(u))
 				{
+					assert(0);
 					auto const idx(cst.id(u));
 					ranges.emplace(idx, idx);
 				}
