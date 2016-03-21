@@ -7,10 +7,14 @@ GCOVR	?= gcovr
 MKDIR	?= mkdir
 CLOC	?= cloc
 
-WARNING_FLAGS	= -Wall -Werror -Wno-unused -Wno-missing-braces \
+WARNING_FLAGS	?=
+WARNING_FLAGS	+= \
+	-Wall -Werror -Wno-unused -Wno-missing-braces -Wstrict-aliasing \
 	-Wno-deprecated-declarations -Wno-sign-compare # for Bandit
 
 LOCAL_CXXFLAGS		?= -std=c++14
+OPT_FLAGS			?=
+OPT_FLAGS			+= -fstrict-aliasing -fstrict-overflow
 OPT_FLAGS_DEBUG		?= -ggdb -O0
 OPT_FLAGS_RELEASE	?= -march=native -O2 -ftree-vectorize -foptimize-sibling-calls
 
@@ -30,9 +34,9 @@ LDFLAGS		=	-L../../lib/sdsl/build/lib \
 				$(OPT_FLAGS) $(LOCAL_LDFLAGS) -ldivsufsort -ldivsufsort64 -lphf -lsdsl
 
 ifeq ($(BUILD_STYLE),release)
-	OPT_FLAGS	= $(OPT_FLAGS_RELEASE)
+	OPT_FLAGS	+= $(OPT_FLAGS_RELEASE)
 else
-	OPT_FLAGS	= $(OPT_FLAGS_DEBUG)
+	OPT_FLAGS	+= $(OPT_FLAGS_DEBUG)
 endif
 
 ifeq ($(EXTRA_WARNINGS),1)
