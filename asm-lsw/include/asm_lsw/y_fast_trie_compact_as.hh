@@ -295,7 +295,7 @@ namespace asm_lsw {
 		virtual key_type min_key() const override					{ return this->m_offset + m_trie.min_key(); }
 		virtual key_type max_key() const override					{ return this->m_offset + m_trie.max_key(); }
 
-		virtual void print() const override							{ m_trie.print(); }
+		virtual void print() const override							{ std::cout << "Offset: " << this->m_offset << std::endl; m_trie.print(); }
 
 		virtual bool find(key_type const key, const_subtree_iterator &iterator) const override;
 		virtual bool find_predecessor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const override;
