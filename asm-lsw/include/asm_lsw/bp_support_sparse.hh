@@ -162,6 +162,7 @@ namespace asm_lsw {
 		template <typename t_input_vector>
 		bp_support_sparse(t_input_vector const &bps_seq);
 		
+		input_value operator[](size_type i) const;
 		decltype(m_bps) const &bps() const { return m_bps; }
 		auto to_bp_idx(size_type const i) const -> typename bp_type::size_type;
 		size_type to_sparse_idx(typename bp_type::size_type const idx) const;
@@ -169,7 +170,7 @@ namespace asm_lsw {
 		size_type find_close(size_type i) const;
 		size_type rank(size_type i) const;
 		size_type select(size_type i) const;
-		
+
 		// TODO: implement rmq_open
 		// TODO: implement enclose
 		// TODO: implement rr_enclose
@@ -381,6 +382,21 @@ namespace asm_lsw {
 			rss tmp(this->m_mask);
 			m_rss = std::move(tmp);
 		}
+	}
+	
+	
+	template <typename t_bps, typename t_vector>
+	auto bp_support_sparse <t_bps, t_vector>::operator[](size_type const i) const -> input_value
+	{
+		if (this->m_mask[i])
+		{
+			if (this->m_bp[to_bp_idx(i)])
+				return bp_support_sparse::input_value::Opening;
+			
+			return bp_support_sparse::input_value::Closing;
+		}
+		
+		return bp_support_sparse::input_value::Space;
 	}
 
 	
