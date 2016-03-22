@@ -537,8 +537,12 @@ namespace asm_lsw {
 					{
 						// cst.depth returns path label length.
 						assert(lb <= i);
-						auto val(isa[csa[i] + cst.depth(u) + 1]);
-						gamma_v.insert(val);
+						auto isa_idx(csa[i] + cst.depth(u) + 1);
+						if (! (isa.size() <= isa_idx))
+						{
+							auto val(isa[isa_idx]);
+							gamma_v.insert(val);
+						}
 						++j;
 					}
 				}
