@@ -11,6 +11,7 @@ CXXFLAGS	+= -fprofile-arcs -ftest-coverage
 LDFLAGS		+= $(LDFLAGS_COVERAGE)
 
 OBJECTS		=	bp_support_sparse_tests.o \
+				k1_matcher_tests.o \
 				map_adaptor_tests.o \
 				pool_allocator_tests.o \
 				x_fast_trie_tests.o \
