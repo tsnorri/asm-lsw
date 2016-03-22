@@ -17,6 +17,8 @@
 
 #include <asm_lsw/k1_matcher.hh>
 #include <bandit/bandit.h>
+#include <sdsl/csa_rao.hpp>
+#include <sdsl/csa_rao_builder.hpp>
 
 using namespace bandit;
 
@@ -123,5 +125,9 @@ void typed_tests()
 go_bandit([](){
 	describe("k1_matcher <cst_sada <>>:", [](){
 		typed_tests <sdsl::cst_sada <>>();
+	});
+
+	describe("k1_matcher <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>>:", [](){
+		typed_tests <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>>();
 	});
 });
