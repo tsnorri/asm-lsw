@@ -85,7 +85,52 @@ namespace asm_lsw {
 	protected:
 		struct transform_gamma_v;
 		
+	protected:
+		cst_type			m_cst;
+		gamma_type			m_gamma;
+		core_endpoints_type	m_ce;
+		lcp_rmq_type		m_lcp_rmq;
+		h_type				m_h;
+		
 	public:
+		
+		k1_matcher() {}
+		
+		k1_matcher(std::string const &input)
+		{
+			std::string file("@testinput.iv8");
+			sdsl::store_to_file(input.c_str(), file);
+			
+			// CST
+			cst_type cst;
+			sdsl::construct(cst, file, 1);
+			m_cst = std::move(cst);
+			
+			// Core path nodes
+			core_nodes_type cn;
+			construct_core_paths(m_cst, cn);
+
+			// Gamma
+			gamma_type gamma;
+			construct_gamma_sets(m_cst, cn, gamma);
+			m_gamma = std::move(gamma);
+			
+			// Core path endpoints
+			core_endpoints_type ce;
+			construct_core_path_endpoints(m_cst, cn, ce);
+			m_ce = std::move(ce);
+			
+			// LCP RMQ
+			lcp_rmq_type lcp_rmq;
+			construct_lcp_rmq(m_cst, lcp_rmq);
+			m_lcp_rmq = std::move(lcp_rmq);
+			
+			// H
+			h_type h(m_cst, m_ce, m_lcp_rmq);
+			m_h = std::move(h);
+		}
+		
+		
 		static typename cst_type::size_type node_id(
 			cst_type const &cst, typename cst_type::node_type const node
 		)
@@ -901,6 +946,13 @@ namespace asm_lsw {
 			ranges.emplace(std::move(range));
 		}
 		
+		
+		void find_1_approximate(pattern_type const &pattern, csa_range_set &ranges)
+		{
+			f_type f(m_cst, pattern);
+			find_1_approximate(m_cst, f, m_gamma, m_ce, m_lcp_rmq, m_h, pattern, ranges);
+		}
+
 
 		// Section 3.3.
 		static void find_1_approximate(
