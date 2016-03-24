@@ -29,7 +29,6 @@
 #include <unordered_set>
 
 
-// FIXME: use integer functions for logarithm and power.
 namespace asm_lsw {
 
 	template <typename t_cst>
@@ -78,7 +77,7 @@ namespace asm_lsw {
 			std::is_unsigned <typename cst_type::node_type>::value,
 			"Unsigned integer required for cst_type::node_type."
 		);
-		
+	
 	public:
 		class h_type
 		{
