@@ -162,6 +162,7 @@ namespace asm_lsw {
 		template <typename t_input_vector>
 		bp_support_sparse(t_input_vector const &bps_seq);
 		
+		size_type size() const { return this->m_mask.size(); }
 		input_value operator[](size_type i) const;
 		decltype(m_bps) const &bps() const { return m_bps; }
 		auto to_bp_idx(size_type const i) const -> typename bp_type::size_type;
