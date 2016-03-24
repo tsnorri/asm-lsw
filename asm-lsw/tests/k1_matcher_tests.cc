@@ -114,6 +114,16 @@ void typed_tests()
 				{"ababac",		{{1, 1}, {4, 4}}},
 				{"ababacc",		{{1, 1}}}
 			}
+		},
+		{
+			"abracadabracadabra", {
+				{"abra",		{{2, 4}, {9, 11}, {14, 15}}}
+			}
+		},
+		{
+			"abbbaabbbab", {
+				{"bbbb",		{{11, 11}, {10, 11}, {9, 9}, {3, 4}}}
+			}
 		}
 	};
 	
