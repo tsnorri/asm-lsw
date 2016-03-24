@@ -64,14 +64,12 @@ namespace asm_lsw {
 		typedef bp_support_sparse <>									core_endpoints_type;	// FIXME: check parameters.
 		
 		typedef sdsl::rmq_succinct_sct <>								lcp_rmq_type;			// Default parameters. FIXME: check that they yield O(t_SA) time complexity.
+		
 		typedef std::pair <
 			typename csa_type::size_type,
 			typename csa_type::size_type
 		>																csa_range;
-		typedef std::unordered_set <
-			csa_range,
-			boost::hash <csa_range>
-		>																csa_range_set;
+		typedef std::vector <csa_range>									csa_ranges;
 
 		static_assert(
 			std::is_unsigned <typename cst_type::node_type>::value,
@@ -143,6 +141,7 @@ namespace asm_lsw {
 			return m_cst.bp_support.select(1 + node_id);
 		}
 
+		
 		bool find_path(
 			pattern_type const &pattern,
 			pattern_type::size_type const start_idx,
@@ -235,7 +234,7 @@ namespace asm_lsw {
 			typename cst_type::node_type const core_path_beginning,
 			typename f_type::size_type const i,
 			typename cst_type::char_type const cc,
-			csa_range_set &ranges
+			csa_ranges &ranges
 		) const;
 		
 		void find_1_approximate_continue_exact(
@@ -243,12 +242,13 @@ namespace asm_lsw {
 			typename cst_type::node_type v,
 			pattern_type::size_type eidx,
 			pattern_type::size_type pidx,
-			csa_range_set &ranges
+			csa_ranges &ranges
 		) const;
 		
 	public:
 		// Section 3.3.
-		void find_1_approximate(pattern_type const &pattern, csa_range_set &ranges) const;
+		void find_1_approximate(pattern_type const &pattern, csa_ranges &ranges) const;
+		void post_process_ranges(csa_ranges &ranges);
 	};
 	
 	
@@ -975,7 +975,7 @@ namespace asm_lsw {
 		typename cst_type::node_type const core_path_beginning,
 		typename f_type::size_type const i,
 		typename cst_type::char_type const cc,
-		csa_range_set &ranges
+		csa_ranges &ranges
 	) const
 	{
 		typename csa_type::size_type left{0}, right{0};
@@ -991,7 +991,7 @@ namespace asm_lsw {
 			if (tree_search(pattern, f, u, core_path_beginning, cc, st, ed, left, right))
 			{
 				csa_range range(left, right);
-				ranges.emplace(std::move(range));
+				ranges.emplace_back(std::move(range));
 			}
 		}
 		else
@@ -1007,7 +1007,7 @@ namespace asm_lsw {
 		typename cst_type::node_type v,
 		pattern_type::size_type eidx,
 		pattern_type::size_type pidx,
-		csa_range_set &ranges
+		csa_ranges &ranges
 	) const
 	{
 		// Repeatedly select the matching branch of the suffix tree until
@@ -1047,13 +1047,13 @@ namespace asm_lsw {
 		
 	end:
 		csa_range range(m_cst.lb(v), m_cst.rb(v));
-		ranges.emplace(std::move(range));
+		ranges.emplace_back(std::move(range));
 	}
 	
 	
 	// Section 3.3.
 	template <typename t_cst>
-	void k1_matcher <t_cst>::find_1_approximate(pattern_type const &pattern, csa_range_set &ranges) const
+	void k1_matcher <t_cst>::find_1_approximate(pattern_type const &pattern, csa_ranges &ranges) const
 	{
 		f_type const f(*this, pattern);
 		typename cst_type::node_type u(m_cst.root());
@@ -1108,7 +1108,7 @@ namespace asm_lsw {
 				if (patlen == k)
 				{
 					csa_range range(m_cst.lb(v), m_cst.rb(v));
-					ranges.emplace(std::move(range));
+					ranges.emplace_back(std::move(range));
 					return;
 				}
 				
@@ -1159,7 +1159,60 @@ namespace asm_lsw {
 			{
 				assert(0);
 				auto const idx(m_cst.id(u));
-				ranges.emplace(idx, idx);
+				ranges.emplace_back(idx, idx);
+			}
+		}
+	}
+
+	
+	template <typename t_cst>
+	void k1_matcher <t_cst>::post_process_ranges(csa_ranges &ranges)
+	{
+		std::sort(ranges.begin(), ranges.end());
+		
+		auto out_it(ranges.begin()), it(ranges.begin()), end(ranges.end());
+		if (it != end)
+		{
+			while (true)
+			{
+				auto val(*it);
+				auto first(val.first);
+				auto last(val.second);
+				
+				auto n_it(it);
+				while (true)
+				{
+					++n_it;
+					if (n_it == end)
+					{
+						val.first = first;
+						val.second = last;
+						*out_it = val;
+						++out_it;
+						ranges.resize(std::distance(ranges.begin(), out_it));
+						return;
+					}
+					
+					auto n_first(n_it->first);
+					auto n_last(n_it->second);
+					
+					assert(first <= n_first);
+					if (n_first <= 1 + last)
+					{
+						if (last < n_last)
+							last = n_last;
+					}
+					else
+					{
+						it = n_it;
+						break;
+					}
+				}
+				
+				val.first = first;
+				val.second = last;
+				*out_it = val;
+				++out_it;
 			}
 		}
 	}

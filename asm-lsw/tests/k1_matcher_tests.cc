@@ -60,9 +60,10 @@ void typed_tests(t_input_pattern const &ip)
 					}
 				}
 			
-				typename t_matcher::csa_range_set ranges;
+				typename t_matcher::csa_ranges ranges;
 				matcher.find_1_approximate(pattern, ranges);
-			
+				matcher.post_process_ranges(ranges);
+				
 				AssertThat(ranges, Equals(p.ranges));
 			});
 		}
@@ -74,12 +75,12 @@ template <typename t_cst>
 void typed_tests()
 {
 	typedef asm_lsw::k1_matcher <t_cst> k1_matcher;
-	typedef input_pattern <typename k1_matcher::csa_range_set> input_pattern;
+	typedef input_pattern <typename k1_matcher::csa_ranges> input_pattern;
 	
 	std::vector <input_pattern> input_patterns{
 		{
 			"abcdefg", {
-				{"abcdefg",		{{1, 1}, {2, 2}}},
+				{"abcdefg",		{{1, 2}}},
 				{"abcdefgh",	{{1, 1}}},
 				{"abcefg",		{{1, 1}}},
 				{"abcefgh",		{}}
@@ -99,7 +100,7 @@ void typed_tests()
 		},
 		{
 			"abbbaabbbab", {
-				{"bbbb",		{{11, 11}, {10, 11}, {9, 9}, {3, 4}}}
+				{"bbbb",		{{3, 4}, {9, 11}}}
 			}
 		}
 	};
