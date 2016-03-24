@@ -872,13 +872,6 @@ namespace asm_lsw {
 					// Get i from j = ISA[SA[i] + |P₁| + 1].
 					auto const isa_val(*it);
 					i = sa_idx_of_stored_isa_val(csa, isa_val, pat1_len);
-#if 0
-					auto const isa_val(*it);
-					auto const isa_idx(csa[isa_val]);
-					auto const sa_val(isa_idx - pat1_len - 1);
-					auto const sa_idx(csa.isa[sa_val]);
-					i = sa_idx;
-#endif
 					return true;
 				}
 				else
@@ -905,24 +898,6 @@ namespace asm_lsw {
 					
 					if (find_pattern_occurrence(csa, pat1_len, st, ed, a, b, i))
 						return true;
-					
-#if 0
-					typename gamma_v_type::const_subtree_iterator a_it, b_it;
-					typename csa_type::size_type a(st), b(ed);
-					
-					if (gamma_v.find_predecessor(st, a_it))
-						a = *a_it;
-					
-					if (gamma_v.find_successor(ed, b_it))
-						b = *b_it;
-					
-					// If extending was not possible, stop.
-					if (st == a && ed == b)
-						return false;
-					
-					if (find_pattern_occurrence(csa, pat1_len, a, b, v_le, v_ri, i))
-						return true;
-#endif
 				}
 			}
 
