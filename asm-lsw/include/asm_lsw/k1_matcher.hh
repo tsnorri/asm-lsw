@@ -129,7 +129,10 @@ namespace asm_lsw {
 		}
 		
 		
-	protected:
+		cst_type const &cst() { return m_cst; }
+		core_endpoints_type const &core_path_endpoints() { return m_ce; }
+
+		
 		typename cst_type::size_type node_id(typename cst_type::node_type const node) const
 		{
 			return m_cst.bp_support.rank(node) - 1;
@@ -142,6 +145,7 @@ namespace asm_lsw {
 		}
 
 		
+	protected:
 		bool find_path(
 			pattern_type const &pattern,
 			pattern_type::size_type const start_idx,
@@ -568,18 +572,24 @@ namespace asm_lsw {
 		auto const val(isa[isa_idx]);
 		
 		// Tail recursion.
-		// The first case prevents overflow for mid - 1.
-		if (st != val && lb == mid)
-			return false;
-		else if (val < st)
-			return find_pattern_occurrence(pat1_len, st, ed, 1 + mid, rb, i);
-		else if (ed < val)
-			return find_pattern_occurrence(pat1_len, st, ed, lb, mid - 1, i);
-		else
+		if (st <= val && val <= ed)
 		{
-			assert(st <= val && val <= ed);
 			i = mid;
 			return true;
+		}
+		else if (val < st)
+		{
+			return find_pattern_occurrence(pat1_len, st, ed, 1 + mid, rb, i);
+		}
+		else
+		{
+			assert(ed < val);
+			
+			// Prevent overflow for mid - 1.
+			if (lb == mid)
+				return false;
+			
+			return find_pattern_occurrence(pat1_len, st, ed, lb, mid - 1, i);
 		}
 	}
 	
@@ -996,7 +1006,7 @@ namespace asm_lsw {
 		}
 		else
 		{
-			assert (ed == f_type::not_found);
+			assert(ed == f_type::not_found);
 		}
 	}
 	
