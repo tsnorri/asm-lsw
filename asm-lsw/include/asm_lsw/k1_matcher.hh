@@ -111,18 +111,16 @@ namespace asm_lsw {
 			// Section 3.1, Lemma 17.
 			static void construct_hl_hr(
 				cst_type const &cst,
-				core_endpoints_type const &ce,
 				lcp_rmq_type const &lcp_rmq,
+				typename cst_type::node_type const v,
 				typename cst_type::node_type const u,
 				typename cst_type::size_type const log2n,
 				h_pair &h
 			)
 			{
-				auto const u_id(node_id(cst, u));
-				auto const v_id(ce.find_open(u_id));			// Core path beginning.
-				auto const v(node_inv_id(cst, v_id));
-				auto const k(cst.lb(u));						// Left bound (leftmost leaf index) in SA.
-				auto const plen_v(cst.depth(v));				// FIXME: check that this actually is plen(v).
+				auto const k(cst.lb(u));			// Left bound in SA i.e. SA index.
+				auto const plen_u(cst.depth(u));
+				auto const plen_v(cst.depth(v));
 				
 				auto const leaf_count(cst.size());
 				typename cst_type::size_type i(0), j(0);
@@ -136,7 +134,7 @@ namespace asm_lsw {
 					//     = {1 + j log₂²n | j ∈ ℕ}
 					
 					// Check |lcp(k, i)| ≥ plen(v).
-					auto const lcp_len(lcp_rmq(std::min(k, i), std::max(k, i)));
+					auto const lcp_len(i == k ? plen_u : lcp_length(cst, lcp_rmq, std::min(k, i), std::max(k, i)));
 					
 					// Check that LCP returns csa_type::size_type (for key).
 					{
@@ -158,6 +156,7 @@ namespace asm_lsw {
 					++j;
 				}
 				
+				// Compress hl and hr.
 				// Another option would be using a value transformer similar to transform_gamma_v.
 				if (hl_tmp.size())
 					h.l.reset(h_u_type::construct(hl_tmp, hl_tmp.cbegin()->first, hl_tmp.crbegin()->first));
@@ -186,23 +185,25 @@ namespace asm_lsw {
 				m_diff = log2n;
 
 				// Number of (opening) parentheses indicates the number of core paths.
-				auto const &bps(ce.bps());
-				auto const count(bps.rank(bps.size() - 1));
+				auto const &ce_bps(ce.bps());
+				auto const count(ce_bps.rank(ce_bps.size() - 1));
 				
 				h_map_intermediate maps_i;
-				for (util::remove_c_t<decltype(count)> i{1}; i <= count; ++i)
+				for (util::remove_c_t<decltype(count)> i{0}; i < count; ++i)
 				{
 					// Find the index of each opening parenthesis and its counterpart,
 					// then convert to sparse index.
-					auto const bps_begin(bps.select(i));
-					auto const bps_end(bps.find_close(bps_begin));
-					auto const u_id(ce.to_sparse_idx(bps_end));
+					auto const ce_bps_begin(ce_bps.select(1 + i));
+					auto const ce_bps_end(ce_bps.find_close(ce_bps_begin));
+					auto const v_id(ce.to_sparse_idx(ce_bps_begin));
+					auto const u_id(ce.to_sparse_idx(ce_bps_end));
+					auto const v(node_inv_id(cst, v_id));
 					auto const u(node_inv_id(cst, u_id));
 					
 					// u is now a core leaf node.
 					assert(cst.is_leaf(u));
 					h_pair h_u;
-					construct_hl_hr(cst, ce, lcp_rmq, u, log2n, h_u);
+					construct_hl_hr(cst, lcp_rmq, v, u, log2n, h_u);
 					maps_i[u_id] = std::move(h_u);
 				}
 				
@@ -281,12 +282,21 @@ namespace asm_lsw {
 					}
 				}
 
-				// Continue with the suffix links. Either i == m or a match was found. In the latter case,
-				// every substring of the pattern must
-				// FIXME: complete the sentence above.
+				// Continue with the suffix links.
 				while (i < m)
 				{
 					node = cst.sl(node);
+					
+					// Remove characters from the end.
+					while (true)
+					{
+						auto parent(cst.parent(node));
+						if (cst.depth(parent) < m - i)
+							break;
+						
+						node = parent;
+					}
+					
 					st[i] = cst.lb(node);
 					ed[i] = cst.rb(node);
 					++i;
@@ -363,6 +373,38 @@ namespace asm_lsw {
 		{
 			auto nid(node_id(cst, node));
 			return 0 == cn[nid];
+		}
+		
+		
+		static lcp_rmq_type::size_type lcp_length(
+			cst_type const &cst,
+			lcp_rmq_type const &lcp_rmq,
+			lcp_rmq_type::size_type const l,
+			lcp_rmq_type::size_type const r
+		)
+		{
+			assert(l < r);
+			auto const idx(lcp_rmq(l + 1, r));
+			auto const retval(cst.lcp[idx]);
+			return retval;
+		}
+		
+		
+		// Allow equal values for l and r.
+		static lcp_rmq_type::size_type lcp_length_e(
+			cst_type const &cst,
+			lcp_rmq_type const &lcp_rmq,
+			lcp_rmq_type::size_type const l,
+			lcp_rmq_type::size_type const r
+		)
+		{
+			assert(l < cst.csa.size());
+			assert(r < cst.csa.size());
+			
+			if (l == r)
+				return cst.depth(cst.select_leaf(l));
+			
+			return lcp_length(cst, lcp_rmq, l, r);
 		}
 		
 		
@@ -569,6 +611,20 @@ namespace asm_lsw {
 		}
 				
 		
+		// Get i from j = ISA[SA[i] + |P₁| + 1].
+		static typename cst_type::size_type sa_idx_of_stored_isa_val(
+			typename cst_type::csa_type const &csa,
+			typename cst_type::csa_type::isa_type::value_type const isa_val,
+			typename cst_type::size_type const pat1_len
+		)
+		{
+			auto const isa_idx(csa[isa_val]);
+			auto const sa_val(isa_idx - pat1_len - 1);
+			auto const sa_idx(csa.isa[sa_val]);
+			return sa_idx;
+		}
+
+		
 		// Find one occurrence of the pattern (index i) s.t. st ≤ ISA[SA[i] + |P₁| + 1] ≤ ed.
 		static bool find_pattern_occurrence(
 			csa_type const &csa,
@@ -615,7 +671,9 @@ namespace asm_lsw {
 		
 		
 		// Find SA index i s.t. |lcp(i, k)| = |P₁| + q + 1 using binary search.
+		template <template <typename> class t_cmp>
 		static bool find_node_ilr_bin(
+			cst_type const &cst,
 			lcp_rmq_type const &lcp_rmq,
 			typename csa_type::size_type const k,
 			typename cst_type::size_type const r_len,
@@ -624,25 +682,54 @@ namespace asm_lsw {
 			typename csa_type::size_type &i
 		)
 		{
+			t_cmp <typename csa_type::size_type> cmp;
+			
 			if (r < l)
 				return false;
 
-			auto const mid((l + r) / 2);
-			auto const res(lcp_rmq(mid, k));
+			auto const mid(l + (r - l) / 2);
+			auto const res(lcp_length_e(cst, lcp_rmq, std::min(mid, k), std::max(mid, k)));
 
 			// Tail recursion.
 			// The first case prevents overflow for mid - 1.
 			if (res != r_len && l == mid)
 				return false;
-			if (res < r_len)
-				return find_node_ilr_bin(lcp_rmq, k, r_len, 1 + mid, r, i);
-			else if (r_len < res)
-				return find_node_ilr_bin(lcp_rmq, k, r_len, l, mid - 1, i);
+			if (cmp(res, r_len))
+				return find_node_ilr_bin <t_cmp>(cst, lcp_rmq, k, r_len, 1 + mid, r, i);
+			else if (cmp(r_len, res))
+				return find_node_ilr_bin <t_cmp>(cst, lcp_rmq, k, r_len, l, mid - 1, i);
 			else
 			{
 				i = mid;
 				return true;
 			}
+		}
+
+		
+		// Partition the range if needed since k has the longest lcp with itself.
+		static bool find_node_ilr_bin_p(
+			cst_type const &cst,
+			lcp_rmq_type const &lcp_rmq,
+			typename csa_type::size_type const k,
+			typename cst_type::size_type const r_len,
+			typename csa_type::size_type const l,
+			typename csa_type::size_type const r,
+			typename csa_type::size_type &i
+		)
+		{
+			// Order is ascending up to k, then descending.
+			if (l < k && k < r)
+			{
+				if (find_node_ilr_bin <std::less>(cst, lcp_rmq, k, r_len, l, k, i))
+					return true;
+				
+				return find_node_ilr_bin <std::greater>(cst, lcp_rmq, k, r_len, 1 + k, r, i);
+			}
+
+			if (r < k)
+				return find_node_ilr_bin <std::less>(cst, lcp_rmq, k, r_len, l, r, i);
+
+			return find_node_ilr_bin <std::greater>(cst, lcp_rmq, k, r_len, l, r, i);
 		}
 
 
@@ -652,6 +739,7 @@ namespace asm_lsw {
 		//  |lcp(j, k)| ≤ r_len ≤ |lcp(j + log₂²n, k)|
 		// Then use the range to search for a suitable node.
 		static bool find_node_ilr(
+			cst_type const &cst,
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
 			typename h_type::h_pair const &hx,
@@ -662,14 +750,18 @@ namespace asm_lsw {
 		{
 			typename csa_type::size_type l(0), r(0);
 			typename h_type::h_u_type::const_subtree_iterator it;
+			auto const h_diff(h.diff());
+			auto const lcp_rmq_size(lcp_rmq.size());
+			auto const lcp_rmq_max(lcp_rmq_size ? lcp_rmq_size - 1 : 0);
 
 			// Try i^l.
 			if (hx.l->find_successor(r_len, it, true))
 			{
 				r = hx.l->iterator_value(it);
-				assert(r >= h.diff());
-				l = r - h.diff();
-				if (l <= r_len && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
+				l = ((h_diff <= r) ? (r - h_diff) : 0);
+				// XXX Is l guaranteed to have |lcp(l, k)| ≤ r_len? (Case 3)
+
+				if (find_node_ilr_bin_p(cst, lcp_rmq, k, r_len, l, r, i))
 					return true;
 			}
 
@@ -677,16 +769,17 @@ namespace asm_lsw {
 			if (hx.r->find_predecessor(r_len, it, true))
 			{
 				l = hx.r->iterator_value(it);
-				r = l + h.diff();
-				if (r_len <= r && find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
+				r = ((l + h_diff <= lcp_rmq_max) ? (l + h_diff) : lcp_rmq_max);
+				// XXX Is r guaranteed to have r_len ≤ |lcp(r, k)|? (Case 3)
+
+				if (find_node_ilr_bin_p(cst, lcp_rmq, k, r_len, l, r, i))
 					return true;
 			}
 
 			// Try i^l again with another range.
-			assert(k >= h.diff());
-			l = k - h.diff();
-			r = k + h.diff();
-			if (find_node_ilr_bin(lcp_rmq, k, r_len, l, r, i))
+			l = ((h_diff <= k) ? (k - h_diff) : 0);
+			r = ((k + h_diff <= lcp_rmq_max) ? (k + h_diff) : lcp_rmq_max);
+			if (find_node_ilr_bin_p(cst, lcp_rmq, k, r_len, l, r, i))
 				return true;			
 
 			return false;
@@ -778,16 +871,42 @@ namespace asm_lsw {
 					// Case 2.
 					// Get i from j = ISA[SA[i] + |P₁| + 1].
 					auto const isa_val(*it);
+					i = sa_idx_of_stored_isa_val(csa, isa_val, pat1_len);
+#if 0
+					auto const isa_val(*it);
 					auto const isa_idx(csa[isa_val]);
 					auto const sa_val(isa_idx - pat1_len - 1);
 					auto const sa_idx(csa.isa[sa_val]);
 					i = sa_idx;
+#endif
 					return true;
 				}
 				else
 				{
 					// Case 3.
-					// Extend the range slightly if possible.
+					// Extend the range slightly if possible. If not, the stored values
+					// should be between st and ed in which case the method in case 2
+					// would be applicable as the number of leaves is small enough.
+					// XXX verify the statement above.
+					typename gamma_v_type::const_subtree_iterator a_val_it, b_val_it;
+					typename csa_type::size_type a(v_le), b(v_ri);
+					
+					if (gamma_v.find_predecessor(st, a_val_it))
+					{
+						auto const a_val(*a_val_it);
+						a = sa_idx_of_stored_isa_val(csa, a_val, pat1_len);
+					}
+					
+					if (gamma_v.find_successor(ed, b_val_it))
+					{
+						auto const b_val(*b_val_it);
+						b = sa_idx_of_stored_isa_val(csa, b_val, pat1_len);
+					}
+					
+					if (find_pattern_occurrence(csa, pat1_len, st, ed, a, b, i))
+						return true;
+					
+#if 0
 					typename gamma_v_type::const_subtree_iterator a_it, b_it;
 					typename csa_type::size_type a(st), b(ed);
 					
@@ -803,6 +922,7 @@ namespace asm_lsw {
 					
 					if (find_pattern_occurrence(csa, pat1_len, a, b, v_le, v_ri, i))
 						return true;
+#endif
 				}
 			}
 
@@ -813,10 +933,12 @@ namespace asm_lsw {
 		// Lemma 19.
 		static bool tree_search(
 			cst_type const &cst,
+			f_type const &f,
 			gamma_type const &gamma,
 			core_endpoints_type const &core_endpoints,
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
+			pattern_type const &pattern,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type core_path_beginning,
 			typename cst_type::char_type const c,
@@ -883,7 +1005,8 @@ namespace asm_lsw {
 					auto const x(node_inv_id(cst, x_id));
 					assert(cst.is_leaf(x));
 					
-					auto const k(cst.id(x)); // Get the suffix array index.
+					// Get the suffix array index.
+					auto const k(cst.id(x));
 					auto const isa_idx(csa[k] + pat1_len + 1);
 					
 					// Check if the pattern may still be found in the suffix tree.
@@ -891,8 +1014,8 @@ namespace asm_lsw {
 						return false;
 					
 					auto const isa_val(isa[isa_idx]);
-					auto const q(lcp_rmq(std::min(isa_val, st), std::max(isa_val, st)));
-					auto const pat2_len(lcp_rmq(st, ed));
+					auto const q(lcp_length_e(cst, lcp_rmq, std::min(isa_val, st), std::max(isa_val, st)));
+					auto const pat2_len(pattern.size() - 1 - pat1_len);
 					if (q >= pat2_len)
 					{
 						// Case 2.
@@ -906,43 +1029,40 @@ namespace asm_lsw {
 					{
 						// Case 3.
 						// Since x is a core leaf node, we have (some of) the indices
-						// of the suitable lcp values stored in hx.l and hx.r.
+						// of the suitable LCP values stored in hx.l and hx.r.
 						auto const r_len(pat1_len + q + 1);
 						typename csa_type::size_type ilr(0);
-						if (!find_node_ilr(lcp_rmq, h, hx, k, r_len, ilr)) // ilr is an SA index.
+						if (!find_node_ilr(cst, lcp_rmq, h, hx, k, r_len, ilr)) // ilr is an SA index.
 							return false;
 						
 						// XXX Paper requires O(t_SA) time complexity for LCA but cst_sada gives O(rr_enclose).
-						auto const leaf(cst.inv_id(ilr)); // Convert the suffix array index.
-						auto const r(cst.lca(leaf, x));
-						assert(cst.is_leaf(leaf));
+						auto const leaf(cst.select_leaf(1 + ilr)); // Convert the suffix array index.
 
-						// Check if r has P₂ as a prefix.
-						auto const lb(cst.lb(r)), rb(cst.rb(r));
-						if (st <= lb && rb <= ed)
+						// Find r and check if it completely matches P.
+						auto const r(cst.lca(leaf, x));
+						auto const r_depth(cst.depth(r));
+						if (pat1_len + 1 + pat2_len <= r_depth)
 						{
-							left = lb;
-							right = rb;
+							left = cst.lb(r);
+							right = cst.rb(r);
 							extend_range(cst, pat1_len, st, ed, v_le, v_ri, left, right); // FIXME: not sure if needed.
 							return true;
 						}
 						else
 						{
-							// Incomplete match, check all the side edges.
-							auto const children(cst.children(r));
-							for (auto const child : children)
+							// Since the match was incomplete, the matching node must be r's descendant.
+							// The chosen edge should be a side edge (Case 3).
+							auto const ncc(pattern[r_depth]);
+#ifndef NDEBUG
 							{
-								auto const child_id(node_id(cst, child));
-								auto const g_it(gamma.find(child_id));
-								if (gamma.cend() != g_it &&
-									tree_search_side_node(cst, *(g_it->second), r, child, st, ed, i))
-								{
-									left = i;
-									right = i;
-									extend_range(cst, pat1_len, st, ed, v_le, v_ri, left, right);
-									return true;
-								}
+								auto const s(cst.child(r, ncc));
+								auto const node_type(core_endpoints[node_id(cst, s)]);
+								assert(cst.is_leaf(s) || core_endpoints_type::input_value::Opening == node_type);
 							}
+#endif
+							auto const r_st(f.st(cst, 1 + r_depth));
+							auto const r_ed(f.ed(cst, 1 + r_depth));
+							return tree_search(cst, f, gamma, core_endpoints, lcp_rmq, h, pattern, r, r, ncc, r_st, r_ed, left, right);
 						}
 
 						return false;
@@ -971,6 +1091,7 @@ namespace asm_lsw {
 			core_endpoints_type const &core_endpoints,
 			lcp_rmq_type const &lcp_rmq,
 			h_type const &h,
+			pattern_type const &pattern,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type const core_path_beginning,
 			typename f_type::size_type const i,
@@ -988,7 +1109,7 @@ namespace asm_lsw {
 			if (st != f_type::not_found)
 			{
 				assert (ed != f_type::not_found);
-				if (tree_search(cst, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, cc, st, ed, left, right))
+				if (tree_search(cst, f, gamma, core_endpoints, lcp_rmq, h, pattern, u, core_path_beginning, cc, st, ed, left, right))
 				{
 					csa_range range(left, right);
 					ranges.emplace(std::move(range));
@@ -1076,7 +1197,7 @@ namespace asm_lsw {
 				{
 					auto const cc(pattern[1 + i]);
 					find_1_approximate_at_i(
-						cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, 2 + i, cc, ranges
+						cst, f, gamma, core_endpoints, lcp_rmq, h, pattern, u, core_path_beginning, 2 + i, cc, ranges
 					);
 				}
 				
@@ -1088,7 +1209,7 @@ namespace asm_lsw {
 					if (pattern[i] != cc)
 					{
 						find_1_approximate_at_i(
-							cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, 1 + i, cc, ranges
+							cst, f, gamma, core_endpoints, lcp_rmq, h, pattern, u, core_path_beginning, 1 + i, cc, ranges
 						);
 					}
 				}
@@ -1101,7 +1222,7 @@ namespace asm_lsw {
 					if (1 + i == pattern.size() || pattern[i] != cc)
 					{
 						find_1_approximate_at_i(
-							cst, f, gamma, core_endpoints, lcp_rmq, h, u, core_path_beginning, i, cc, ranges
+							cst, f, gamma, core_endpoints, lcp_rmq, h, pattern, u, core_path_beginning, i, cc, ranges
 						);
 					}
 				}
@@ -1117,7 +1238,9 @@ namespace asm_lsw {
 					return;
 				
 				assert(i == cst.depth(u));
-				for (auto k(i), len(cst.depth(v)); k < len; ++k)
+				auto k(i);
+				auto const len(cst.depth(v));
+				while (true)
 				{
 					// If the end of the pattern is reached, stop.
 					if (patlen == k)
@@ -1126,6 +1249,11 @@ namespace asm_lsw {
 						ranges.emplace(std::move(range));
 						return;
 					}
+					
+					// If the end of the edge was reached, stop.
+					// (Obviously the match needs to be checked first.)
+					if (! (k < len))
+						break;
 
 					auto const ec(cst.edge(v, 1 + k));
 					auto const pc(pattern[k]);
@@ -1149,6 +1277,8 @@ namespace asm_lsw {
 						
 						return;
 					}
+					
+					++k;
 				}
 				
 				// No mismatches were found, continue.
