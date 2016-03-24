@@ -102,6 +102,12 @@ void typed_tests()
 			"abbbaabbbab", {
 				{"bbbb",		{{3, 4}, {9, 11}}}
 			}
+		},
+		{
+			"mississippi", {
+				{"miss",		{{3, 5}, {9, 9}}},
+				{"issi",		{{3, 5}, {9, 11}}}
+			}
 		}
 	};
 	
