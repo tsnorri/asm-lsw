@@ -98,7 +98,7 @@ namespace asm_lsw {
 		
 		k1_matcher(std::string const &input)
 		{
-			std::string file("@testinput.iv8");
+			std::string file("@asm_lsw_k1_matcher_input.iv8");
 			sdsl::store_to_file(input.c_str(), file);
 			
 			// CST
