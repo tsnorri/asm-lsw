@@ -44,30 +44,8 @@ template <typename t_matcher, typename t_input_pattern>
 void typed_tests(t_input_pattern const &ip)
 {
 	describe(("input '" + ip.input + "'").c_str(), [&](){
-		std::string file("@testinput.iv8");
-		sdsl::store_to_file(ip.input.c_str(), file);
 		
-		typename t_matcher::cst_type cst;
-		sdsl::construct(cst, file, 1);
-		
-		// Core path nodes
-		typename t_matcher::core_nodes_type cn;
-		t_matcher::construct_core_paths(cst, cn);
-
-		// Gamma
-		typename t_matcher::gamma_type gamma;
-		t_matcher::construct_gamma_sets(cst, cn, gamma);
-		
-		// Core path endpoints
-		typename t_matcher::core_endpoints_type ce;
-		t_matcher::construct_core_path_endpoints(cst, cn, ce);
-		
-		// LCP RMQ
-		typename t_matcher::lcp_rmq_type lcp_rmq;
-		t_matcher::construct_lcp_rmq(cst, lcp_rmq);
-		
-		// H
-		typename t_matcher::h_type h(cst, ce, lcp_rmq);
+		t_matcher matcher(ip.input);
 		
 		for (auto const &p : ip.patterns)
 		{
@@ -82,10 +60,8 @@ void typed_tests(t_input_pattern const &ip)
 					}
 				}
 			
-				typename t_matcher::f_type f(cst, pattern);
-
 				typename t_matcher::csa_range_set ranges;
-				t_matcher::find_1_approximate(cst, f, gamma, ce, lcp_rmq, h, pattern, ranges);
+				matcher.find_1_approximate(pattern, ranges);
 			
 				AssertThat(ranges, Equals(p.ranges));
 			});
