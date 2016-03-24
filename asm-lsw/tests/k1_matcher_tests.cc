@@ -16,6 +16,7 @@
 
 
 #include <asm_lsw/k1_matcher.hh>
+#include <asm_lsw/k1_matcher_helper.hh>
 #include <bandit/bandit.h>
 #include <sdsl/csa_rao.hpp>
 #include <sdsl/csa_rao_builder.hpp>
