@@ -52,6 +52,8 @@ namespace asm_lsw {
 		};
 
 	protected:
+		typedef k1_matcher <t_cst> k1_matcher;
+		
 		// Indexed by identifiers from node_id().
 		typedef unordered_map <typename cst_type::size_type, h_pair> h_map;
 		typedef std::map <typename cst_type::size_type, h_pair> h_map_intermediate;
@@ -63,14 +65,14 @@ namespace asm_lsw {
 	protected:
 		// Section 3.1, Lemma 17.
 		static void construct_hl_hr(
-			cst_type const &cst,
-			lcp_rmq_type const &lcp_rmq,
+			k1_matcher const &matcher,
 			typename cst_type::node_type const v,
 			typename cst_type::node_type const u,
 			typename cst_type::size_type const log2n,
 			h_pair &h
 		)
 		{
+			auto const &cst(matcher.m_cst);
 			auto const k(cst.lb(u));			// Left bound in SA i.e. SA index.
 			auto const plen_u(cst.depth(u));
 			auto const plen_v(cst.depth(v));
@@ -87,7 +89,7 @@ namespace asm_lsw {
 				//     = {1 + j log₂²n | j ∈ ℕ}
 				
 				// Check |lcp(k, i)| ≥ plen(v).
-				auto const lcp_len(i == k ? plen_u : lcp_length(cst, lcp_rmq, std::min(k, i), std::max(k, i)));
+				auto const lcp_len(i == k ? plen_u : matcher.lcp_length(std::min(k, i), std::max(k, i)));
 				
 				// Check that LCP returns csa_type::size_type (for key).
 				{
@@ -129,8 +131,11 @@ namespace asm_lsw {
 		h_type() {}
 		
 		// Section 3.1, Lemma 17.
-		h_type(cst_type const &cst, core_endpoints_type const &ce, lcp_rmq_type const &lcp_rmq)
+		h_type(k1_matcher const &matcher)
 		{
+			auto const &cst(matcher.m_cst);
+			auto const &ce(matcher.m_ce);
+			
 			auto const n(cst.size());						// Text length.
 			auto const logn(sdsl::util::log2_floor(n));
 			auto const log2n(logn * logn);
@@ -150,13 +155,13 @@ namespace asm_lsw {
 				auto const ce_bps_end(ce_bps.find_close(ce_bps_begin));
 				auto const v_id(ce.to_sparse_idx(ce_bps_begin));
 				auto const u_id(ce.to_sparse_idx(ce_bps_end));
-				auto const v(node_inv_id(cst, v_id));
-				auto const u(node_inv_id(cst, u_id));
+				auto const v(matcher.node_inv_id(v_id));
+				auto const u(matcher.node_inv_id(u_id));
 				
 				// u is now a core leaf node.
 				assert(cst.is_leaf(u));
 				h_pair h_u;
-				construct_hl_hr(cst, lcp_rmq, v, u, log2n, h_u);
+				construct_hl_hr(matcher, v, u, log2n, h_u);
 				maps_i[u_id] = std::move(h_u);
 			}
 			
@@ -174,6 +179,9 @@ namespace asm_lsw {
 	public:
 		typedef f_vector_type::size_type size_type;
 		static f_vector_type::value_type const not_found{std::numeric_limits<f_vector_type::value_type>::max()};
+		
+	protected:
+		typedef k1_matcher <t_cst> k1_matcher;
 
 	protected:
 		f_vector_type m_st;
@@ -201,8 +209,9 @@ namespace asm_lsw {
 
 		// Construct the F arrays as defined in definitions 1 and 2 and lemma 10.
 		// FIXME: calculate time complexity.
-		f_type(cst_type const &cst, pattern_type const &pattern)
+		f_type(k1_matcher const &matcher, pattern_type const &pattern)
 		{
+			auto const &cst(matcher.m_cst);
 			auto const m(pattern.size());
 			pattern_type::size_type i(0);
 			typename cst_type::node_type node;
@@ -218,7 +227,7 @@ namespace asm_lsw {
 			{
 				// Resetting node is safe (in terms of time complexity) as long as a match hasn't been found.
 				node = cst.root();
-				if (find_path(cst, pattern, i, node))
+				if (matcher.find_path(pattern, i, node))
 				{
 					// Find the SA indices of the leftmost and rightmost leaves.
 					auto const lb(cst.lb(node));
@@ -265,7 +274,7 @@ namespace asm_lsw {
 	template <typename t_cst>
 	struct k1_matcher <t_cst>::transform_gamma_v
 	{
-		typename gamma_type::kv_type operator()(typename gamma_intermediate_type::value_type &kv)
+		typename gamma_type::kv_type operator()(typename gamma_intermediate_type::value_type &kv) const
 		{
 			if (kv.second.size())
 			{
