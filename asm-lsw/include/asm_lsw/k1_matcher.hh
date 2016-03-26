@@ -18,15 +18,12 @@
 #define ASM_LSW_K1_MATCHER_HH
 
 #include <asm_lsw/bp_support_sparse.hh>
-#include <asm_lsw/x_fast_tries.hh>
 #include <asm_lsw/y_fast_tries.hh>
-#include <boost/functional/hash.hpp>
-#include <boost/range/irange.hpp>
 #include <sdsl/csa_rao.hpp>
 #include <sdsl/cst_sada.hpp>
 #include <sdsl/int_vector.hpp>
 #include <sdsl/isa_lsw.hpp>
-#include <unordered_set>
+#include <set>
 
 
 namespace asm_lsw {
