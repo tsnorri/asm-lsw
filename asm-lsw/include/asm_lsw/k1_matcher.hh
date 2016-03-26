@@ -224,6 +224,7 @@ namespace asm_lsw {
 			f_type const &f,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type core_path_beginning,
+			typename f_type::size_type const i,
 			typename cst_type::char_type const c,
 			typename csa_type::size_type const st,
 			typename csa_type::size_type const ed,
@@ -832,6 +833,7 @@ namespace asm_lsw {
 		f_type const &f,
 		typename cst_type::node_type const u,
 		typename cst_type::node_type core_path_beginning,
+		typename f_type::size_type const pat_idx,
 		typename cst_type::char_type const c,
 		typename csa_type::size_type const st,
 		typename csa_type::size_type const ed,
@@ -853,6 +855,8 @@ namespace asm_lsw {
 		auto const v_le(m_cst.lb(v));
 		auto const v_ri(m_cst.rb(v));
 
+		assert(pat1_len <= pat_idx);
+		
 		// If we diverged from the previous core path, update.
 		auto core_path_beginning_id(0);
 		if (core_endpoints_type::input_value::Opening == m_ce[v_id])
@@ -906,7 +910,7 @@ namespace asm_lsw {
 				
 				auto const isa_val(isa[isa_idx]);
 				auto const q(lcp_length_e(std::min(isa_val, st), std::max(isa_val, st)));
-				auto const pat2_len(pattern.size() - 1 - pat1_len);
+				auto const pat2_len(pattern.size() - pat_idx);
 				if (q >= pat2_len)
 				{
 					// Case 2.
@@ -945,17 +949,18 @@ namespace asm_lsw {
 						// The chosen edge should be a side edge (Case 3).
 						// Every side edge should lead either to a leaf node or to a beginning of
 						// a core path. XXX verify this.
-						auto const next_cc(pattern[r_depth]);
+						auto const next_idx(r_depth - 1 + (pat_idx - pat1_len));
+						auto const next_cc(pattern[next_idx]);
 #ifndef NDEBUG
 						{
 							auto const s(m_cst.child(r, next_cc));
 							auto const node_type(m_ce[node_id(s)]);
-							assert(m_cst.is_leaf(s) || core_endpoints_type::input_value::Opening == node_type);
+							assert(m_cst.root() == s || m_cst.is_leaf(s) || core_endpoints_type::input_value::Opening == node_type);
 						}
 #endif
-						auto const r_st(f.st(m_cst, 1 + r_depth));
-						auto const r_ed(f.ed(m_cst, 1 + r_depth));
-						return tree_search(pattern, f, r, r, next_cc, r_st, r_ed, left, right);
+						auto const r_st(f.st(m_cst, 1 + next_idx));
+						auto const r_ed(f.ed(m_cst, 1 + next_idx));
+						return tree_search(pattern, f, r, r, 1 + next_idx, next_cc, r_st, r_ed, left, right);
 					}
 
 					return false;
@@ -998,7 +1003,7 @@ namespace asm_lsw {
 		if (st != f_type::not_found)
 		{
 			assert (ed != f_type::not_found);
-			if (tree_search(pattern, f, u, core_path_beginning, cc, st, ed, left, right))
+			if (tree_search(pattern, f, u, core_path_beginning, i, cc, st, ed, left, right))
 			{
 				csa_range range(left, right);
 				ranges.emplace_back(std::move(range));
@@ -1075,7 +1080,7 @@ namespace asm_lsw {
 		{
 			// 1. Deletion
 			// Needn't be checked if P[i] == P[i + 1].
-			if (pattern[i] != pattern[1 + i])
+			if (! (i == patlen - 1 || pattern[i] == pattern[1 + i]))
 			{
 				auto const cc(pattern[1 + i]);
 				find_1_approximate_at_i(pattern, f, u, core_path_beginning, 2 + i, cc, ranges);
@@ -1115,7 +1120,8 @@ namespace asm_lsw {
 			while (true)
 			{
 				// If the end of the pattern is reached, stop.
-				if (patlen == k)
+				// The last character may have a mismatch.
+				if (patlen - 1 == k)
 				{
 					csa_range range(m_cst.lb(v), m_cst.rb(v));
 					ranges.emplace_back(std::move(range));

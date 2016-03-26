@@ -209,7 +209,7 @@ namespace asm_lsw {
 
 		// Construct the F arrays as defined in definitions 1 and 2 and lemma 10.
 		// FIXME: calculate time complexity.
-		f_type(k1_matcher const &matcher, pattern_type const &pattern)
+		f_type(k1_matcher const &matcher, pattern_type const &pattern) const
 		{
 			auto const &cst(matcher.m_cst);
 			auto const m(pattern.size());
