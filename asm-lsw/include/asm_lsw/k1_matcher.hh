@@ -29,7 +29,7 @@
 
 namespace asm_lsw {
 
-	template <typename t_cst, typename t_pattern>
+	template <typename t_cst>
 	class k1_matcher
 	{
 	protected:
@@ -38,7 +38,6 @@ namespace asm_lsw {
 		
 	public:
 		typedef sdsl::int_vector <>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
-		typedef t_pattern												pattern_type;
 		typedef int_vector_type											f_vector_type;
 		typedef t_cst													cst_type;
 		typedef typename cst_type::csa_type								csa_type;
@@ -152,9 +151,10 @@ namespace asm_lsw {
 
 		
 	protected:
+		template <typename t_pattern>
 		bool find_path(
-			pattern_type const &pattern,
-			typename pattern_type::size_type const start_idx,
+			t_pattern const &pattern,
+			typename t_pattern::size_type const start_idx,
 			typename cst_type::node_type &node // inout
 		) const;
 		
@@ -173,8 +173,9 @@ namespace asm_lsw {
 			typename cst_type::size_type const pat1_len
 		) const;
 		
+		template <typename t_size>
 		bool find_pattern_occurrence(
-			typename pattern_type::size_type const pat1_len,
+			t_size const pat1_len,
 			typename csa_type::size_type const st,
 			typename csa_type::size_type const ed,
 			typename csa_type::size_type const lb,
@@ -206,8 +207,9 @@ namespace asm_lsw {
 			typename csa_type::size_type &i
 		) const;
 
+		template <typename t_size>
 		void extend_range(
-			typename pattern_type::size_type const pat1_len,
+			t_size const pat1_len,
 			typename csa_type::size_type const st,
 			typename csa_type::size_type const ed,
 			typename csa_type::size_type const v_le,
@@ -225,8 +227,9 @@ namespace asm_lsw {
 			typename csa_type::size_type &i
 		) const;
 
+		template <typename t_pattern>
 		bool tree_search(
-			pattern_type const &pattern,
+			t_pattern const &pattern,
 			f_type const &f,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type core_path_beginning,
@@ -238,8 +241,9 @@ namespace asm_lsw {
 			typename csa_type::size_type &right
 		) const;
 		
+		template <typename t_pattern>
 		void find_1_approximate_at_i(
-			pattern_type const &pattern,
+			t_pattern const &pattern,
 			f_type const &f,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type const core_path_beginning,
@@ -248,28 +252,32 @@ namespace asm_lsw {
 			csa_ranges &ranges
 		) const;
 		
+		template <typename t_pattern>
 		void find_1_approximate_continue_exact(
-			pattern_type const &pattern,
+			t_pattern const &pattern,
 			typename cst_type::node_type v,
-			typename pattern_type::size_type eidx,
-			typename pattern_type::size_type pidx,
+			typename t_pattern::size_type eidx,
+			typename t_pattern::size_type pidx,
 			csa_ranges &ranges
 		) const;
 		
 	public:
 		// Section 3.3.
-		void find_1_approximate(pattern_type const &pattern, csa_ranges &ranges) const;
-		void post_process_ranges(csa_ranges &ranges);
+		template <typename t_pattern>
+		void find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const;
+		
+		void post_process_ranges(csa_ranges &ranges) const;
 	};
 	
 	
 	// Find the path for the given pattern.
 	// Set node to the final node if found.
 	// Time complexity O((|pattern| - start_idx) * t_SA)
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::find_path(
-		pattern_type const &pattern,
-		typename pattern_type::size_type const start_idx,
+	template <typename t_cst>
+	template <typename t_pattern>
+	bool k1_matcher <t_cst>::find_path(
+		t_pattern const &pattern,
+		typename t_pattern::size_type const start_idx,
 		typename cst_type::node_type &node // inout
 	) const
 	{
@@ -277,15 +285,15 @@ namespace asm_lsw {
 		auto const end(pattern.cend());
 		assert(begin < end);
 		
-		typename pattern_type::size_type char_pos(0);
+		typename t_pattern::size_type char_pos(0);
 		return (0 < sdsl::forward_search(*m_cst, node, 0, begin, end, char_pos));
 	}
 	
 	
 	// Check if the given node is a side node as per section 2.5.
 	// FIXME: calculate time complexity.
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::is_side_node(
+	template <typename t_cst>
+	bool k1_matcher <t_cst>::is_side_node(
 		core_nodes_type const &cn,
 		typename cst_type::node_type const node
 	) const
@@ -295,8 +303,8 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_cst, typename t_pattern>
-	auto k1_matcher <t_cst, t_pattern>::lcp_length(
+	template <typename t_cst>
+	auto k1_matcher <t_cst>::lcp_length(
 		lcp_rmq_type::size_type const l,
 		lcp_rmq_type::size_type const r
 	) const -> lcp_rmq_type::size_type
@@ -309,8 +317,8 @@ namespace asm_lsw {
 	
 	
 	// Allow equal values for l and r.
-	template <typename t_cst, typename t_pattern>
-	auto k1_matcher <t_cst, t_pattern>::lcp_length_e(
+	template <typename t_cst>
+	auto k1_matcher <t_cst>::lcp_length_e(
 		lcp_rmq_type::size_type const l,
 		lcp_rmq_type::size_type const r
 	) const -> lcp_rmq_type::size_type
@@ -328,8 +336,8 @@ namespace asm_lsw {
 	// Construct a bit vector core_nodes for listing core nodes. (Not included in the paper but needed for section 3.1.)
 	// Space complexity: O(n) bits since the number of nodes in a suffix tree with |T| = n is 2n = O(n).
 	// FIXME: calculate time complexity.
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::construct_core_paths(core_nodes_type &cn) const
+	template <typename t_cst>
+	void k1_matcher <t_cst>::construct_core_paths(core_nodes_type &cn) const
 	{
 		std::map <
 			typename cst_type::node_type,
@@ -383,8 +391,8 @@ namespace asm_lsw {
 	
 	// Core path endpoints from Lemma 15.
 	// FIXME: calculate time complexity.
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::construct_core_path_endpoints(core_nodes_type const &cn, core_endpoints_type &ce) const
+	template <typename t_cst>
+	void k1_matcher <t_cst>::construct_core_path_endpoints(core_nodes_type const &cn, core_endpoints_type &ce) const
 	{
 		auto const leaf_count(m_cst->size());
 		auto const node_count(m_cst->nodes());
@@ -458,8 +466,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::construct_uncompressed_gamma_sets(core_nodes_type const &cn, gamma_intermediate_type &gamma) const
+	template <typename t_cst>
+	void k1_matcher <t_cst>::construct_uncompressed_gamma_sets(core_nodes_type const &cn, gamma_intermediate_type &gamma) const
 	{
 		// Γ_v = {ISA[SA[i] + plen(u) + 1] | i ≡ 1 (mod log₂²n) and v_le ≤ i ≤ v_ri}.
 
@@ -512,8 +520,8 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::construct_gamma_sets(core_nodes_type const &cn, gamma_type &gamma) const
+	template <typename t_cst>
+	void k1_matcher <t_cst>::construct_gamma_sets(core_nodes_type const &cn, gamma_type &gamma) const
 	{
 		gamma_intermediate_type gamma_i;
 		construct_uncompressed_gamma_sets(cn, gamma_i);
@@ -525,8 +533,8 @@ namespace asm_lsw {
 	
 	
 	// Create the auxiliary data structures in order to perform range minimum queries on the LCP array.
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::construct_lcp_rmq(lcp_rmq_type &rmq) const
+	template <typename t_cst>
+	void k1_matcher <t_cst>::construct_lcp_rmq(lcp_rmq_type &rmq) const
 	{
 		lcp_rmq_type rmq_tmp(&m_cst->lcp);
 		rmq = std::move(rmq_tmp);
@@ -534,8 +542,8 @@ namespace asm_lsw {
 			
 	
 	// Get i from j = ISA[SA[i] + |P₁| + 1].
-	template <typename t_cst, typename t_pattern>
-	auto k1_matcher <t_cst, t_pattern>::sa_idx_of_stored_isa_val(
+	template <typename t_cst>
+	auto k1_matcher <t_cst>::sa_idx_of_stored_isa_val(
 		typename cst_type::csa_type::isa_type::value_type const isa_val,
 		typename cst_type::size_type const pat1_len
 	) const -> typename cst_type::size_type
@@ -549,9 +557,10 @@ namespace asm_lsw {
 
 	
 	// Find one occurrence of the pattern (index i) s.t. st ≤ ISA[SA[i] + |P₁| + 1] ≤ ed.
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::find_pattern_occurrence(
-		typename pattern_type::size_type const pat1_len,
+	template <typename t_cst>
+	template <typename t_size>
+	bool k1_matcher <t_cst>::find_pattern_occurrence(
+		t_size const pat1_len,
 		typename csa_type::size_type const st,
 		typename csa_type::size_type const ed,
 		typename csa_type::size_type const lb,
@@ -602,9 +611,9 @@ namespace asm_lsw {
 	
 	
 	// Find SA index i s.t. |lcp(i, k)| = |P₁| + q + 1 using binary search.
-	template <typename t_cst, typename t_pattern>
+	template <typename t_cst>
 	template <template <typename> class t_cmp>
-	bool k1_matcher <t_cst, t_pattern>::find_node_ilr_bin(
+	bool k1_matcher <t_cst>::find_node_ilr_bin(
 		typename csa_type::size_type const k,
 		typename cst_type::size_type const r_len,
 		typename csa_type::size_type const l,
@@ -637,8 +646,8 @@ namespace asm_lsw {
 
 	
 	// Partition the range if needed since k has the longest lcp with itself.
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::find_node_ilr_bin_p(
+	template <typename t_cst>
+	bool k1_matcher <t_cst>::find_node_ilr_bin_p(
 		typename csa_type::size_type const k,
 		typename cst_type::size_type const r_len,
 		typename csa_type::size_type const l,
@@ -667,8 +676,8 @@ namespace asm_lsw {
 	//  |lcp(j - log₂²n, k)| ≤ r_len ≤ |lcp(j, k)| or
 	//  |lcp(j, k)| ≤ r_len ≤ |lcp(j + log₂²n, k)|
 	// Then use the range to search for a suitable node.
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::find_node_ilr(
+	template <typename t_cst>
+	bool k1_matcher <t_cst>::find_node_ilr(
 		typename h_type::h_pair const &hx,
 		typename csa_type::size_type const k,
 		typename cst_type::size_type const r_len,	// cst.depth returns size_type.
@@ -714,9 +723,10 @@ namespace asm_lsw {
 
 
 	// Use Lemma 11.
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::extend_range(
-		typename pattern_type::size_type const pat1_len,
+	template <typename t_cst>
+	template <typename t_size>
+	void k1_matcher <t_cst>::extend_range(
+		t_size const pat1_len,
 		typename csa_type::size_type const st,
 		typename csa_type::size_type const ed,
 		typename csa_type::size_type const v_le,
@@ -767,8 +777,8 @@ namespace asm_lsw {
 
 
 	// Lemma 19 (with v being a side node).
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::tree_search_side_node(
+	template <typename t_cst>
+	bool k1_matcher <t_cst>::tree_search_side_node(
 		gamma_v_type const &gamma_v,
 		typename cst_type::node_type const u,
 		typename cst_type::node_type const v,
@@ -833,9 +843,10 @@ namespace asm_lsw {
 	
 	
 	// Lemma 19.
-	template <typename t_cst, typename t_pattern>
-	bool k1_matcher <t_cst, t_pattern>::tree_search(
-		pattern_type const &pattern,
+	template <typename t_cst>
+	template <typename t_pattern>
+	bool k1_matcher <t_cst>::tree_search(
+		t_pattern const &pattern,
 		f_type const &f,
 		typename cst_type::node_type const u,
 		typename cst_type::node_type core_path_beginning,
@@ -988,9 +999,10 @@ namespace asm_lsw {
 	
 	
 	// Section 3.3.
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::find_1_approximate_at_i(
-		pattern_type const &pattern,
+	template <typename t_cst>
+	template <typename t_pattern>
+	void k1_matcher <t_cst>::find_1_approximate_at_i(
+		t_pattern const &pattern,
 		f_type const &f,
 		typename cst_type::node_type const u,
 		typename cst_type::node_type const core_path_beginning,
@@ -1022,12 +1034,13 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::find_1_approximate_continue_exact(
-		pattern_type const &pattern,
+	template <typename t_cst>
+	template <typename t_pattern>
+	void k1_matcher <t_cst>::find_1_approximate_continue_exact(
+		t_pattern const &pattern,
 		typename cst_type::node_type v,
-		typename pattern_type::size_type eidx,
-		typename pattern_type::size_type pidx,
+		typename t_pattern::size_type eidx,
+		typename t_pattern::size_type pidx,
 		csa_ranges &ranges
 	) const
 	{
@@ -1073,8 +1086,9 @@ namespace asm_lsw {
 	
 	
 	// Section 3.3.
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::find_1_approximate(pattern_type const &pattern, csa_ranges &ranges) const
+	template <typename t_cst>
+	template <typename t_pattern>
+	void k1_matcher <t_cst>::find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const
 	{
 		f_type const f(*this, pattern);
 		typename cst_type::node_type u(m_cst->root());
@@ -1187,8 +1201,8 @@ namespace asm_lsw {
 	}
 
 	
-	template <typename t_cst, typename t_pattern>
-	void k1_matcher <t_cst, t_pattern>::post_process_ranges(csa_ranges &ranges)
+	template <typename t_cst>
+	void k1_matcher <t_cst>::post_process_ranges(csa_ranges &ranges) const
 	{
 		std::sort(ranges.begin(), ranges.end());
 		

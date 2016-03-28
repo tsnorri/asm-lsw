@@ -22,8 +22,8 @@
 
 namespace asm_lsw {
 	
-	template <typename t_cst, typename t_pattern>
-	class k1_matcher <t_cst, t_pattern>::h_type
+	template <typename t_cst>
+	class k1_matcher <t_cst>::h_type
 	{
 	public:
 		typedef std::map<
@@ -42,7 +42,7 @@ namespace asm_lsw {
 		};
 
 	protected:
-		typedef k1_matcher <t_cst, t_pattern> k1_matcher;
+		typedef k1_matcher <t_cst> k1_matcher;
 		
 		// Indexed by identifiers from node_id().
 		typedef unordered_map <typename cst_type::size_type, h_pair> h_map;
@@ -163,15 +163,15 @@ namespace asm_lsw {
 
 
 	// Def. 1, 2, Lemma 10.
-	template <typename t_cst, typename t_pattern>
-	class k1_matcher <t_cst, t_pattern>::f_type
+	template <typename t_cst>
+	class k1_matcher <t_cst>::f_type
 	{
 	public:
 		typedef f_vector_type::size_type size_type;
 		static f_vector_type::value_type const not_found{std::numeric_limits<f_vector_type::value_type>::max()};
 		
 	protected:
-		typedef k1_matcher <t_cst, t_pattern> k1_matcher;
+		typedef k1_matcher <t_cst> k1_matcher;
 
 	protected:
 		f_vector_type m_st;
@@ -199,11 +199,12 @@ namespace asm_lsw {
 
 		// Construct the F arrays as defined in definitions 1 and 2 and lemma 10.
 		// FIXME: calculate time complexity.
-		f_type(k1_matcher const &matcher, pattern_type const &pattern)
+		template <typename t_pattern>
+		f_type(k1_matcher const &matcher, t_pattern const &pattern)
 		{
 			auto const &cst(matcher.cst());
 			auto const m(pattern.size());
-			typename pattern_type::size_type i(0);
+			typename t_pattern::size_type i(0);
 			typename cst_type::node_type node;
 
 			f_vector_type st(m, 0);
@@ -261,8 +262,8 @@ namespace asm_lsw {
 	};
 
 	
-	template <typename t_cst, typename t_pattern>
-	struct k1_matcher <t_cst, t_pattern>::transform_gamma_v
+	template <typename t_cst>
+	struct k1_matcher <t_cst>::transform_gamma_v
 	{
 		typename gamma_type::kv_type operator()(typename gamma_intermediate_type::value_type &kv) const
 		{

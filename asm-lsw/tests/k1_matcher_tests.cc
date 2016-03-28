@@ -75,7 +75,7 @@ void typed_tests(t_input_pattern const &ip)
 template <typename t_cst>
 void typed_tests()
 {
-	typedef asm_lsw::k1_matcher <t_cst, sdsl::int_vector <0>> k1_matcher;
+	typedef asm_lsw::k1_matcher <t_cst> k1_matcher;
 	typedef input_pattern <typename k1_matcher::csa_ranges> input_pattern;
 	
 	std::vector <input_pattern> input_patterns{
