@@ -54,6 +54,9 @@ namespace asm_lsw {
 		{
 		}
 		
+		static uint64_t max_value(uint8_t width) { return content_type::max_value(width); }
+		uint64_t max_value() const { return m_columns.max_value(); }
+		
 		size_type rows() const { return m_row_count; }
 		size_type columns() const { return m_columns.size() / m_row_count; }
 		
@@ -70,6 +73,8 @@ namespace asm_lsw {
 			assert(j < columns());
 			return m_columns[i + j * m_row_count];
 		}
+		
+		void fill(value_type const value) { std::fill(m_columns.begin(), m_columns.end(), value); }
 	};
 }
 
