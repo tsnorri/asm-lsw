@@ -122,9 +122,7 @@ namespace asm_lsw {
 		void reset(bool allocate_matrix)
 		{
 			auto const patlen(m_pattern->size());
-			auto const patlen_log2(sdsl::util::log2_ceil(1 + patlen));
-			auto const patlen_bits(sdsl::util::upper_power_of_2(patlen_log2));
-			auto const bits(std::min <decltype(patlen_bits)>(8, patlen_bits));
+			auto const bits(sdsl::util::log2_ceil(1 + patlen));
 			auto const default_cost(decltype(m_e)::max_value(bits));
 			
 			if (allocate_matrix)
