@@ -1204,53 +1204,7 @@ namespace asm_lsw {
 	template <typename t_cst>
 	void k1_matcher <t_cst>::post_process_ranges(csa_ranges &ranges) const
 	{
-		std::sort(ranges.begin(), ranges.end());
-		
-		auto out_it(ranges.begin()), it(ranges.begin()), end(ranges.end());
-		if (it != end)
-		{
-			while (true)
-			{
-				auto val(*it);
-				auto first(val.first);
-				auto last(val.second);
-				
-				auto n_it(it);
-				while (true)
-				{
-					++n_it;
-					if (n_it == end)
-					{
-						val.first = first;
-						val.second = last;
-						*out_it = val;
-						++out_it;
-						ranges.resize(std::distance(ranges.begin(), out_it));
-						return;
-					}
-					
-					auto n_first(n_it->first);
-					auto n_last(n_it->second);
-					
-					assert(first <= n_first);
-					if (n_first <= 1 + last)
-					{
-						if (last < n_last)
-							last = n_last;
-					}
-					else
-					{
-						it = n_it;
-						break;
-					}
-				}
-				
-				val.first = first;
-				val.second = last;
-				*out_it = val;
-				++out_it;
-			}
-		}
+		util::post_process_ranges(ranges);
 	}
 }
 
