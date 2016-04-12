@@ -63,7 +63,7 @@ void typed_tests(t_input_pattern const &ip)
 			
 				typename t_matcher::csa_ranges ranges;
 				matcher.find_1_approximate(pattern, ranges);
-				matcher.post_process_ranges(ranges);
+				asm_lsw::util::post_process_ranges(ranges);
 				
 				AssertThat(ranges, Equals(p.ranges));
 			});

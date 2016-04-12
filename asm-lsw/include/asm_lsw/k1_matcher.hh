@@ -265,8 +265,6 @@ namespace asm_lsw {
 		// Section 3.3.
 		template <typename t_pattern>
 		void find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const;
-		
-		void post_process_ranges(csa_ranges &ranges) const;
 	};
 	
 	
@@ -1198,13 +1196,6 @@ namespace asm_lsw {
 				ranges.emplace_back(idx, idx);
 			}
 		}
-	}
-
-	
-	template <typename t_cst>
-	void k1_matcher <t_cst>::post_process_ranges(csa_ranges &ranges) const
-	{
-		util::post_process_ranges(ranges);
 	}
 }
 
