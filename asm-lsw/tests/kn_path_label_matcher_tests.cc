@@ -68,6 +68,9 @@ struct pattern_match
 		}
 	}
 };
+	
+	
+typedef std::map <std::size_t, std::multiset <pattern_match>> match_set;
 
 
 struct pattern
@@ -75,7 +78,7 @@ struct pattern
 	std::string pattern;
 	uint8_t edit_distance;
 	match_type mt;
-	std::set <pattern_match> matches;
+	match_set matches;
 };
 
 
@@ -84,25 +87,31 @@ struct pattern_set
 	std::string text;
 	std::vector <pattern> patterns;
 };
-
-template <typename t_matcher>
-bool next_path_label(
-	t_matcher &matcher,
-	match_type const mt,
-	typename t_matcher::cst_type::node_type &node,
-	typename t_matcher::cst_type::size_type &length,
-	typename t_matcher::edit_distance_type &edit_distance
-)
+	
+	
+template <typename t_matcher, typename t_pattern>
+void run_typed_test(t_matcher &matcher, std::string const &text, t_pattern const &p)
 {
-	if (match_type::match_lte == mt)
-		return matcher.next_path_label(node, length, edit_distance);
-	else if (match_type::match_exact == mt)
-		return matcher.next_path_label_exact(node, length, edit_distance);
-	else
+	typedef typename t_matcher::cst_type cst_type;
+	
+	cst_type const &cst(matcher.cst());
+	match_set matches;
+
+	typename cst_type::node_type node{};
+	typename cst_type::size_type match_length{};
+	typename t_matcher::size_type pattern_length{};
+	typename t_matcher::edit_distance_type edit_distance{};
+		
+	while (matcher.next_path_label(node, pattern_length, match_length, edit_distance))
 	{
-		assert(0);
-		return false;
+		pattern_match match{match_length, edit_distance, cst.lb(node), cst.rb(node)};
+		matches[pattern_length].emplace(std::move(match));
 	}
+		
+	auto const name(boost::format("should report matches correctly (text: '%s' pattern: '%s' k: %d allow_lt: %d)") % text % p.pattern % +matcher.edit_distance() % matcher.matches_lt_edit_distance());
+	it(boost::str(name).c_str(), [&](){
+		AssertThat(matches, Equals(p.matches));
+	});
 }
 
 
@@ -115,11 +124,19 @@ void typed_tests()
 		{
 			"i", {
 				{"ijj", 2, match_type::match_lte, {
-					{1, 2, 1, 1}
+					{
+						3, {
+							{1, 2, 1, 1}
+						}
+					}
 				}},
 					
 				{"ijj", 2, match_type::match_exact, {
-					{1, 2, 1, 1}
+					{
+						3, {
+							{1, 2, 1, 1}
+						}
+					}
 				}}
 			}
 		},
@@ -127,65 +144,157 @@ void typed_tests()
 		{
 			"mississippi", {
 				{"ippi", 2, match_type::match_lte, {
-					{4, 0, 2, 2},
-					{4, 2, 3, 4},
-					{3, 1, 7, 7},
-					{5, 1, 8, 8},
-					{6, 2, 10, 10}
+					{
+						2, {
+							{0, 2, 0, 11},
+							{0, 2, 0, 11},
+							{0, 2, 0, 11}
+						}
+					},
+					{
+						3, {
+							{1, 2, 1, 4},
+							{1, 2, 1, 4}
+						}
+					},
+					{
+						4, {
+							{4, 0, 2, 2},
+							{4, 2, 3, 4},
+							{2, 2, 6, 6},
+							{3, 1, 7, 7},
+							{5, 1, 8, 8},
+							{6, 2, 10, 10}
+						}
+					}
 				}},
 				
 				{"ippi", 2, match_type::match_exact, {
-					{2, 2, 2, 2},
-					{4, 2, 3, 4},
-					{2, 2, 7, 7},
-					{4, 2, 8, 8},
-					{6, 2, 10, 10}
+					{
+						4, {
+							{2, 2, 2, 2},
+							{4, 2, 3, 4},
+							{2, 2, 6, 6},
+							{2, 2, 7, 7},
+							{4, 2, 8, 8},
+							{6, 2, 10, 10}
+						}
+					}
 				}},
 
 				{"iippi", 2, match_type::match_lte, {
-					{4, 1, 2, 2},
-					{7, 2, 3, 3},
-					{5, 1, 8, 8},
-					{6, 2, 10, 10}
+					{
+						2, {
+							{0, 2, 0, 11}
+						}
+					},
+					{
+						3, {
+							{1, 2, 1, 4},
+							{1, 2, 1, 4},
+							{2, 2, 5, 5},
+							{1, 2, 6, 7},
+							{2, 2, 8, 9}
+						}
+					},
+					{
+						5, {
+							{4, 1, 2, 2},
+							{7, 2, 3, 3},
+							{3, 2, 7, 7},
+							{5, 1, 8, 8},
+							{6, 2, 10, 10}
+						}
+					}
 				}},
 				
 				{"iippi", 2, match_type::match_exact, {
-					{3, 2, 2, 2},
-					{7, 2, 3, 3},
-					{4, 2, 8, 8},
-					{6, 2, 10, 10}
+					{
+						5, {
+							{3, 2, 2, 2},
+							{7, 2, 3, 3},
+							{3, 2, 7, 7},
+							{4, 2, 8, 8},
+							{6, 2, 10, 10}
+						}
+					}
 				}},
 				
 				{"issi", 2, match_type::match_lte, {
-					{4, 2, 2, 2},
-					{4, 0, 3, 4},
-					{5, 1, 5, 5},
-					{2, 2, 8, 9},
-					{5, 1, 9, 9},
-					{3, 1, 10, 11}
+					{
+						1, {
+							{1, 0, 1, 4}
+						},
+					},
+					{
+						2, {
+							{0, 2, 0, 11},
+							{1, 1, 8, 11}
+						}
+					},
+					{
+						3, {
+							{1, 2, 1, 4}
+						}
+					},
+					{
+						4, {
+							{4, 2, 2, 2},
+							{4, 0, 3, 4},
+							{5, 1, 5, 5},
+							{2, 2, 8, 9},
+							{5, 1, 9, 9},
+							{3, 1, 10, 11}
+						}
+					}
 				}},
 				
 				{"issi", 2, match_type::match_exact, {
-					{4, 2, 2, 2},
-					{2, 2, 3, 4},
-					{4, 2, 5, 5},
-					{2, 2, 8, 9},
-					{2, 2, 10, 11}
+					{
+						4, {
+							{4, 2, 2, 2},
+							{2, 2, 3, 4},
+							{4, 2, 5, 5},
+							{2, 2, 8, 9},
+							{2, 2, 10, 11}
+						}
+					}
 				}},
 				
 				{"iissi", 2, match_type::match_lte, {
-					{4, 1, 3, 4},
-					{5, 1, 5, 5},
-					{5, 1, 9, 9},
-					{3, 2, 10, 11},
-					{6, 2, 11, 11} // Actually overlaps the previous match.
+					{
+						2, {
+							{1, 1, 1, 4},
+							{0, 2, 0, 11}
+						}
+					},
+					{
+						3, {
+							{1, 2, 1, 4},
+							{2, 2, 6, 6},
+							{1, 2, 8, 11},	// Everything that begins with the single letter 's'
+							{1, 2, 8, 11}
+						}
+					},
+					{
+						5, {
+							{4, 1, 3, 4},	// Delete one 'i' from the beginning
+							{5, 1, 5, 5},	// Substitute the first 'i' with an 'm'
+							{5, 1, 9, 9},	// Substitute the first 'i' with an 's'
+							{3, 2, 10, 11}	// Delete two 'i' from the beginning
+						}
+					}
 				}},
 				
 				{"iissi", 2, match_type::match_exact, {
-					{3, 2, 3, 4},
-					{4, 2, 5, 5},
-					{4, 2, 9, 9},
-					{3, 2, 10, 11}
+					{
+						5, {
+							{3, 2, 3, 4},
+							{4, 2, 5, 5},
+							{4, 2, 9, 9},
+							{3, 2, 10, 11}
+						}
+					}
 				}}
 			}
 		}
@@ -199,27 +308,25 @@ void typed_tests()
 		
 		cst_type cst;
 		sdsl::construct(cst, file, 1);
-		
+
 		for (auto const &p : t.patterns)
 		{
-			typedef asm_lsw::kn_path_label_matcher <cst_type, std::string> matcher_type;
-			matcher_type matcher(cst, p.pattern, p.edit_distance);
-			std::set <pattern_match> matches;
-			
-			typename cst_type::node_type node{};
-			typename cst_type::size_type length{};
-			typename matcher_type::edit_distance_type edit_distance{};
-			
-			while (next_path_label(matcher, p.mt, node, length, edit_distance))
+			if (match_type::match_lte == p.mt)
 			{
-				pattern_match match{length, edit_distance, cst.lb(node), cst.rb(node)};
-				matches.emplace(std::move(match));
+				typedef asm_lsw::kn_path_label_matcher <cst_type, std::string, true, true> matcher_type;
+				matcher_type matcher(cst, p.pattern, p.edit_distance);
+				run_typed_test(matcher, t.text, p);
 			}
-			
-			auto const name(boost::format("should report matches correctly (text: '%s' pattern: '%s' k: %d match type: %d)") % t.text % p.pattern % +p.edit_distance % int(p.mt));
-			it(boost::str(name).c_str(), [&](){
-				AssertThat(matches, Equals(p.matches));
-			});
+			else if (match_type::match_exact == p.mt)
+			{
+				typedef asm_lsw::kn_path_label_matcher <cst_type, std::string, false, false> matcher_type;
+				matcher_type matcher(cst, p.pattern, p.edit_distance);
+				run_typed_test(matcher, t.text, p);
+			}
+			else
+			{
+				assert(0);
+			}
 		}
 	}
 }

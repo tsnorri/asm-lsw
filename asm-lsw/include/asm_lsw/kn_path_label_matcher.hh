@@ -27,11 +27,17 @@
 
 namespace asm_lsw {
 
-	template <typename t_cst, typename t_pattern_vector>
+	template <
+		typename t_cst,
+		typename t_pattern_vector,
+		bool t_allow_lt_k,
+		bool t_match_pattern_prefix
+	>
 	class kn_path_label_matcher
 	{
 	public:
 		typedef t_cst cst_type;
+		typedef t_pattern_vector pattern_vector_type;
 		
 		static_assert(
 			std::is_unsigned <typename cst_type::node_type>::value,
@@ -40,7 +46,7 @@ namespace asm_lsw {
 
 	protected:
 		cst_type const *m_cst;
-		t_pattern_vector const *m_pattern;
+		pattern_vector_type const *m_pattern;
 		typename cst_type::node_type m_node;
 		typename cst_type::node_type m_previous_match;
 		matrix <0> m_e;
@@ -93,7 +99,7 @@ namespace asm_lsw {
 			
 		public:
 			lte_cmp(edit_distance_type const k):
-				m_min_cost(1 + k)
+				m_min_cost(k)
 			{
 			}
 			
@@ -117,6 +123,15 @@ namespace asm_lsw {
 			// Any of the subtrees may contain a better match.
 			constexpr bool can_prune() const { return false; }
 		};
+		
+		
+		template <bool t_use_lte_cmp, typename t_dummy = void>
+		struct cmp {};
+		
+		template <typename t_dummy> struct cmp <false, t_dummy>	{ typedef exact_cmp type; };
+		template <typename t_dummy> struct cmp <true, t_dummy>	{ typedef lte_cmp type; };
+		
+		typedef typename cmp <t_allow_lt_k>::type cmp_type;
 		
 	protected:
 		void reset(bool allocate_matrix)
@@ -183,8 +198,7 @@ namespace asm_lsw {
 		}
 		
 		
-		// node_ref is inout.
-		bool find_next_node(typename cst_type::node_type &node_ref) const
+		bool find_next_node(/* inout */ typename cst_type::node_type &node_ref) const
 		{
 			auto const root(m_cst->root());
 			auto node(node_ref);
@@ -246,16 +260,134 @@ namespace asm_lsw {
 		}
 		
 		
-		template <typename t_cmp>
+		bool compare_path_label(
+			size_type const row,
+			/* inout */ size_type &k0,
+			/* out */ bool &have_low_errors,
+			/* out */ typename cst_type::node_type &node_ref,
+			/* out */ typename cst_type::size_type &length_ref,
+			/* out */ edit_distance_type &cost_ref
+		)
+		{
+			auto const patlen(m_pattern->size());
+			auto const ncol(m_e.columns());
+
+			// Find the rightmost column that may be read.
+			// Save k0 to spare some iterations in case
+			// pattern ranges shorter than patlen are allowed.
+			while (k0 < ncol)
+			{
+				auto const idx(ncol - k0 - 1);
+				auto const pad(column_pad(idx));
+		
+				if (pad <= row)
+					break;
+				++k0;
+			}
+			
+			// Check the given row, find the leftmost minimum or equal index.
+			auto k(k0);
+			cmp_type cmp(m_k);
+		
+			// Read until the leftmost column is reached.
+			while (k < ncol)
+			{
+				auto const idx(ncol - k - 1);
+				auto const pad(column_pad(idx));
+				auto const last_entry_row(pad + 1 + 2 * m_k);
+			
+				if (last_entry_row < row)
+					break;
+			
+				auto const cost(m_e(row - pad, idx));
+				cmp(cost, m_k, idx);
+				
+				++k;
+			}
+		
+			if (cmp.found())
+			{
+				// Find the lowest node that contains the index in question.
+				auto node(m_node);
+				auto const root(m_cst->root());
+				while (true)
+				{
+					auto const parent(m_cst->parent(node));
+					if (m_cst->depth(parent) < cmp.index() || node == root)
+						break;
+				
+					node = parent;
+				}
+				
+				// In case of exact matching, the subtree may be skipped if
+				// a suitable parent was found since a better match needn't
+				// be searched.
+				if (cmp.can_prune())
+					m_node = node;
+				
+				if (node != m_previous_match)
+				{
+					m_previous_match = node;
+					node_ref = node;
+					length_ref = cmp.index();
+					cost_ref = cmp.cost(m_k);
+					return true;
+				}
+			}
+			else
+			{
+				have_low_errors = cmp.can_continue_branch();
+			}
+			return false;
+		}
+
+
+	public:
+		cst_type const &cst() const { return *m_cst; }
+		uint8_t edit_distance() const { return m_k; }
+		constexpr bool matches_lt_edit_distance() const { return t_allow_lt_k; }
+
+		
+		kn_path_label_matcher(t_cst const &cst, pattern_vector_type const &pattern, uint8_t const k):
+			m_cst(&cst),
+			m_pattern(&pattern),
+			m_k(k)
+		{
+			reset(true);
+		}
+		
+		
+		void reset()
+		{
+			reset(false);
+		}
+		
+		
 		bool next_path_label(
 			typename cst_type::node_type &node_ref,
-			typename cst_type::size_type &length_ref,
+			typename cst_type::size_type &match_length_ref,
 			edit_distance_type &cost_ref
 		)
 		{
+			size_type pattern_length(0);
+			return next_path_label(node_ref, pattern_length, match_length_ref, cost_ref);
+		}
+
+		
+		bool next_path_label(
+			/* out */ typename cst_type::node_type &node_ref,
+			/* out */ size_type &pattern_length_ref,
+			/* out */ typename cst_type::size_type &match_length_ref,
+			/* out */ edit_distance_type &cost_ref
+		)
+		{
+			// m_node is initialized to the node '$',
+			// which would be the only one in case the tree were empty
+			// and thus would not be handled.
+			assert(m_cst->size());
+			
 			// Calculating a new column in m_e takes O(k) time (Lemma 23)
 			// as there are entries on 2k + 1 rows at most.
-			auto const patlen(m_pattern->size());
 			auto const ncol(m_e.columns());
 			
 			while (true)
@@ -285,73 +417,55 @@ namespace asm_lsw {
 					// Make sure that the current branch is handled by checking leaves.
 					if (j == ncol - 1 || !can_continue_branch || (j == depth && m_cst->is_leaf(m_node)))
 					{
-						// Check the last row, find the leftmost minimum or equal index.
-						t_cmp cmp(m_k);
+						auto const patlen(m_pattern->size());
 						
-						// Find the rightmost column that may be read.
-						size_type k(ncol - j - 1); // Not related to m_k.
-						while (k < ncol)
-						{
-							auto const idx(ncol - k - 1);
-							auto const pad(column_pad(idx));
-							
-							if (pad <= patlen)
-								break;
-							++k;
-						}
+						// ncol - k0 - 1 equals to rightmost column index (updated in compare_path_label),
+						// not related to m_k.
+						size_type k0(ncol - j - 1);
 						
-						// Read until the leftmost column is reached.
-						while (k < ncol)
+						if (t_match_pattern_prefix)
 						{
-							auto const idx(ncol - k - 1);
-							auto const pad(column_pad(idx));
-							auto const last_entry_idx(pad + 1 + 2 * m_k);
-							
-							if (last_entry_idx < patlen)
-								break;
-							
-							auto const cost(m_e(patlen - pad, idx));
-							cmp(cost, m_k, idx);
-
-							++k;
-						}
-						
-						if (cmp.found())
-						{
-							// Find the lowest node that contains the index in question.
-							auto node(m_node);
-							while (true)
+							// Don't check with an empty pattern (i.e. patlen - l - 1)
+							// as this case is handled as a deletion.
+							bool have_low_errors(false);
+							size_type l(0);
+							while (l < patlen)
 							{
-								auto const parent(m_cst->parent(node));
-								if (m_cst->depth(parent) < cmp.index())
-									break;
+								if (compare_path_label(patlen - l, k0, have_low_errors, node_ref, match_length_ref, cost_ref))
+								{
+									pattern_length_ref = patlen - l;
+									return true;
+								}
 								
-								node = parent;
+								++l;
 							}
 							
-							// In case of exact matching, the subtree may be skipped if
-							// a suitable parent was found since a better match needn't
-							// be searched.
-							if (cmp.can_prune())
-								m_node = node;
-							
-							if (node != m_previous_match)
+							if (!can_continue_branch || !(have_low_errors && 0 == l))
 							{
-								m_previous_match = node;
-								node_ref = node;
-								length_ref = cmp.index();
-								cost_ref = cmp.cost(m_k);
+								// If too many mismatches were found or if the pattern were shortened,
+								// continue in the outer loop.
+								break;
+							}
+							
+							// If sufficiently (or too) few mismatches were found, continue in this branch.
+						}
+						else
+						{
+							bool have_low_errors(false);
+							if (compare_path_label(patlen, k0, have_low_errors, node_ref, match_length_ref, cost_ref))
+							{
+								pattern_length_ref = patlen;
 								return true;
 							}
+							else if (!can_continue_branch || !have_low_errors)
+							{
+								// If too many mismatches were found, continue in the outer loop.
+								break;
+							}
+							
+							// If sufficiently (or too) few mismatches were found, continue in this branch.
 						}
-						else if (!can_continue_branch || !cmp.can_continue_branch())
-						{
-							// If too many mismatches were found, continue in the outer loop.
-							break;
-						}
-						
-						// If sufficiently (or too) few mismatches were found, continue in this branch.
-					}
+					} // if (j == ncol - 1 || !can_continue_branch || (j == depth && m_cst->is_leaf(m_node)))
 							 
 					if (j == depth)
 					{
@@ -367,47 +481,8 @@ namespace asm_lsw {
 					}
 					
 					++j;
-				}
-			}
-		}
-
-
-	public:
-		cst_type const &cst() { return *m_cst; }
-
-		
-		kn_path_label_matcher(t_cst const &cst, t_pattern_vector const &pattern, uint8_t const k):
-			m_cst(&cst),
-			m_pattern(&pattern),
-			m_k(k)
-		{
-			reset(true);
-		}
-		
-		
-		void reset()
-		{
-			reset(false);
-		}
-		
-		
-		bool next_path_label(
-			typename cst_type::node_type &node_ref,
-			typename cst_type::size_type &length_ref,
-			edit_distance_type &cost_ref
-		)
-		{
-			return next_path_label <lte_cmp>(node_ref, length_ref, cost_ref);
-		}
-		
-		
-		bool next_path_label_exact(
-			typename cst_type::node_type &node_ref,
-			typename cst_type::size_type &length_ref,
-			edit_distance_type &cost_ref
-		)
-		{
-			return next_path_label <exact_cmp>(node_ref, length_ref, cost_ref);
+				} // while (true) [update columns]
+			} // while (true) [find the next node]
 		}
 
 		
