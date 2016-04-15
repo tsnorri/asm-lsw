@@ -48,6 +48,14 @@ namespace asm_lsw { namespace util {
 	};
 	
 	
+	template <typename T, typename U>
+	auto min(T const a, U const b) -> typename std::common_type <T, U>::type
+	{
+		typedef typename std::common_type <T, U>::type return_type;
+		return std::min <return_type>(a, b);
+	}
+	
+	
 	template <typename t_ranges>
 	void post_process_ranges(t_ranges &ranges)
 	{

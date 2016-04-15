@@ -18,6 +18,7 @@
 #define ASM_LSW_KN_PATH_LABEL_MATCHER_HH
 
 #include <asm_lsw/matrix.hh>
+#include <asm_lsw/util.hh>
 #include <boost/format.hpp>
 #include <cstdint>
 #include <sdsl/cst_sada.hpp>
@@ -142,7 +143,7 @@ namespace asm_lsw {
 			
 			if (allocate_matrix)
 			{
-				// 2k + 1 row entries to be filled in each column, two additional for sentinels.
+ 				// At most 2k + 1 row entries to be filled in each column, two additional for sentinels.
 				decltype(patlen) const effective_rows(3 + 2 * m_k);
 				auto const rows(std::min(effective_rows, 1 + patlen));
 				decltype(m_e) e(rows, 1 + patlen + m_k, bits, default_cost);
@@ -233,8 +234,7 @@ namespace asm_lsw {
 			
 			auto const patlen(m_pattern->size());
 			auto const max_entries(1 + 2 * m_k);
-			typedef typename std::common_type <decltype(patlen), decltype(max_entries)>::type limit_type;
-			auto const limit(std::min <limit_type>(max_entries + p_idx, patlen));
+			auto const limit(util::min(max_entries + p_idx, patlen));
 
 			edit_distance_type min_cost(std::numeric_limits <edit_distance_type>::max());
 			
@@ -325,7 +325,9 @@ namespace asm_lsw {
 				if (cmp.can_prune())
 					m_node = node;
 				
-				if (node != m_previous_match)
+				// In case of prefix matching, report all matches as otherwise
+				// the prefix length would need to be taken into account.
+				if (t_match_pattern_prefix || node != m_previous_match)
 				{
 					m_previous_match = node;
 					node_ref = node;
