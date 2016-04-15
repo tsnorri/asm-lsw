@@ -144,9 +144,11 @@ namespace asm_lsw {
 			if (allocate_matrix)
 			{
  				// At most 2k + 1 row entries to be filled in each column, two additional for sentinels.
+				// patlen columns are needed as insertions in the path label are equivalent
+				// to deletions in the pattern.
 				decltype(patlen) const effective_rows(3 + 2 * m_k);
 				auto const rows(std::min(effective_rows, 1 + patlen));
-				decltype(m_e) e(rows, 1 + patlen + m_k, bits, default_cost);
+				decltype(m_e) e(rows, patlen, bits, default_cost);
 				
 				m_e = std::move(e);
 			}
