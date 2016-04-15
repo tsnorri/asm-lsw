@@ -283,7 +283,7 @@ namespace asm_lsw {
 		auto const end(pattern.cend());
 		assert(begin < end);
 		
-		typename t_pattern::size_type char_pos(0);
+		typename cst_type::size_type char_pos(0);
 		return (0 < sdsl::forward_search(*m_cst, node, 0, begin, end, char_pos));
 	}
 	
