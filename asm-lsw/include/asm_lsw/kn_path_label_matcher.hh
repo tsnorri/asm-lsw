@@ -31,7 +31,6 @@ namespace asm_lsw {
 	template <
 		typename t_cst,
 		typename t_pattern_vector,
-		bool t_allow_lt_k,
 		bool t_match_pattern_prefix
 	>
 	class kn_path_label_matcher
@@ -58,85 +57,10 @@ namespace asm_lsw {
 		typedef decltype(m_e)::value_type	edit_distance_type;
 		
 	protected:
-		class exact_cmp
-		{
-		protected:
-			size_type			m_idx{0};
-			bool				m_found_less{false};
-			bool				m_found_exact{false};
-			
-		public:
-			exact_cmp(edit_distance_type const k)
-			{
-			}
-			
-			void operator()(edit_distance_type const cost, edit_distance_type const k, size_type const idx)
-			{
-				if (cost < k)
-					m_found_less = true;
-				else if (cost == k)
-				{
-					m_found_exact = true;
-					m_idx = idx;
-				}
-			}
-			
-			bool found() const { return m_found_exact; }
-			size_type index() const { assert(m_found_exact); return m_idx; }
-			edit_distance_type cost(edit_distance_type const k) const { assert(m_found_exact); return k; }
-			bool can_continue_branch() const { assert(!m_found_exact); return m_found_less; }
-			
-			// Once a match has been located, no reason to go through the remaining subtrees.
-			constexpr bool can_prune() const { return true; }
-		};
-		
-		
-		class lte_cmp
-		{
-		protected:
-			edit_distance_type	m_min_cost{0};
-			size_type			m_idx{0};
-			bool				m_found{false};
-			
-		public:
-			lte_cmp(edit_distance_type const k):
-				m_min_cost(k)
-			{
-			}
-			
-			void operator()(edit_distance_type const cost, edit_distance_type const k, size_type const idx)
-			{
-				if (cost <= m_min_cost)
-				{
-					m_found = true;
-					m_min_cost = cost;
-					m_idx = idx;
-				}
-			}
-
-			bool found() const { return m_found; }
-			size_type index() const { return m_idx; }
-			edit_distance_type cost(edit_distance_type const k) const { assert(m_found); return m_min_cost; }
-			
-			// No need to continue in the current branch.
-			constexpr bool can_continue_branch() const { return false; }
-			
-			// Any of the subtrees may contain a better match.
-			constexpr bool can_prune() const { return false; }
-		};
-		
-		
-		template <bool t_use_lte_cmp, typename t_dummy = void>
-		struct cmp {};
-		
-		template <typename t_dummy> struct cmp <false, t_dummy>	{ typedef exact_cmp type; };
-		template <typename t_dummy> struct cmp <true, t_dummy>	{ typedef lte_cmp type; };
-		
-		typedef typename cmp <t_allow_lt_k>::type cmp_type;
-		
-	protected:
 		void reset(bool allocate_matrix)
 		{
+			assert(m_cst);
+			
 			auto const patlen(m_pattern->size());
 			auto const bits(sdsl::util::log2_ceil(1 + patlen));
 			auto const default_cost(decltype(m_e)::max_value(bits));
@@ -265,7 +189,6 @@ namespace asm_lsw {
 		bool compare_path_label(
 			size_type const row,
 			/* inout */ size_type &k0,
-			/* out */ bool &have_low_errors,
 			/* out */ typename cst_type::node_type &node_ref,
 			/* out */ typename cst_type::size_type &length_ref,
 			/* out */ edit_distance_type &cost_ref
@@ -289,58 +212,59 @@ namespace asm_lsw {
 			
 			// Check the given row, find the leftmost minimum or equal index.
 			auto k(k0);
-			cmp_type cmp(m_k);
-		
+
 			// Read until the leftmost column is reached.
 			while (k < ncol)
 			{
-				auto const idx(ncol - k - 1);
+				auto idx(ncol - k - 1);
 				auto const pad(column_pad(idx));
 				auto const last_entry_row(pad + 1 + 2 * m_k);
 			
 				if (last_entry_row < row)
 					break;
 			
-				auto const cost(m_e(row - pad, idx));
-				cmp(cost, m_k, idx);
+				auto cost(m_e(row - pad, idx));
+				if (cost <= m_k)
+				{
+					// Check if the ending character was matched. If this is the case,
+					// take the previous character.
+					auto const c(m_cst->edge(m_node, idx));
+					if (0 == c)
+					{
+						--idx;
+						auto const pad(column_pad(idx));
+						auto new_cost(m_e(row - pad, idx));
+						assert(new_cost <= cost);
+						cost = new_cost;
+					}
+					
+					// Find the lowest node that contains the index in question.
+					auto node(m_node);
+					auto const root(m_cst->root());
+					while (true)
+					{
+						auto const parent(m_cst->parent(node));
+						if (m_cst->depth(parent) < idx || node == root)
+							break;
+				
+						node = parent;
+					}
+					
+					// In case of prefix matching, report all matches as otherwise
+					// the prefix length would need to be taken into account.
+					if (t_match_pattern_prefix || node != m_previous_match)
+					{
+						m_previous_match = node;
+						node_ref = node;
+						length_ref = idx;
+						cost_ref = cost;
+						return true;
+					}
+					
+					return false;
+				}
 				
 				++k;
-			}
-		
-			if (cmp.found())
-			{
-				// Find the lowest node that contains the index in question.
-				auto node(m_node);
-				auto const root(m_cst->root());
-				while (true)
-				{
-					auto const parent(m_cst->parent(node));
-					if (m_cst->depth(parent) < cmp.index() || node == root)
-						break;
-				
-					node = parent;
-				}
-				
-				// In case of exact matching, the subtree may be skipped if
-				// a suitable parent was found since a better match needn't
-				// be searched.
-				if (cmp.can_prune())
-					m_node = node;
-				
-				// In case of prefix matching, report all matches as otherwise
-				// the prefix length would need to be taken into account.
-				if (t_match_pattern_prefix || node != m_previous_match)
-				{
-					m_previous_match = node;
-					node_ref = node;
-					length_ref = cmp.index();
-					cost_ref = cmp.cost(m_k);
-					return true;
-				}
-			}
-			else
-			{
-				have_low_errors = cmp.can_continue_branch();
 			}
 			return false;
 		}
@@ -349,8 +273,14 @@ namespace asm_lsw {
 	public:
 		cst_type const &cst() const { return *m_cst; }
 		uint8_t edit_distance() const { return m_k; }
-		constexpr bool matches_lt_edit_distance() const { return t_allow_lt_k; }
-
+		
+		
+		kn_path_label_matcher():
+			m_cst(nullptr),
+			m_k(0)
+		{
+		}
+		
 		
 		kn_path_label_matcher(t_cst const &cst, pattern_vector_type const &pattern, uint8_t const k):
 			m_cst(&cst),
@@ -385,6 +315,8 @@ namespace asm_lsw {
 			/* out */ edit_distance_type &cost_ref
 		)
 		{
+			assert(m_cst);
+
 			// m_node is initialized to the node '$',
 			// which would be the only one in case the tree were empty
 			// and thus would not be handled.
@@ -431,11 +363,10 @@ namespace asm_lsw {
 						{
 							// Don't check with an empty pattern (i.e. patlen - l - 1)
 							// as this case is handled as a deletion.
-							bool have_low_errors(false);
 							size_type l(0);
 							while (l < patlen)
 							{
-								if (compare_path_label(patlen - l, k0, have_low_errors, node_ref, match_length_ref, cost_ref))
+								if (compare_path_label(patlen - l, k0, node_ref, match_length_ref, cost_ref))
 								{
 									pattern_length_ref = patlen - l;
 									return true;
@@ -444,7 +375,7 @@ namespace asm_lsw {
 								++l;
 							}
 							
-							if (!can_continue_branch || !(have_low_errors && 0 == l))
+							if (!can_continue_branch)
 							{
 								// If too many mismatches were found or if the pattern were shortened,
 								// continue in the outer loop.
@@ -455,13 +386,12 @@ namespace asm_lsw {
 						}
 						else
 						{
-							bool have_low_errors(false);
-							if (compare_path_label(patlen, k0, have_low_errors, node_ref, match_length_ref, cost_ref))
+							if (compare_path_label(patlen, k0, node_ref, match_length_ref, cost_ref))
 							{
 								pattern_length_ref = patlen;
 								return true;
 							}
-							else if (!can_continue_branch || !have_low_errors)
+							else if (!can_continue_branch)
 							{
 								// If too many mismatches were found, continue in the outer loop.
 								break;

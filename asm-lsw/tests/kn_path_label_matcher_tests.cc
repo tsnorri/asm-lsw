@@ -24,13 +24,6 @@
 using namespace bandit;
 
 
-enum class match_type : int
-{
-	match_lte = 0,
-	match_exact = 1
-};
-
-
 struct pattern_match
 {
 	std::size_t length;
@@ -77,7 +70,6 @@ struct pattern
 {
 	std::string pattern;
 	uint8_t edit_distance;
-	match_type mt;
 	match_set matches;
 };
 
@@ -108,7 +100,7 @@ void run_typed_test(t_matcher &matcher, std::string const &text, t_pattern const
 		matches[pattern_length].emplace(std::move(match));
 	}
 		
-	auto const name(boost::format("should report matches correctly (text: '%s' pattern: '%s' k: %d allow_lt: %d)") % text % p.pattern % +matcher.edit_distance() % matcher.matches_lt_edit_distance());
+	auto const name(boost::format("should report matches correctly (text: '%s' pattern: '%s' k: %d)") % text % p.pattern % +matcher.edit_distance());
 	it(boost::str(name).c_str(), [&](){
 		AssertThat(matches, Equals(p.matches));
 	});
@@ -118,32 +110,22 @@ void run_typed_test(t_matcher &matcher, std::string const &text, t_pattern const
 template <typename t_cst>
 void typed_tests()
 {
-	typedef t_cst cst_type;
-	
 	std::vector <pattern_set> tests{
 		{
 			"i", {
-				{"ijj", 2, match_type::match_lte, {
+				{"ijj", 2, {
 					{
 						3, {
 							{1, 2, 1, 1}
 						}
 					}
 				}},
-					
-				{"ijj", 2, match_type::match_exact, {
-					{
-						3, {
-							{1, 2, 1, 1}
-						}
-					}
-				}}
 			}
 		},
 		
 		{
 			"mississippi", {
-				{"ippi", 2, match_type::match_lte, {
+				{"ippi", 2, {
 					{
 						2, {
 							{0, 2, 0, 11},
@@ -169,20 +151,7 @@ void typed_tests()
 					}
 				}},
 				
-				{"ippi", 2, match_type::match_exact, {
-					{
-						4, {
-							{2, 2, 2, 2},
-							{4, 2, 3, 4},
-							{2, 2, 6, 6},
-							{2, 2, 7, 7},
-							{4, 2, 8, 8},
-							{6, 2, 10, 10}
-						}
-					}
-				}},
-
-				{"iippi", 2, match_type::match_lte, {
+				{"iippi", 2, {
 					{
 						2, {
 							{0, 2, 0, 11}
@@ -208,19 +177,7 @@ void typed_tests()
 					}
 				}},
 				
-				{"iippi", 2, match_type::match_exact, {
-					{
-						5, {
-							{3, 2, 2, 2},
-							{7, 2, 3, 3},
-							{3, 2, 7, 7},
-							{4, 2, 8, 8},
-							{6, 2, 10, 10}
-						}
-					}
-				}},
-				
-				{"issi", 2, match_type::match_lte, {
+				{"issi", 2, {
 					{
 						1, {
 							{1, 0, 1, 4}
@@ -249,19 +206,7 @@ void typed_tests()
 					}
 				}},
 				
-				{"issi", 2, match_type::match_exact, {
-					{
-						4, {
-							{4, 2, 2, 2},
-							{2, 2, 3, 4},
-							{4, 2, 5, 5},
-							{2, 2, 8, 9},
-							{2, 2, 10, 11}
-						}
-					}
-				}},
-				
-				{"iissi", 2, match_type::match_lte, {
+				{"iissi", 2, {
 					{
 						2, {
 							{1, 1, 1, 4},
@@ -284,21 +229,13 @@ void typed_tests()
 							{3, 2, 10, 11}	// Delete two 'i' from the beginning
 						}
 					}
-				}},
-				
-				{"iissi", 2, match_type::match_exact, {
-					{
-						5, {
-							{3, 2, 3, 4},
-							{4, 2, 5, 5},
-							{4, 2, 9, 9},
-							{3, 2, 10, 11}
-						}
-					}
 				}}
 			}
 		}
 	};
+	
+	typedef t_cst cst_type;
+	typedef asm_lsw::kn_path_label_matcher <cst_type, std::string, true> matcher_type;
 	
 	for (auto const &t : tests)
 	{
@@ -311,22 +248,8 @@ void typed_tests()
 
 		for (auto const &p : t.patterns)
 		{
-			if (match_type::match_lte == p.mt)
-			{
-				typedef asm_lsw::kn_path_label_matcher <cst_type, std::string, true, true> matcher_type;
-				matcher_type matcher(cst, p.pattern, p.edit_distance);
-				run_typed_test(matcher, t.text, p);
-			}
-			else if (match_type::match_exact == p.mt)
-			{
-				typedef asm_lsw::kn_path_label_matcher <cst_type, std::string, false, false> matcher_type;
-				matcher_type matcher(cst, p.pattern, p.edit_distance);
-				run_typed_test(matcher, t.text, p);
-			}
-			else
-			{
-				assert(0);
-			}
+			matcher_type matcher(cst, p.pattern, p.edit_distance);
+			run_typed_test(matcher, t.text, p);
 		}
 	}
 }
