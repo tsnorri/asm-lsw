@@ -39,7 +39,10 @@ namespace asm_lsw {
 		size_type m_row_count;
 		
 	public:
-		matrix() {}
+		matrix():
+			m_row_count(0)
+		{
+		}
 		
 		matrix(size_type const rows, size_type const columns, uint8_t bits, value_type const default_value):
 			m_columns(rows * columns, default_value, bits),
@@ -58,7 +61,7 @@ namespace asm_lsw {
 		uint64_t max_value() const { return m_columns.max_value(); }
 		
 		size_type rows() const { return m_row_count; }
-		size_type columns() const { return m_columns.size() / m_row_count; }
+		size_type columns() const { return m_row_count ? m_columns.size() / m_row_count : 0; }
 		
 		inline reference operator()(size_type const i, size_type const j)
 		{
