@@ -68,11 +68,9 @@ namespace asm_lsw {
 			if (allocate_matrix)
 			{
  				// At most 2k + 1 row entries to be filled in each column, two additional for sentinels.
-				// patlen columns are needed as insertions in the path label are equivalent
-				// to deletions in the pattern.
 				decltype(patlen) const effective_rows(3 + 2 * m_k);
 				auto const rows(std::min(effective_rows, 1 + patlen));
-				decltype(m_e) e(rows, patlen, bits, default_cost);
+				decltype(m_e) e(rows, 1 + m_k + patlen, bits, default_cost);
 				
 				m_e = std::move(e);
 			}
@@ -375,14 +373,9 @@ namespace asm_lsw {
 								++l;
 							}
 							
-							if (!can_continue_branch)
-							{
-								// If too many mismatches were found or if the pattern were shortened,
-								// continue in the outer loop.
-								break;
-							}
-							
-							// If sufficiently (or too) few mismatches were found, continue in this branch.
+							// If too many mismatches were found or if the pattern were shortened,
+							// continue in the outer loop.
+							break;
 						}
 						else
 						{
@@ -391,13 +384,9 @@ namespace asm_lsw {
 								pattern_length_ref = patlen;
 								return true;
 							}
-							else if (!can_continue_branch)
-							{
-								// If too many mismatches were found, continue in the outer loop.
-								break;
-							}
-							
-							// If sufficiently (or too) few mismatches were found, continue in this branch.
+
+							// If too many mismatches were found, continue in the outer loop.
+							break;
 						}
 					} // if (j == ncol - 1 || !can_continue_branch || (j == depth && m_cst->is_leaf(m_node)))
 							 
