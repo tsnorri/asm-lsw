@@ -274,7 +274,7 @@ namespace asm_lsw {
 				{
 					// Check if the ending character was matched. If this is the case,
 					// take the previous character.
-					auto const c(m_cst->edge(m_node, idx));
+					auto const c(m_cst->edge_c(m_node, idx));
 					if (0 == c)
 					{
 						--idx;
@@ -320,19 +320,22 @@ namespace asm_lsw {
 			t_partial_match_callback &cb
 		)
 		{
-			auto const pad(column_pad(j));
-			auto p_idx(text_start(j));
-			auto const max_entries(1 + 2 * m_k);
+			// Only report up to patlen - 1 since matches on the last row are complete.
 			auto const patlen(m_pattern->size());
-			auto const limit(util::min(max_entries + p_idx, patlen));
-			
-			for (size_type i(pad); i <= limit; ++i)
+			if (patlen)
 			{
-				auto p(m_p(i - pad, j));
-				if (0x1 == p)
+				auto const pad(column_pad(j));
+				auto p_idx(text_start(j));
+				auto const max_entries(1 + 2 * m_k);
+				auto const limit(util::min(max_entries + p_idx, patlen - 1));
+				for (size_type i(pad); i <= limit; ++i)
 				{
-					cb(node, i, j);
-					p = 0x3; // Don't report again.
+					auto p(m_p(i - pad, j));
+					if (0x1 == p)
+					{
+						cb(node, i, j);
+						p = 0x3; // Don't report again.
+					}
 				}
 			}
 		}
@@ -450,24 +453,27 @@ namespace asm_lsw {
 						auto child(m_cst->select_child(m_node, 1));
 						if (m_cst->root() == child)
 						{
-							// If the current node is a leaf, continue in the
-							// outer loop.
+							// If the current node is a leaf, continue in the outer loop.
 							// Report partial matches in the filled range.
 							for (decltype(j) js(j_begin); js <= j; ++js)
 								report_partial_matches(m_node, js, cb);
 
 							break;
 						}
-						else if (0 == m_cst->edge_c(child, m_cst->depth(child)))
+						else
 						{
-							// If the new edge begins with '$', there should be a valid sibling.
-							// Select it instead.
-							child = m_cst->sibling(child);
-							assert(m_cst->root() != child);
+							depth = m_cst->depth(child);
+							if (0 == m_cst->edge_c(child, depth))
+							{
+								// If the new edge begins with '$', there should be a valid sibling.
+								// Select it instead.
+								child = m_cst->sibling(child);
+								assert(m_cst->root() != child);
+								depth = m_cst->depth(child);
+							}
+							
+							m_node = child;
 						}
-						
-						m_node = child;
-						depth = m_cst->depth(m_node);
 					}
 
 					++j;
