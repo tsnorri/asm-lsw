@@ -60,7 +60,7 @@ namespace asm_lsw {
 	
 	// A bps class for sparse sequences i.e. ones that may contain spaces in addition to () characters.
 	template <
-		typename t_bps		= sdsl::bp_support_sada<>,
+		typename t_bps		= sdsl::bp_support_g<>,
 		typename t_vector	= sdsl::bit_vector			// Unfortunately select is needed, otherwise rrr_vector might be preferrable.
 	>
 	class bp_support_sparse : public bp_support_sparse_base<t_vector>
