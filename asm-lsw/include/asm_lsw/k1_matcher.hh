@@ -963,10 +963,11 @@ namespace asm_lsw {
 						// Since the match was incomplete, the matching node must be r's descendant.
 						// The chosen edge should be a side edge (Case 3).
 						// Every side edge should lead either to a leaf node or to a beginning of
-						// a core path. XXX verify this.
+						// a core path.
 						auto const next_idx(r_depth - 1 + (pat_idx - pat1_len));
 						auto const next_cc(pattern[next_idx]);
 #ifndef NDEBUG
+						// Check that the side node branch will be taken when tree_search is called below.
 						{
 							auto const s(m_cst->child(r, next_cc));
 							auto const node_type(m_ce[node_id(s)]);
@@ -1186,14 +1187,13 @@ namespace asm_lsw {
 			if (core_endpoints_type::input_value::Opening == m_ce[u_id])
 				core_path_beginning = u;
 
-			// In case the pattern length was reached with i, add the match
-			// to ranges.
-			// FIXME: shouldn't be reached now.
+			// Check for reaching the end of the current branch.
+			// This should only happen in case the pattern contains the zero character
+			// (which may happen when the pattern is concatenated to a path label.
 			if (m_cst->is_leaf(u))
 			{
-				assert(0);
-				auto const idx(m_cst->id(u));
-				ranges.emplace_back(idx, idx);
+				assert(0 == pattern[i - 1]);
+				return;
 			}
 		}
 	}
