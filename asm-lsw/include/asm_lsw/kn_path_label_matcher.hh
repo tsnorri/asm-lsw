@@ -26,12 +26,20 @@
 #include <sdsl/util.hpp>
 
 
+namespace asm_lsw { namespace detail {
+	struct kn_path_label_matcher_pm {
+		template <typename t_node, typename t_size>
+		void operator()(t_node const &node, t_size match_length, t_size pattern_start) {}
+	};
+}}
+
+
 namespace asm_lsw {
 
 	template <
 		typename t_cst,
 		typename t_pattern_vector,
-		bool t_match_pattern_prefix
+		typename t_partial_match_callback = detail::kn_path_label_matcher_pm
 	>
 	class kn_path_label_matcher
 	{
@@ -47,9 +55,10 @@ namespace asm_lsw {
 	protected:
 		cst_type const *m_cst;
 		pattern_vector_type const *m_pattern;
-		typename cst_type::node_type m_node;
-		typename cst_type::node_type m_previous_match;
+		typename cst_type::node_type m_node{0};
+		typename cst_type::node_type m_previous_match{0};
 		matrix <0> m_e;
+		matrix <2> m_p;		// 0x0: no path, 0x1: path ending, 0x2: no ending, 0x3: already reported.
 		uint8_t m_k{0};
 		
 	public:
@@ -71,12 +80,15 @@ namespace asm_lsw {
 				decltype(patlen) const effective_rows(3 + 2 * m_k);
 				auto const rows(std::min(effective_rows, 1 + patlen));
 				decltype(m_e) e(rows, 1 + m_k + patlen, bits, default_cost);
+				decltype(m_p) p(rows, 1 + m_k + patlen, 2, 0);
 				
 				m_e = std::move(e);
+				m_p = std::move(p);
 			}
 			else
 			{
 				m_e.fill(default_cost);
+				m_p.fill(0);
 			}
 			
 			m_node = m_cst->child(m_cst->root(), 0);
@@ -91,6 +103,10 @@ namespace asm_lsw {
 			{
 				// Indel cost is 1.
 				m_e(i, 0) = i;
+				
+				if (i == m_k)
+					m_p(i, 0) = 0x1;
+
 				++i;
 			}
 			
@@ -100,6 +116,10 @@ namespace asm_lsw {
 			{
 				// Indel cost is 1.
 				m_e(0, i) = i;
+				
+				if (i == m_k)
+					m_p(0, i) = 0x1;
+				
 				++i;
 			}
 		}
@@ -174,8 +194,36 @@ namespace asm_lsw {
 				auto const diagonal(m_e(i - 1	- pad1,	j - 1)	+ (pc == ec ? 0 : 1));
 				
 				auto const cost(std::min({up, left, diagonal}));
+				
+				// Mark the path endings as non-endings.
+				if (cost <= m_k)
+				{
+					if (up == cost)
+					{
+						auto p(m_p(i - 1 - pad0, j));
+						if (0x1 == p) p = 0x2;
+					}
+					if (left == cost)
+					{
+						auto p(m_p(i     - pad1, j - 1));
+						if (0x1 == p) p = 0x2;
+					}
+					if (diagonal == cost)
+					{
+						auto p(m_p(i - 1 - pad1, j - 1));
+						if (0x1 == p) p = 0x2;
+					}
+				}
+				
+				// Record the minimum cost.
 				min_cost = std::min(cost, min_cost);
+				
+				// Update the current cell.
 				m_e(i - pad0, j) = cost;
+				if (cost == m_k)
+					m_p(i - pad0, j) = 0x1;
+				else
+					m_p(i - pad0, j) = 0x0;
 				
 				++p_idx;
 			}
@@ -248,9 +296,7 @@ namespace asm_lsw {
 						node = parent;
 					}
 					
-					// In case of prefix matching, report all matches as otherwise
-					// the prefix length would need to be taken into account.
-					if (t_match_pattern_prefix || node != m_previous_match)
+					if (node != m_previous_match)
 					{
 						m_previous_match = node;
 						node_ref = node;
@@ -265,6 +311,30 @@ namespace asm_lsw {
 				++k;
 			}
 			return false;
+		}
+		
+		
+		void report_partial_matches(
+			typename cst_type::node_type const &node,
+			size_type const j,
+			t_partial_match_callback &cb
+		)
+		{
+			auto const pad(column_pad(j));
+			auto p_idx(text_start(j));
+			auto const max_entries(1 + 2 * m_k);
+			auto const patlen(m_pattern->size());
+			auto const limit(util::min(max_entries + p_idx, patlen));
+			
+			for (size_type i(pad); i <= limit; ++i)
+			{
+				auto p(m_p(i - pad, j));
+				if (0x1 == p)
+				{
+					cb(node, i, j);
+					p = 0x3; // Don't report again.
+				}
+			}
 		}
 
 
@@ -296,21 +366,21 @@ namespace asm_lsw {
 		
 		
 		bool next_path_label(
-			typename cst_type::node_type &node_ref,
-			typename cst_type::size_type &match_length_ref,
-			edit_distance_type &cost_ref
+			/* out */ typename cst_type::node_type &node_ref,
+			/* out */ typename cst_type::size_type &match_length_ref,
+			/* out */ edit_distance_type &cost_ref
 		)
 		{
-			size_type pattern_length(0);
-			return next_path_label(node_ref, pattern_length, match_length_ref, cost_ref);
+			t_partial_match_callback cb;
+			return next_path_label(node_ref, match_length_ref, cost_ref, cb);
 		}
-
+		
 		
 		bool next_path_label(
 			/* out */ typename cst_type::node_type &node_ref,
-			/* out */ size_type &pattern_length_ref,
 			/* out */ typename cst_type::size_type &match_length_ref,
-			/* out */ edit_distance_type &cost_ref
+			/* out */ edit_distance_type &cost_ref,
+			t_partial_match_callback &cb
 		)
 		{
 			assert(m_cst);
@@ -323,7 +393,9 @@ namespace asm_lsw {
 			// Calculating a new column in m_e takes O(k) time (Lemma 23)
 			// as there are entries on 2k + 1 rows at most.
 			auto const ncol(m_e.columns());
-			
+			auto const patlen(m_pattern->size());
+			auto const max_entries(1 + 2 * m_k);
+
 			while (true)
 			{
 				if (m_cst->root() == m_node)
@@ -332,6 +404,10 @@ namespace asm_lsw {
 				if (!find_next_node(m_node))
 				{
 					m_node = m_cst->root();
+					
+					// Check column zero if it wasn't handled earlier.
+					report_partial_matches(m_node, 0, cb);
+					
 					return false;
 				}
 				
@@ -341,96 +417,116 @@ namespace asm_lsw {
 				auto const start(m_cst->depth(parent));
 				auto depth(m_cst->depth(m_node));
 
+				auto j(1 + start);
+				auto const j_begin(j);
+				
 				// Update the columns.
 				auto const i(column_pad(1 + start));
-				auto j(1 + start);
 				while (true)
 				{
 					bool can_continue_branch(fill_column(j));
 					
 					// Make sure that the current branch is handled by checking leaves.
-					if (j == ncol - 1 || !can_continue_branch || (j == depth && m_cst->is_leaf(m_node)))
+					// Count only up to depth - 1 as the last character is '$'.
+					if (j == ncol - 1 || !can_continue_branch || (j == (depth - 1) && m_cst->is_leaf(m_node)))
 					{
-						auto const patlen(m_pattern->size());
-						
 						// ncol - k0 - 1 equals to rightmost column index (updated in compare_path_label),
 						// not related to m_k.
 						size_type k0(ncol - j - 1);
 						
-						if (t_match_pattern_prefix)
-						{
-							// Don't check with an empty pattern (i.e. patlen - l - 1)
-							// as this case is handled as a deletion.
-							size_type l(0);
-							while (l < patlen)
-							{
-								if (compare_path_label(patlen - l, k0, node_ref, match_length_ref, cost_ref))
-								{
-									pattern_length_ref = patlen - l;
-									return true;
-								}
-								
-								++l;
-							}
-							
-							// If too many mismatches were found or if the pattern were shortened,
-							// continue in the outer loop.
-							break;
-						}
-						else
-						{
-							if (compare_path_label(patlen, k0, node_ref, match_length_ref, cost_ref))
-							{
-								pattern_length_ref = patlen;
-								return true;
-							}
+						// Report partial matches in the filled range.
+						for (decltype(j) js(j_begin); js <= j; ++js)
+							report_partial_matches(m_node, js, cb);
+						
+						if (compare_path_label(patlen, k0, node_ref, match_length_ref, cost_ref))
+							return true;
 
-							// If too many mismatches were found, continue in the outer loop.
-							break;
-						}
-					} // if (j == ncol - 1 || !can_continue_branch || (j == depth && m_cst->is_leaf(m_node)))
+						// If too many mismatches were found, continue in the outer loop.
+						break;
+					}
 							 
 					if (j == depth)
 					{
-						auto const child(m_cst->select_child(m_node, 1));
-						
-						// If the current node is a leaf, continue in the
-						// outer loop.
+						auto child(m_cst->select_child(m_node, 1));
 						if (m_cst->root() == child)
+						{
+							// If the current node is a leaf, continue in the
+							// outer loop.
+							// Report partial matches in the filled range.
+							for (decltype(j) js(j_begin); js <= j; ++js)
+								report_partial_matches(m_node, js, cb);
+
 							break;
+						}
+						else if (0 == m_cst->edge_c(child, m_cst->depth(child)))
+						{
+							// If the new edge begins with '$', there should be a valid sibling.
+							// Select it instead.
+							child = m_cst->sibling(child);
+							assert(m_cst->root() != child);
+						}
 						
 						m_node = child;
 						depth = m_cst->depth(m_node);
 					}
-					
+
 					++j;
 				} // while (true) [update columns]
 			} // while (true) [find the next node]
 		}
+		
+		
+		void print_e()
+		{
+			print_matrix(m_e);
+		}
+		
+		
+		void print_p()
+		{
+			print_matrix(m_p);
+		}
 
 		
-		void print_matrix()
+		template <typename t_matrix>
+		void print_matrix(t_matrix const &matrix)
 		{
-			std::cout << std::endl;
-			size_type const rows(m_e.rows()), cols(m_e.columns());
-
-			std::cout << "  ";
-			for (size_type i(0); i < cols; ++i)
-				std::cout << boost::format(" %02u") % i;
-			std::cout << std::endl;
-			
-			for (size_type i(0); i < rows; ++i)
+			if (m_cst && m_pattern)
 			{
-				std::cout << boost::format("%02u") % i;
-				for (size_type j(0); j < cols; ++j)
+				std::cout << "\n";
+				size_type const rows(matrix.rows()), cols(matrix.columns()), patlen(m_pattern->size());
+				auto const length(util::min(cols - 1, m_cst->depth(m_node)));
+				
+				std::cout << "       ";
+				for (size_type i(0); i < length; ++i)
 				{
-					auto const pad(column_pad(j));
-					if (i < pad || pad + rows <= i)
-						std::cout << "   ";
-					else
-						std::cout << boost::format(" %02u") % m_e(i - pad, j);
+					char const c(m_cst->edge(m_node, 1 + i));
+					std::cout << (boost::format("  %c") % (0 == c ? '$' : c));
 				}
-				std::cout << std::endl;
+				std::cout << "\n";
+				
+				std::cout << "    ";
+				for (size_type i(0); i < 1 + length; ++i)
+					std::cout << boost::format(" %02u") % i;
+				std::cout << "\n";
+				
+				for (size_type i(0); i < 1 + patlen; ++i)
+				{
+					if (i)
+						std::cout << (boost::format("%c %02u") % (*m_pattern)[i - 1] % i);
+					else
+						std::cout << (boost::format("  %02u") % i);
+					
+					for (size_type j(0); j < 1 + length; ++j)
+					{
+						auto const pad(column_pad(j));
+						if (i < pad || pad + rows <= i)
+							std::cout << "   ";
+						else
+							std::cout << boost::format(" %02u") % matrix(i - pad, j);
+					}
+					std::cout << "\n";
+				}
 			}
 		}
 	};
