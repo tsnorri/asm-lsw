@@ -373,7 +373,7 @@ namespace asm_lsw {
 					// d_it->first is not needed anymore.
 					node_depths.erase(d_it);
 				}
-				
+
 				// Update the bit vector.
 				typename cst_type::size_type nid(node_id(argmax_nd));
 				core_nodes[nid] = 1;
@@ -621,20 +621,24 @@ namespace asm_lsw {
 	{
 		t_cmp <typename csa_type::size_type> cmp;
 		
-		if (r < l)
-			return false;
+		assert(l <= r);
 
 		auto const mid(l + (r - l) / 2);
 		auto const res(lcp_length_e(std::min(mid, k), std::max(mid, k)));
 
 		// Tail recursion.
-		// The first case prevents overflow for mid - 1.
-		if (res != r_len && l == mid)
-			return false;
 		if (cmp(res, r_len))
+		{
+			if (mid == r)
+				return false;
 			return find_node_ilr_bin <t_cmp>(k, r_len, 1 + mid, r, i);
+		}
 		else if (cmp(r_len, res))
+		{
+			if (mid == l)
+				return false;
 			return find_node_ilr_bin <t_cmp>(k, r_len, l, mid - 1, i);
+		}
 		else
 		{
 			i = mid;
@@ -858,7 +862,7 @@ namespace asm_lsw {
 	{
 		typename cst_type::size_type pos(0);
 		auto const v(m_cst->child(u, c, pos));
-		
+	
 		// Check if found.
 		if (m_cst->root() == v)
 			return false;
@@ -1019,7 +1023,7 @@ namespace asm_lsw {
 		// there aren't any occurrences of P₁cP₂ (as defined in Lemma 19) in cst.
 		if (st != f_type::not_found)
 		{
-			assert (ed != f_type::not_found);
+			assert(ed != f_type::not_found);
 			if (tree_search(pattern, f, u, core_path_beginning, i, cc, st, ed, left, right))
 			{
 				csa_range range(left, right);
