@@ -324,8 +324,9 @@ namespace asm_lsw {
 		assert(l < m_cst->csa.size());
 		assert(r < m_cst->csa.size());
 		
+		// select_leaf uses 1-based indexing.
 		if (l == r)
-			return m_cst->depth(m_cst->select_leaf(l));
+			return m_cst->depth(m_cst->select_leaf(1 + l));
 		
 		return lcp_length(l, r);
 	}
@@ -340,7 +341,7 @@ namespace asm_lsw {
 		std::map <
 			typename cst_type::node_type,
 			typename cst_type::size_type
-		> node_depths;
+		> node_counts;
 		sdsl::bit_vector core_nodes(m_cst->nodes(), 0); // Nodes with incoming core edges.
 		
 		// Count node depths from the bottom and choose the greatest.
@@ -349,36 +350,41 @@ namespace asm_lsw {
 			typename cst_type::node_type node(*it);
 			if (m_cst->is_leaf(node))
 			{
-				auto res(node_depths.emplace(std::make_pair(node, 1)));
+				auto res(node_counts.emplace(std::make_pair(node, 1)));
 				assert(res.second); // Insertion should have happened.
 			}
 			else
 			{
 				// Not a leaf, iterate the children and choose.
-				typename cst_type::size_type max_nd(0);
-				typename cst_type::node_type argmax_nd(m_cst->root());
+				typename cst_type::size_type sum_nc(0);
+				typename cst_type::size_type max_nc(0);
+				typename cst_type::node_type argmax_nc(m_cst->root());
 				
 				auto children(m_cst->children(node));
 				for (auto const child : children)
 				{
-					auto d_it(node_depths.find(child));
-					assert(node_depths.end() != d_it);
+					auto c_it(node_counts.find(child));
+					assert(node_counts.end() != c_it);
 					
-					if (max_nd < d_it->second)
+					auto const nc(c_it->second);
+					sum_nc += nc;
+					if (max_nc < nc)
 					{
-						max_nd = d_it->second;
-						argmax_nd = d_it->first;
+						max_nc = c_it->second;
+						argmax_nc = c_it->first;
 					}
 					
-					// d_it->first is not needed anymore.
-					node_depths.erase(d_it);
+					// c_it->first is not needed anymore.
+					node_counts.erase(c_it);
 				}
 
 				// Update the bit vector.
-				typename cst_type::size_type nid(node_id(argmax_nd));
+				typename cst_type::size_type nid(node_id(argmax_nc));
 				core_nodes[nid] = 1;
 				
-				auto res(node_depths.emplace(std::make_pair(node, 1 + max_nd)));
+				//std::cerr << "node (" << nid << "): " << node << " heaviest child (" << max_nc << "): " << argmax_nc << std::endl;
+
+				auto res(node_counts.emplace(std::make_pair(node, 1 + sum_nc)));
 				assert(res.second); // Insertion should have happened.
 			}
 		}
@@ -423,6 +429,8 @@ namespace asm_lsw {
 					
 					auto const nid(node_id(node));
 					opening[nid] = 1;
+					
+					//std::cerr << "Ep1: " << node_inv_id(nid) << " ep2: " << node_inv_id(leaf_id) << std::endl;
 				}
 			}
 			
@@ -646,32 +654,6 @@ namespace asm_lsw {
 		}
 	}
 
-	
-	// Partition the range if needed since k has the longest lcp with itself.
-	template <typename t_cst>
-	bool k1_matcher <t_cst>::find_node_ilr_bin_p(
-		typename csa_type::size_type const k,
-		typename cst_type::size_type const r_len,
-		typename csa_type::size_type const l,
-		typename csa_type::size_type const r,
-		typename csa_type::size_type &i
-	) const
-	{
-		// Order is ascending up to k, then descending.
-		if (l < k && k < r)
-		{
-			if (find_node_ilr_bin <std::less>(k, r_len, l, k, i))
-				return true;
-			
-			return find_node_ilr_bin <std::greater>(k, r_len, 1 + k, r, i);
-		}
-
-		if (r < k)
-			return find_node_ilr_bin <std::less>(k, r_len, l, r, i);
-
-		return find_node_ilr_bin <std::greater>(k, r_len, l, r, i);
-	}
-
 
 	// Lemma 19 case 3 (with v being a core node).
 	// Find a suitable range in H_u s.t. either 
@@ -692,14 +674,17 @@ namespace asm_lsw {
 		auto const lcp_rmq_size(m_lcp_rmq.size());
 		auto const lcp_rmq_max(lcp_rmq_size ? lcp_rmq_size - 1 : 0);
 
+		// Partition the range if needed (esp. in the third case)
+		// since k has the longest lcp with itself.
+
 		// Try i^l.
 		if (hx.l->find_successor(r_len, it, true))
 		{
 			r = hx.l->iterator_value(it);
 			l = ((h_diff <= r) ? (r - h_diff) : 0);
-			// XXX Is l guaranteed to have |lcp(l, k)| ≤ r_len? (Case 3)
-
-			if (find_node_ilr_bin_p(k, r_len, l, r, i))
+			assert(r < k);
+			assert(l <= r);
+			if (find_node_ilr_bin <std::less>(k, r_len, l, r, i))
 				return true;
 		}
 
@@ -708,17 +693,20 @@ namespace asm_lsw {
 		{
 			l = hx.r->iterator_value(it);
 			r = ((l + h_diff <= lcp_rmq_max) ? (l + h_diff) : lcp_rmq_max);
-			// XXX Is r guaranteed to have r_len ≤ |lcp(r, k)|? (Case 3)
-
-			if (find_node_ilr_bin_p(k, r_len, l, r, i))
+			assert(k < l);
+			assert(l <= r);
+			if (find_node_ilr_bin <std::greater>(k, r_len, l, r, i))
 				return true;
 		}
 
 		// Try i^l again with another range.
 		l = ((h_diff <= k) ? (k - h_diff) : 0);
 		r = ((k + h_diff <= lcp_rmq_max) ? (k + h_diff) : lcp_rmq_max);
-		if (find_node_ilr_bin_p(k, r_len, l, r, i))
-			return true;			
+		// No assertions needed b.c. of the checks below.
+		if (l < k && find_node_ilr_bin <std::less>(k, r_len, l, k - 1, i))
+			return true;
+		if (k < r && find_node_ilr_bin <std::greater>(k, r_len, 1 + k, r, i))
+			return true;
 
 		return false;
 	}

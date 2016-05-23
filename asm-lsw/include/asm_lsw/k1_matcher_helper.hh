@@ -90,11 +90,11 @@ namespace asm_lsw {
 					);
 				}
 				
-				if (lcp_len >= plen_v)
+				if (plen_v <= lcp_len)
 				{
-					if (i <= k)
+					if (i < k) // Diverges from the paper (section 3.1), the case where i = k is handled in Lemma 19 Case 2 (CP).
 						hl_tmp.insert(std::make_pair(lcp_len, i));
-					else if (i > k)
+					else if (k < i)
 						hr_tmp.insert(std::make_pair(lcp_len, i));
 				}
 				
