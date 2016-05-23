@@ -47,7 +47,6 @@ namespace asm_lsw { namespace detail {
 
 
 	// FIXME: used by the base class.
-	// FIXME: refactor so that m_is_descendant is not needed.
 	template <typename t_key>
 	class x_fast_trie_edge
 	{
