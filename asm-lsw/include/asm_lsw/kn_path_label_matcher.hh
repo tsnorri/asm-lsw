@@ -104,7 +104,7 @@ namespace asm_lsw {
 				// Indel cost is 1.
 				m_e(i, 0) = i;
 				
-				if (i == m_k)
+				if (i <= m_k)
 					m_p(i, 0) = 0x1;
 
 				++i;
@@ -117,7 +117,7 @@ namespace asm_lsw {
 				// Indel cost is 1.
 				m_e(0, i) = i;
 				
-				if (i == m_k)
+				if (i <= m_k)
 					m_p(0, i) = 0x1;
 				
 				++i;
@@ -333,7 +333,7 @@ namespace asm_lsw {
 					auto p(m_p(i - pad, j));
 					if (0x1 == p)
 					{
-						cb(node, i, j);
+						cb(node, j, i); // j: match_length, i: pattern_start
 						p = 0x3; // Don't report again.
 					}
 				}
@@ -430,8 +430,8 @@ namespace asm_lsw {
 					bool can_continue_branch(fill_column(j));
 					
 					// Make sure that the current branch is handled by checking leaves.
-					// Count only up to depth - 1 as the last character is '$'.
-					if (j == ncol - 1 || !can_continue_branch || (j == (depth - 1) && m_cst->is_leaf(m_node)))
+					// In the last case count only up to depth - 1 as the last character is '$'.
+					if (j == ncol - 1 || !can_continue_branch || (j == depth && m_cst->is_leaf(m_node) && j--))
 					{
 						// ncol - k0 - 1 equals to rightmost column index (updated in compare_path_label),
 						// not related to m_k.
@@ -462,17 +462,19 @@ namespace asm_lsw {
 						}
 						else
 						{
-							depth = m_cst->depth(child);
-							if (0 == m_cst->edge_c(child, depth))
+							// FIXME: may be removed?
+#if 0
+							if (0 == m_cst->edge_c(child, 1 + depth))
 							{
 								// If the new edge begins with '$', there should be a valid sibling.
 								// Select it instead.
 								child = m_cst->sibling(child);
 								assert(m_cst->root() != child);
-								depth = m_cst->depth(child);
 							}
+#endif
 							
 							m_node = child;
+							depth = m_cst->depth(m_node);
 						}
 					}
 
