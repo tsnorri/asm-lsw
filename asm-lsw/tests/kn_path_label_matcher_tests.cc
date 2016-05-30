@@ -79,8 +79,8 @@ struct pattern_set
 	std::string text;
 	std::vector <pattern> patterns;
 };
-	
-	
+
+
 template <typename t_matcher, typename t_pattern>
 void run_typed_test(t_matcher &matcher, std::string const &text, t_pattern const &p)
 {
@@ -260,7 +260,7 @@ go_bandit([](){
 		typed_tests <sdsl::cst_sada <>>();
 	});
 
-	describe("k1_matcher <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>>:", [](){
-		typed_tests <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>>();
+	describe("k1_matcher <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <0, 0>>, sdsl::lcp_support_sada <>>>:", [](){
+		typed_tests <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <0, 0>>, sdsl::lcp_support_sada <>>>();
 	});
 });
