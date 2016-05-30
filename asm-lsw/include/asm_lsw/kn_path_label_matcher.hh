@@ -27,9 +27,13 @@
 
 
 namespace asm_lsw { namespace detail {
-	struct kn_path_label_matcher_pm {
+	struct kn_path_label_matcher_cb {
+		
 		template <typename t_node, typename t_size>
-		void operator()(t_node const &node, t_size match_length, t_size pattern_start) {}
+		void partial_match(t_node const &node, t_size match_length, t_size pattern_start) {}
+		
+		template <typename t_node, typename t_size, typename t_cost>
+		void complete_match(t_node const &node, t_size match_length, t_cost cost) {}
 	};
 }}
 
@@ -39,7 +43,7 @@ namespace asm_lsw {
 	template <
 		typename t_cst,
 		typename t_pattern_vector,
-		typename t_partial_match_callback = detail::kn_path_label_matcher_pm
+		typename t_match_callback = detail::kn_path_label_matcher_cb
 	>
 	class kn_path_label_matcher
 	{
@@ -235,11 +239,10 @@ namespace asm_lsw {
 		bool compare_path_label(
 			size_type const row,
 			/* inout */ size_type &k0,
-			/* out */ typename cst_type::node_type &node_ref,
-			/* out */ typename cst_type::size_type &length_ref,
-			/* out */ edit_distance_type &cost_ref
+			/* in */ t_match_callback &cb
 		)
 		{
+			bool retval(false);
 			auto const patlen(m_pattern->size());
 			auto const ncol(m_e.columns());
 
@@ -260,6 +263,10 @@ namespace asm_lsw {
 			auto k(k0);
 
 			// Read until the leftmost column is reached.
+			auto const root(m_cst->root());
+			auto node(m_node);
+			auto parent(m_cst->parent(node));
+			auto parent_depth(m_cst->depth(parent));
 			while (k < ncol)
 			{
 				auto idx(ncol - k - 1);
@@ -285,39 +292,31 @@ namespace asm_lsw {
 					}
 					
 					// Find the lowest node that contains the index in question.
-					auto node(m_node);
-					auto const root(m_cst->root());
+					// Since we're reading from right to left, the parent etc. may be cached.
 					while (true)
 					{
-						auto const parent(m_cst->parent(node));
-						if (m_cst->depth(parent) < idx || node == root)
+						if (parent_depth < idx || node == root)
 							break;
-				
+						
 						node = parent;
+						parent = m_cst->parent(node);
+						parent_depth = m_cst->depth(parent);
 					}
 					
-					if (node != m_previous_match)
-					{
-						m_previous_match = node;
-						node_ref = node;
-						length_ref = idx;
-						cost_ref = cost;
-						return true;
-					}
-					
-					return false;
+					retval = true;
+					cb.complete_match(node, idx, cost);
 				}
 				
 				++k;
 			}
-			return false;
+			return retval;
 		}
 		
 		
 		void report_partial_matches(
 			typename cst_type::node_type const &node,
 			size_type const j,
-			t_partial_match_callback &cb
+			t_match_callback &cb
 		)
 		{
 			// Only report up to patlen - 1 since matches on the last row are complete.
@@ -333,7 +332,7 @@ namespace asm_lsw {
 					auto p(m_p(i - pad, j));
 					if (0x1 == p)
 					{
-						cb(node, j, i); // j: match_length, i: pattern_start
+						cb.partial_match(node, j, i); // j: match_length, i: pattern_start
 						p = 0x3; // Don't report again.
 					}
 				}
@@ -368,23 +367,7 @@ namespace asm_lsw {
 		}
 		
 		
-		bool next_path_label(
-			/* out */ typename cst_type::node_type &node_ref,
-			/* out */ typename cst_type::size_type &match_length_ref,
-			/* out */ edit_distance_type &cost_ref
-		)
-		{
-			t_partial_match_callback cb;
-			return next_path_label(node_ref, match_length_ref, cost_ref, cb);
-		}
-		
-		
-		bool next_path_label(
-			/* out */ typename cst_type::node_type &node_ref,
-			/* out */ typename cst_type::size_type &match_length_ref,
-			/* out */ edit_distance_type &cost_ref,
-			t_partial_match_callback &cb
-		)
+		bool next_path_label(t_match_callback &cb)
 		{
 			assert(m_cst);
 
@@ -441,7 +424,7 @@ namespace asm_lsw {
 						for (decltype(j) js(j_begin); js <= j; ++js)
 							report_partial_matches(m_node, js, cb);
 						
-						if (compare_path_label(patlen, k0, node_ref, match_length_ref, cost_ref))
+						if (compare_path_label(patlen, k0, cb))
 							return true;
 
 						// If too many mismatches were found, continue in the outer loop.
@@ -462,17 +445,6 @@ namespace asm_lsw {
 						}
 						else
 						{
-							// FIXME: may be removed?
-#if 0
-							if (0 == m_cst->edge_c(child, 1 + depth))
-							{
-								// If the new edge begins with '$', there should be a valid sibling.
-								// Select it instead.
-								child = m_cst->sibling(child);
-								assert(m_cst->root() != child);
-							}
-#endif
-							
 							m_node = child;
 							depth = m_cst->depth(m_node);
 						}
@@ -481,6 +453,16 @@ namespace asm_lsw {
 					++j;
 				} // while (true) [update columns]
 			} // while (true) [find the next node]
+		}
+		
+		
+		void find_approximate(t_match_callback &cb)
+		{
+			while (true)
+			{
+				if (!next_path_label(cb))
+					break;
+			}
 		}
 		
 		
