@@ -66,8 +66,8 @@ namespace asm_lsw {
 		uint8_t m_k{0};
 		
 	public:
-		typedef decltype(m_e)::size_type	size_type;
-		typedef decltype(m_e)::value_type	edit_distance_type;
+		typedef typename decltype(m_e)::size_type	size_type;
+		typedef typename decltype(m_e)::value_type	edit_distance_type;
 		
 	protected:
 		void reset(bool allocate_matrix)
