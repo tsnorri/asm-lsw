@@ -115,6 +115,9 @@ namespace asm_lsw {
 		using base_class::find;
 		using base_class::find_predecessor;
 		using base_class::find_successor;
+		using base_class::find_subtree_min;
+		using base_class::find_subtree_max;
+		using base_class::find_subtree_exact;
 		
 		bool find(key_type const key, subtree_iterator &iterator);
 		bool find_predecessor(key_type const key, subtree_iterator &iterator, bool allow_equal = false);
@@ -216,27 +219,16 @@ namespace asm_lsw {
 		if (0 == this->m_reps.size())
 			return false;
 		
-		key_type k1, k2;
-		if (!this->find_nearest_subtrees(key, k1, k2))
+		typename representative_trie::const_leaf_iterator leaf_it;
+		if (!this->m_reps.find_predecessor(key, leaf_it, true))
 			return false;
+		
+		key_type const k1(leaf_it->first);
 		
 		{
 			auto st_it(this->m_subtrees.find(k1));
 			if (st_it->second.erase(key))
 			{
-				--this->m_size;
-				check_merge_subtree(st_it);
-				return true;
-			}
-		}
-		
-		// FIXME shouldn't be needed.
-		if (k2 != k1)
-		{
-			auto st_it(this->m_subtrees.find(k2));
-			if (st_it->second.erase(key))
-			{
-				assert(0);
 				--this->m_size;
 				check_merge_subtree(st_it);
 				return true;

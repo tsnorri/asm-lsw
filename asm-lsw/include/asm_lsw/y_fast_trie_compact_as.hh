@@ -131,7 +131,7 @@ namespace asm_lsw {
 			return retval;
 		}
 	};
-	
+
 	
 	template <typename t_max_key, typename t_value = void>
 	class y_fast_trie_compact_as
@@ -255,6 +255,9 @@ namespace asm_lsw {
 		virtual bool find(key_type const key, const_subtree_iterator &iterator) const = 0;
 		virtual bool find_predecessor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const = 0;
 		virtual bool find_successor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const = 0;
+		virtual bool find_subtree_min(key_type const key, const_subtree_iterator &iterator) const = 0;
+		virtual bool find_subtree_max(key_type const key, const_subtree_iterator &iterator) const = 0;
+		virtual bool find_next_subtree_key(key_type &key /* inout */) const = 0;
 
 		virtual void print() const = 0;
 
@@ -300,6 +303,9 @@ namespace asm_lsw {
 		virtual bool find(key_type const key, const_subtree_iterator &iterator) const override;
 		virtual bool find_predecessor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const override;
 		virtual bool find_successor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const override;
+		virtual bool find_subtree_min(key_type const key, const_subtree_iterator &iterator) const override;
+		virtual bool find_subtree_max(key_type const key, const_subtree_iterator &iterator) const override;
+		virtual bool find_next_subtree_key(key_type &key /* inout */) const override;
 		
 	protected:
 		bool check_find_result(bool const, typename trie_type::const_subtree_iterator, const_subtree_iterator &) const;
@@ -366,7 +372,52 @@ namespace asm_lsw {
 		typename trie_type::const_subtree_iterator succ;
 		return check_find_result(m_trie.find_successor(key - this->m_offset, succ, allow_equal), succ, out_it);
 	}
+
 	
+	template <typename t_max_key, typename t_key, typename t_value>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_subtree_min(
+		key_type const key, const_subtree_iterator &out_it
+	) const
+	{
+		if (key < this->m_offset)
+			return false;
+
+		typename trie_type::const_subtree_iterator it;
+		return check_find_result(m_trie.find_subtree_min(key - this->m_offset, it), it, out_it);
+	}
+
+	
+	template <typename t_max_key, typename t_key, typename t_value>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_subtree_max(
+		key_type const key, const_subtree_iterator &out_it
+	) const
+	{
+		if (key < this->m_offset)
+			return false;
+		
+		typename trie_type::const_subtree_iterator it;
+		return check_find_result(m_trie.find_subtree_max(key - this->m_offset, it), it, out_it);
+	}
+
+	
+	template <typename t_max_key, typename t_key, typename t_value>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_next_subtree_key(
+		key_type &key /* inout */
+	) const
+	{
+		if (key < this->m_offset)
+			return false;
+		
+		typename trie_type::key_type tmp_key(key - this->m_offset);
+		if (m_trie.find_next_subtree_key(tmp_key))
+		{
+			key = tmp_key + this->m_offset;
+			return true;
+		}
+		
+		return false;
+	}
+
 	
 	template <typename t_max_key, typename t_value>
 	template <typename t_ret_key, typename t_collection, typename t_fill>

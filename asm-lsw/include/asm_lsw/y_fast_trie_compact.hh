@@ -78,6 +78,11 @@ namespace asm_lsw {
 			base_class(other.m_reps, other.m_subtrees.map(), other.m_size)
 		{
 		}
+		
+		using base_class::find;
+		using base_class::find_predecessor;
+		using base_class::find_successor;
+		using base_class::find_subtree_exact;
 	};
 }
 

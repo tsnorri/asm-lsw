@@ -51,6 +51,8 @@ namespace asm_lsw {
 		
 	public:
 		typedef size_t size_type;
+		typedef typename subtree_map::const_iterator const_subtree_map_iterator;
+		
 		typedef typename subtree::iterator subtree_iterator;
 		typedef typename subtree::const_iterator const_subtree_iterator;
 		typedef typename subtree::reverse_iterator reverse_subtree_iterator;
@@ -70,9 +72,6 @@ namespace asm_lsw {
 	protected:
 		template <typename t_trie, typename t_iterator>
 		static bool find(t_trie &trie, key_type const key, t_iterator &iterator);
-		
-		template <typename t_trie, typename t_iterator>
-		static bool find_from_subtrees(t_trie &trie, key_type const &key, t_iterator &it, key_type const k1, key_type const k2);
 		
 		template <typename t_trie, typename t_iterator>
 		static bool find_predecessor(t_trie &trie, key_type const key, t_iterator &it, bool allow_equal);
@@ -101,11 +100,14 @@ namespace asm_lsw {
 		bool contains(key_type const key) const;
 		key_type min_key() const { return m_reps.min_key(); } // Returns a meaningful value if the tree is not empty.
 		key_type max_key() const;
-		
+		bool find_next_subtree_key(key_type &key /* inout */) const;
+
 		bool find(key_type const key, const_subtree_iterator &iterator) const;
 		bool find_predecessor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const;
 		bool find_successor(key_type const key, const_subtree_iterator &iterator, bool allow_equal = false) const;
-		bool find_nearest_subtrees(key_type const key, key_type &k1, key_type &k2) const;
+		bool find_subtree_min(key_type const key, const_subtree_iterator &iterator) const;
+		bool find_subtree_max(key_type const key, const_subtree_iterator &iterator) const;
+		bool find_subtree_exact(key_type const key, const_subtree_map_iterator &iterator) const;
 		void print() const;
 
 		y_fast_trie_subtree_map_proxy <subtree_map> subtree_map_proxy() { return y_fast_trie_subtree_map_proxy <subtree_map>(&m_subtrees); }
@@ -152,20 +154,60 @@ namespace asm_lsw {
 	
 	
 	template <typename t_spec>
-	bool y_fast_trie_base <t_spec>::find_nearest_subtrees(key_type const key, key_type &k1, key_type &k2) const
+	bool y_fast_trie_base <t_spec>::find_subtree_min(key_type const key, const_subtree_iterator &iterator) const
 	{
-		if (m_reps.size() == 0)
+		const_subtree_map_iterator st_it;
+		if (!find_subtree_exact(key, st_it))
 			return false;
 		
-		typename representative_trie::const_leaf_iterator it;
-		if (key <= m_reps.min_key())
-			m_reps.find(m_reps.min_key(), it);
-		else if (!m_reps.find_predecessor(key, it, true)) // XXX likely culprit for problems if any come up.
+		auto &subtree(st_it->second);
+		if (0 == subtree.size())
 			return false;
 		
-		k1 = it->first;
-		k2 = it->second.next;
+		iterator = subtree.cbegin();
 		return true;
+	}
+
+	
+	template <typename t_spec>
+	bool y_fast_trie_base <t_spec>::find_subtree_max(key_type const key, const_subtree_iterator &iterator) const
+	{
+		const_subtree_map_iterator st_it;
+		if (!find_subtree_exact(key, st_it))
+			return false;
+		
+		auto &subtree(st_it->second);
+		if (0 == subtree.size())
+			return false;
+		
+		iterator = --subtree.cend();
+		return true;
+	}
+	
+	
+	template <typename t_spec>
+	bool y_fast_trie_base <t_spec>::find_subtree_exact(key_type const key, const_subtree_map_iterator &iterator) const
+	{
+		auto it(m_subtrees.find(key));
+		if (m_subtrees.cend() == it)
+			return false;
+		
+		iterator = it;
+		return true;
+	}
+	
+	
+	template <typename t_spec>
+	bool y_fast_trie_base <t_spec>::find_next_subtree_key(key_type &key /* inout */) const
+	{
+		typename representative_trie::const_leaf_iterator it;
+		if (m_reps.find_successor(key, it, false))
+		{
+			key = it->first;
+			return true;
+		}
+		
+		return false;
 	}
 	
 	
@@ -180,37 +222,19 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool y_fast_trie_base <t_spec>::find(t_trie &trie, key_type const key, t_iterator &it)
 	{
-		key_type k1, k2;
-		if (!trie.find_nearest_subtrees(key, k1, k2))
+		typename representative_trie::const_leaf_iterator leaf_it;
+		if (!trie.m_reps.find_predecessor(key, leaf_it, true))
 			return false;
 		
-		return find_from_subtrees(trie, key, it, k1, k2);
-	}
-	
-	
-	template <typename t_spec>
-	template <typename t_trie, typename t_iterator>
-	bool y_fast_trie_base <t_spec>::find_from_subtrees(t_trie &trie, key_type const &key, t_iterator &it, key_type const k1, key_type const k2)
-	{
+		key_type const st_key(leaf_it->first);
+		auto st_it(trie.m_subtrees.find(st_key));
+		assert(trie.m_subtrees.cend() != st_it);
+		auto &subtree(st_it->second);
+		auto val_it(subtree.find(key));
+		if (subtree.cend() != val_it)
 		{
-			auto st_it(trie.m_subtrees.find(k1));
-			assert(trie.m_subtrees.cend() != st_it);
-			it = st_it->second.find(key);
-			if (st_it->second.cend() != it)
-				return true;
-		}
-		
-		// FIXME: should no longer be needed?
-		if (k2 != k1)
-		{
-			auto st_it(trie.m_subtrees.find(k2));
-			assert(trie.m_subtrees.cend() != st_it);
-			it = st_it->second.find(key);
-			if (st_it->second.cend() != it)
-			{
-				assert(0);
-				return true;
-			}
+			it = val_it;
+			return true;
 		}
 		
 		return false;
@@ -228,10 +252,11 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool y_fast_trie_base <t_spec>::find_predecessor(t_trie &trie, key_type const key, t_iterator &it, bool allow_equal)
 	{
-		key_type k1, k2;
-		if (!trie.find_nearest_subtrees(key, k1, k2))
+		typename representative_trie::const_leaf_iterator leaf_it;
+		if (!trie.m_reps.find_predecessor(key, leaf_it, allow_equal))
 			return false;
-		
+
+		key_type const k1(leaf_it->first);
 		auto subtree_it(trie.m_subtrees.find(k1));
 		auto &subtree(subtree_it->second);
 		
@@ -241,7 +266,7 @@ namespace asm_lsw {
 		if (subtree.cend() == it)
 		{
 			// All elements are less but the tree may be empty.
-			if (subtree.size() < 0)
+			if (0 < subtree.size())
 			{
 				--it;
 				return true;
@@ -254,48 +279,16 @@ namespace asm_lsw {
 				assert(key == trie.iterator_key(it));
 				return true;
 			}
+
+			// Since allow_equal were tested when calling find_predecessor for the representatives,
+			// there must not be another subtree that contains a suitable value.
+			return false;
 		}
 		else
 		{
 			if (!(allow_equal && trie.iterator_key(it) == key))
 				--it;
 			return true;
-		}
-		
-		// FIXME: should no longer be needed.
-		if (k2 != k1)
-		{
-			auto subtree_it(trie.m_subtrees.find(k2));
-			auto &subtree(subtree_it->second);
-			it = subtree.lower_bound(key);
-			if (subtree.cend() == it)
-			{
-				// All elements are less but the tree may be empty.
-				if (subtree.size() < 0)
-				{
-					assert(0); // Shouldn't actually happen since the first subtree should be the correct one.
-					--it;
-					return true;
-				}
-			}
-			else if (subtree.cbegin() == it)
-			{
-				if (allow_equal)
-				{
-					assert(0); // Shouldn't actually happen since the first subtree should be the correct one.
-					assert(key == trie.iterator_key(it));
-					return true;
-				}
-			}
-			else
-			{
-				assert(0); // Shouldn't actually happen since the first subtree should be the correct one.
-
-				// Special case for equality.
-				if (!(allow_equal && trie.iterator_key(it) == key))
-					--it;
-				return true;
-			}
 		}
 		
 		return false;
@@ -313,10 +306,22 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool y_fast_trie_base <t_spec>::find_successor(t_trie &trie, key_type const key, t_iterator &it, bool allow_equal)
 	{
-		key_type k1, k2;
-		if (!trie.find_nearest_subtrees(key, k1, k2))
-			return false;
-		
+		typename representative_trie::const_leaf_iterator leaf_it;
+		if (!trie.m_reps.find_predecessor(key, leaf_it, true))
+		{
+			if (!trie.size())
+				return false;
+			
+			key_type const min(trie.min_key());
+			const_subtree_map_iterator st_it;
+			auto const status(trie.find_subtree_exact(min, st_it));
+			assert(status);
+			assert(st_it->second.size());
+			it = st_it->second.begin();
+			return true;
+		}
+
+		key_type const k1(leaf_it->first);
 		auto subtree_it(trie.m_subtrees.find(k1));
 		auto &subtree(subtree_it->second);
 		
@@ -337,30 +342,19 @@ namespace asm_lsw {
 			}
 		}
 		
-		// FIXME: should no longer be needed.
-		if (k2 != k1)
+		// If key is the rightmost value of a subtree, the minimum (i.e. representative)
+		// of the next subtree is the successor.
+		key_type const k2(leaf_it->second.next);
+		if (k1 < k2)
 		{
+			assert(key < k2);
 			auto subtree_it(trie.m_subtrees.find(k2));
+			assert(subtree_it != trie.m_subtrees.cend());
 			auto &subtree(subtree_it->second);
-			it = subtree.upper_bound(key);
-			it = subtree.lower_bound(key);
-			if (subtree.cend() != it)
-			{
-				if (!allow_equal && key == trie.iterator_key(it))
-				{
-					++it;
-					if (subtree.cend() != it)
-					{
-						assert(0); // Shouldn't actually happen since the first subtree should be the correct one.
-						return true;
-					}
-				}
-				else
-				{
-					assert(0); // Shouldn't actually happen since the first subtree should be the correct one.
-					return true;
-				}
-			}
+			auto min_it(subtree.cbegin());
+			assert(subtree.cend() != min_it);
+			it = min_it;
+			return true;
 		}
 		
 		return false;
