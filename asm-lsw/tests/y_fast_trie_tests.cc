@@ -25,7 +25,8 @@ go_bandit([](){
 		common_any_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 		set_type_tests <trie_type>();
 		common_set_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
-		y_fast_set_tests <trie_type>();
+		y_fast_set_nc_tests <trie_type>();
+		y_fast_set_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	describe("Y-fast trie <uint32_t>:", [](){
@@ -33,7 +34,8 @@ go_bandit([](){
 		common_any_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
 		set_type_tests <trie_type>();
 		common_set_type_tests <trie_type, ref_trie_adaptor <trie_type>>();
-		y_fast_set_tests <trie_type>();
+		y_fast_set_nc_tests <trie_type>();
+		y_fast_set_tests <trie_type, ref_trie_adaptor <trie_type>>();
 	});
 
 	describe("Y-fast trie <uint8_t, uint8_t>:", [](){

@@ -174,7 +174,7 @@ void common_set_type_tests()
 		AssertThat(ct.contains('a'), Equals(true));
 		AssertThat(ct.contains('b'), Equals(true));
 	});
-
+	
 	it("can find successors (1)", [&](){
 		t_trie trie;
 		trie.insert('a');
@@ -219,6 +219,25 @@ void common_set_type_tests()
 			auto s(ct.iterator_key(succ));
 			AssertThat(s, Equals('k'));
 		}
+	});
+	
+	it("can find successors (lesser key)", [&](){
+		// Test with a key lesser than any of the stored values.
+		
+		t_trie trie;
+		for (auto const i : boost::irange(16, 127, 1))
+			trie.insert(i);
+		
+		t_trie tmp_trie(trie); // Copy since the compact trie takes ownership of the values.
+		typename t_adaptor::return_type ct((adaptor(tmp_trie)));
+
+		typename t_adaptor::trie_type::const_iterator it;
+
+		AssertThat(ct.find_successor(1, it, true), Equals(true));
+		AssertThat(ct.iterator_key(it), Equals(16));
+		
+		AssertThat(ct.find_successor(1, it, false), Equals(true));
+		AssertThat(ct.iterator_key(it), Equals(16));
 	});
 
 	it("can find successors (range)", [&](){
@@ -469,7 +488,7 @@ void y_fast_set_test_subtree_size(t_trie &trie, typename t_trie::size_type const
 
 
 template <typename t_trie>
-void y_fast_set_tests()
+void y_fast_set_nc_tests()
 {
 	it("should retain key limit after moving", [&](){
 		t_trie t1(5);
@@ -485,12 +504,96 @@ void y_fast_set_tests()
 		AssertThrows(asm_lsw::invalid_argument, trie.insert(6));
 		AssertThat(LastException <asm_lsw::invalid_argument>().error <typename t_trie::error>(), Equals(t_trie::error::out_of_range));
 	});
-
+	
 	it("should have small subtrees", [&](){
 		t_trie trie;
 		y_fast_set_test_subtree_size(trie, 20);
 		y_fast_set_test_subtree_size(trie, 40);
 		y_fast_set_test_subtree_size(trie, 255);
+	});
+}
+
+
+template <typename t_trie, typename t_adaptor>
+void y_fast_set_tests()
+{
+	it("can find predecessors (subtree minimum)", [&]() {
+		// Test with a leftmost value of a subtree.
+		
+		t_trie trie;
+		t_adaptor adaptor;
+		
+		for (auto const i : boost::irange(1, 127, 1))
+			trie.insert(i);
+		
+		t_trie tmp_trie(trie); // Copy since the compact trie takes ownership of the values.
+		typename t_adaptor::return_type ct((adaptor(tmp_trie)));
+		
+		// Find a subtree key.
+		auto subtree_key(ct.min_key());
+		for (uint8_t i(0); i < 2; ++i)
+			AssertThat(ct.find_next_subtree_key(subtree_key), Equals(true));
+		typename t_adaptor::trie_type::const_iterator min_it;
+		AssertThat(ct.find_subtree_min(subtree_key, min_it), Equals(true));
+		
+		// Check that find_predecessor works for a leftmost value of a subtree.
+		typename t_adaptor::trie_type::const_iterator it;
+		AssertThat(ct.find_predecessor(subtree_key, it, false), Equals(true));
+		AssertThat(*it, Equals(subtree_key - 1));
+	});
+
+	it("can find successors (rightmost subtree minimum)", [&](){
+		// Test with a key slightly greater than the rightmost subtree minimum (i.e. representative).
+		
+		t_trie trie;
+		t_adaptor adaptor;
+
+		for (auto const i : boost::irange(1, 127, 1))
+			trie.insert(i);
+		
+		t_trie tmp_trie(trie); // Copy since the compact trie takes ownership of the values.
+		typename t_adaptor::return_type ct((adaptor(tmp_trie)));
+		
+		// Find the rightmost subtree.
+		auto key(ct.min_key());
+		while (ct.find_next_subtree_key(key)) {}
+		
+		// Find a successor twice in order to pass the slightly greater key as a parameter.
+		typename t_adaptor::trie_type::const_iterator it;
+		
+		AssertThat(ct.find_successor(key, it, false), Equals(true));
+		AssertThat(*it, Equals(1 + key));
+		key = *it;
+		
+		AssertThat(ct.find_successor(key, it, false), Equals(true));
+		AssertThat(*it, Equals(1 + key));
+		key = *it;
+	});
+	
+	it("can find successors (subtree maximum)", [&]() {
+		// Test with a rightmost value of a subtree.
+		
+		t_trie trie;
+		t_adaptor adaptor;
+		
+		for (auto const i : boost::irange(1, 127, 1))
+			trie.insert(i);
+		
+		t_trie tmp_trie(trie); // Copy since the compact trie takes ownership of the values.
+		typename t_adaptor::return_type ct((adaptor(tmp_trie)));
+		
+		// Get a rightmost value of a subtree.
+		auto subtree_key(ct.min_key());
+		for (uint8_t i(0); i < 1; ++i)
+			AssertThat(ct.find_next_subtree_key(subtree_key), Equals(true));
+		typename t_adaptor::trie_type::const_iterator max_it;
+		AssertThat(ct.find_subtree_max(subtree_key, max_it), Equals(true));
+		auto const rightmost(*max_it);
+		
+		// Check that find_successor works for a rightmost value of a subtree.
+		typename t_adaptor::trie_type::const_iterator it;
+		AssertThat(ct.find_successor(rightmost, it, false), Equals(true));
+		AssertThat(*it, Equals(1 + rightmost));
 	});
 }
 
