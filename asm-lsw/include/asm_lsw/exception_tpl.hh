@@ -42,7 +42,7 @@ namespace asm_lsw {
 		{
 		}
 
-		virtual char const *what() const noexcept
+		virtual char const *what() const noexcept override
 		{
 			return m_what.c_str();
 		}		
