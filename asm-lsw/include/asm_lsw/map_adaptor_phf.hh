@@ -412,8 +412,10 @@ namespace asm_lsw {
 	auto map_adaptor_phf <t_spec>::find_index_acc(t_adaptor &adaptor, accessed_type const &acc) -> size_type
 	{
 		// In case the user passes a non-existent key, the hash function may return a colliding value.
+		// To alleviate this, check both that a value has been stored for the adapted key and that the
+		// found value matches the given one.
 		auto const adapted_key(adaptor.adapted_key(acc));
-		if (adapted_key < adaptor.m_vector.size())
+		if (adapted_key < adaptor.m_vector.size() && adaptor.m_used_indices[adapted_key])
 		{
 			auto const found_acc(adaptor.m_access_key_fn(trait_type::key(adaptor.m_vector[adapted_key])));
 			if (found_acc == acc)
