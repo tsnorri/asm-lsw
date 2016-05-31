@@ -42,8 +42,6 @@ namespace asm_lsw {
 		};
 
 	protected:
-		typedef k1_matcher <t_cst> k1_matcher;
-		
 		// Indexed by identifiers from node_id().
 		typedef unordered_map <typename cst_type::size_type, h_pair> h_map;
 		typedef std::map <typename cst_type::size_type, h_pair> h_map_intermediate;
@@ -170,9 +168,6 @@ namespace asm_lsw {
 		typedef f_vector_type::size_type size_type;
 		static f_vector_type::value_type const not_found{std::numeric_limits<f_vector_type::value_type>::max()};
 		
-	protected:
-		typedef k1_matcher <t_cst> k1_matcher;
-
 	protected:
 		f_vector_type m_st;
 		f_vector_type m_ed;
