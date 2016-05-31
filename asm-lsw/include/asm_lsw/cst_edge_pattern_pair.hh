@@ -19,6 +19,7 @@
 #define ASM_LSW_CST_EDGE_PATTERN_PAIR_HH
 
 #include <asm_lsw/cst_edge_adaptor.hh>
+#include <vector>
 
 
 namespace asm_lsw { namespace detail {
