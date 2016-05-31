@@ -23,6 +23,8 @@ CFLAGS		= -c -std=c99 $(OPT_FLAGS) $(WARNING_FLAGS)
 CXXFLAGS	= -c $(OPT_FLAGS) $(LOCAL_CXXFLAGS) $(WARNING_FLAGS)
 CPPFLAGS	=	-DMODE_TI \
 				-DHAVE_ATTRIBUTE_HOT \
+				-DHAVE_ATTRIBUTE_PURE \
+				-DHAVE_ATTRIBUTE_CONST \
 				-I../include \
 				-I../../lib/bandit \
 				-I../../lib/sdsl/build/include \
