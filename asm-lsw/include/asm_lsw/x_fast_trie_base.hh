@@ -145,7 +145,7 @@ namespace asm_lsw {
 	protected:
 		lss_access m_lss;
 		leaf_link_map m_leaf_links;
-		key_type m_min;
+		key_type m_min{};
 
 	protected:
 		// Moving functionality to the static member functions is needed for avoiding code duplication
