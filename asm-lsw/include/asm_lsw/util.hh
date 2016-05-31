@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_UTIL_HH
 #define ASM_LSW_UTIL_HH
 
+#include <algorithm>
 #include <limits>
 #include <type_traits>
  
