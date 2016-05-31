@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_CST_EDGE_ADAPTOR_HH
 #define ASM_LSW_CST_EDGE_ADAPTOR_HH
 
+#include <asm_lsw/util.hh>
 #include <boost/iterator/iterator_facade.hpp>
 #include <cassert>
 
@@ -71,7 +72,7 @@ namespace asm_lsw { namespace detail {
 		
 		difference_type distance_to(cst_edge_adaptor_iterator_tpl <t_adaptor> const &other) const;
 		
-		bool equal(cst_edge_adaptor_iterator_tpl <t_adaptor> const &other) const;
+		bool equal(cst_edge_adaptor_iterator_tpl <t_adaptor> const &other) const ASM_LSW_PURE;
 		
 		typename t_adaptor::value_type dereference() const;
 	};

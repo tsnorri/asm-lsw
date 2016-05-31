@@ -198,7 +198,7 @@ namespace asm_lsw {
 
 
 	template <typename t_max_key, typename t_key, typename t_value>
-	class x_fast_trie_compact_as_tpl : public x_fast_trie_compact_as <t_max_key, t_value>
+	class x_fast_trie_compact_as_tpl final : public x_fast_trie_compact_as <t_max_key, t_value>
 	{
 	protected:
 		typedef x_fast_trie_compact_as <t_max_key, t_value> base_class;

@@ -21,6 +21,7 @@
 #include <asm_lsw/map_adaptor_helper.hh>
 #include <asm_lsw/map_adaptor_phf_helper.hh>
 #include <asm_lsw/phf_wrapper.hh>
+#include <asm_lsw/util.hh>
 #include <boost/core/enable_if.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <sdsl/int_vector.hpp>
@@ -165,9 +166,9 @@ namespace asm_lsw {
 		difference_type distance_to(map_iterator_phf_tpl <t_adaptor, t_other_val> const &other) const;
 		
 		template <typename t_other_val>
-		bool equal(map_iterator_phf_tpl <t_adaptor, t_other_val> const &other) const;
+		bool equal(map_iterator_phf_tpl <t_adaptor, t_other_val> const &other) const ASM_LSW_PURE;
 		
-		t_it_val &dereference() const;
+		t_it_val &dereference() const ASM_LSW_PURE;
 	};
 	
 

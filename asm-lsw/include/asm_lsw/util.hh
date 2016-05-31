@@ -21,7 +21,19 @@
 #include <algorithm>
 #include <limits>
 #include <type_traits>
- 
+
+#ifdef HAVE_ATTRIBUTE_PURE
+#define ASM_LSW_PURE __attribute__((pure))
+#else
+#define ASM_LSW_PURE
+#endif
+
+#ifdef HAVE_ATTRIBUTE_CONST
+#define ASM_LSW_CONST __attribute__((const))
+#else
+#define ASM_LSW_CONST
+#endif
+
 
 namespace asm_lsw { namespace util {
 	// Preserve C++11 compatibility.
@@ -50,7 +62,7 @@ namespace asm_lsw { namespace util {
 	
 	
 	template <typename T, typename U>
-	auto min(T const a, U const b) -> typename std::common_type <T, U>::type
+	ASM_LSW_CONST auto min(T const a, U const b) -> typename std::common_type <T, U>::type
 	{
 		typedef typename std::common_type <T, U>::type return_type;
 		return std::min <return_type>(a, b);

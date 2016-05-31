@@ -19,6 +19,7 @@
 #define ASM_LSW_CST_EDGE_PATTERN_PAIR_HH
 
 #include <asm_lsw/cst_edge_adaptor.hh>
+#include <asm_lsw/util.hh>
 #include <vector>
 
 
@@ -71,7 +72,7 @@ namespace asm_lsw { namespace detail {
 		
 		difference_type distance_to(cst_edge_pattern_pair_iterator_tpl <t_pair> const &other) const;
 		
-		bool equal(cst_edge_pattern_pair_iterator_tpl <t_pair> const &other) const;
+		bool equal(cst_edge_pattern_pair_iterator_tpl <t_pair> const &other) const ASM_LSW_PURE;
 		
 		typename t_pair::value_type dereference() const;
 	};

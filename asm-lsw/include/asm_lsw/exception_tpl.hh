@@ -74,7 +74,7 @@ namespace asm_lsw {
 
 
 	template <typename t_base_class>
-	class exception_tpl : public t_base_class, public exception_base
+	class exception_tpl final : public t_base_class, public exception_base
 	{
 	public:
 		explicit exception_tpl(char const *what, uint32_t const error, char const *file, uint32_t const line):
