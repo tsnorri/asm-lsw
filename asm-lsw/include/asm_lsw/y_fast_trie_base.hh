@@ -44,7 +44,7 @@ namespace asm_lsw {
 		typedef typename t_spec::value_type mapped_type;
 		
 	protected:
-		typedef typename t_spec::trie_type representative_trie;
+		typedef typename t_spec::trie_type representative_trie_type;
 		typedef typename t_spec::subtree_type subtree;
 		typedef typename t_spec::template map_adaptor <key_type, subtree> subtree_map;
 		typedef detail::y_fast_trie_trait<key_type, value_type> trait;
@@ -64,7 +64,7 @@ namespace asm_lsw {
 		
 		
 	protected:
-		representative_trie m_reps;
+		representative_trie_type m_reps;
 		subtree_map m_subtrees;
 		size_type m_size{0};
 		
@@ -94,6 +94,8 @@ namespace asm_lsw {
 			m_size(size)
 		{
 		}
+		
+		representative_trie_type const &representative_trie() const { return m_reps; }
 		
 		std::size_t constexpr key_size() const { return sizeof(key_type); }
 		size_type size() const;
@@ -200,7 +202,7 @@ namespace asm_lsw {
 	template <typename t_spec>
 	bool y_fast_trie_base <t_spec>::find_next_subtree_key(key_type &key /* inout */) const
 	{
-		typename representative_trie::const_leaf_iterator it;
+		typename representative_trie_type::const_leaf_iterator it;
 		if (m_reps.find_successor(key, it, false))
 		{
 			key = it->first;
@@ -222,7 +224,7 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool y_fast_trie_base <t_spec>::find(t_trie &trie, key_type const key, t_iterator &it)
 	{
-		typename representative_trie::const_leaf_iterator leaf_it;
+		typename representative_trie_type::const_leaf_iterator leaf_it;
 		if (!trie.m_reps.find_predecessor(key, leaf_it, true))
 			return false;
 		
@@ -252,7 +254,7 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool y_fast_trie_base <t_spec>::find_predecessor(t_trie &trie, key_type const key, t_iterator &it, bool allow_equal)
 	{
-		typename representative_trie::const_leaf_iterator leaf_it;
+		typename representative_trie_type::const_leaf_iterator leaf_it;
 		if (!trie.m_reps.find_predecessor(key, leaf_it, allow_equal))
 			return false;
 
@@ -306,7 +308,7 @@ namespace asm_lsw {
 	template <typename t_trie, typename t_iterator>
 	bool y_fast_trie_base <t_spec>::find_successor(t_trie &trie, key_type const key, t_iterator &it, bool allow_equal)
 	{
-		typename representative_trie::const_leaf_iterator leaf_it;
+		typename representative_trie_type::const_leaf_iterator leaf_it;
 		if (!trie.m_reps.find_predecessor(key, leaf_it, true))
 		{
 			if (!trie.size())

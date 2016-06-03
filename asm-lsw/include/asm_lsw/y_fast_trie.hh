@@ -71,7 +71,7 @@ namespace asm_lsw {
 		typedef typename base_class::const_iterator const_iterator;
 		
 	protected:
-		typedef typename base_class::representative_trie representative_trie;
+		typedef typename base_class::representative_trie_type representative_trie_type;
 		typedef typename base_class::subtree subtree;
 		typedef typename base_class::subtree_map subtree_map;
 
@@ -131,7 +131,7 @@ namespace asm_lsw {
 	{
 		// Find the correct subtree. If the inserted key is smaller than any representative,
 		// just use the first subtree.
-		typename representative_trie::const_leaf_iterator it;
+		typename representative_trie_type::const_leaf_iterator it;
 		bool res(false);
 		if (key <= this->m_reps.min_key())
 			res = this->m_reps.find(this->m_reps.min_key(), it);
@@ -219,7 +219,7 @@ namespace asm_lsw {
 		if (0 == this->m_reps.size())
 			return false;
 		
-		typename representative_trie::const_leaf_iterator leaf_it;
+		typename representative_trie_type::const_leaf_iterator leaf_it;
 		if (!this->m_reps.find_predecessor(key, leaf_it, true))
 			return false;
 		
@@ -249,7 +249,7 @@ namespace asm_lsw {
 			return;
 		
 		auto &map(this->m_subtrees.map());
-		typename representative_trie::leaf_iterator it;
+		typename representative_trie_type::leaf_iterator it;
 		this->m_reps.find(st_it->first, it);
 		auto const next(it->second.next);
 		if (next == st_it->first)
