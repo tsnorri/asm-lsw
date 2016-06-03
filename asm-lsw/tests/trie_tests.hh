@@ -165,6 +165,115 @@ void set_type_tests()
 			AssertThat(trie.iterator_key(it), Equals('b'));
 		}
 	});
+	
+	it("can insert (2)", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			0x58, 0x50, 0x18, 0x10, 0x0
+		};
+		
+		for (auto const k : vec)
+			trie.insert(k);
+		
+		typename t_trie::const_iterator it;
+		AssertThat(trie.find_predecessor(0x20, it, false), Equals(true));
+		auto const pred(trie.iterator_key(it));
+		trie.insert(0x20);
+	});
+	
+	it("can insert (3)", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			0x0, 0xd, 0x15, 0x67, 0x5d, 0x55, 0x1d, 0x20
+		};
+		for (auto const k : vec)
+			trie.insert(k);
+	});
+	
+	it("can insert (4)", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			0x0, 0x10, 0x18, 0x50, 0x58
+		};
+		for (auto const k : vec)
+			trie.insert(k);
+		
+		typename t_trie::const_iterator it;
+		AssertThat(trie.find_predecessor(0x20, it, false), Equals(true));
+		auto const pred(trie.iterator_key(it));
+		trie.insert(0x20);
+	});
+	
+	it("can insert (5)", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			0x0, 0x10, 0x58, 0x50, 0x18
+		};
+		for (auto const k : vec)
+			trie.insert(k);
+		
+		typename t_trie::const_iterator it;
+		AssertThat(trie.find_predecessor(0x20, it, false), Equals(true));
+		auto const pred(trie.iterator_key(it));
+		trie.insert(0x20);
+	});
+	
+	it("can insert (6)", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			88, 89, 90, 91, 92, 93, 94, 95, 80, 81, 82, 83, 84, 85, 86, 87,
+			24, 25, 26, 27, 28, 29, 30, 31,
+			16, 17, 18, 19, 20, 21, 22, 23,
+			0, 1, 2, 3, 4, 5, 6, 7
+		};
+		
+		for (auto const k : vec)
+			trie.insert(k);
+		
+		typename t_trie::const_iterator it;
+		AssertThat(trie.find_predecessor(0x20, it, false), Equals(true));
+		auto const pred(trie.iterator_key(it));
+		trie.insert(0x20);
+	});
+	
+	it("can insert (7)", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			97, 98, 99, 100, 10, 102, 103, 104, 105, 106, 107, 108, 109, 110,
+			88, 89, 90, 91, 92, 93, 94, 95, 80, 81, 82, 83, 84, 85, 86, 87,
+			24, 25, 26, 27, 28, 29, 30, 31,
+			16, 17, 18, 19, 20, 21, 22, 23,
+			8, 9, 10, 11, 12, 13, 14, 15,
+			0, 1, 2, 3, 4, 5, 6, 7,
+			32
+		};
+		
+		for (auto const k : vec)
+			trie.insert(k);
+	});
+	
+	it("can insert and erase", [](){
+		t_trie trie;
+		
+		trie.insert(0x58);
+		trie.erase(0x58);
+		trie.insert(0x58);
+		trie.insert(0x50);
+		trie.erase(0x50);
+		trie.insert(0x50);
+		trie.insert(0x18);
+		trie.erase(0x18);
+		trie.insert(0x18);
+		trie.insert(0x10);
+		trie.erase(0x10);
+		trie.insert(0x10);
+		trie.insert(0x0);
+		
+		typename t_trie::const_iterator it;
+		AssertThat(trie.find_predecessor(0x20, it, false), Equals(true));
+		auto const pred(trie.iterator_key(it));
+		trie.insert(0x20);
+	});
 }
 
 
