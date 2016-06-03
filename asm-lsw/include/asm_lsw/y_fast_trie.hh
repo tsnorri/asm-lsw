@@ -89,7 +89,8 @@ namespace asm_lsw {
 		void check_merge_subtree(typename subtree_map::map_type::iterator &st_it);
 		void split_subtree(typename subtree_map::map_type::iterator &st_it);
 		typename subtree_map::iterator find_subtree(key_type const key);
-		void check_subtree_size(typename subtree_map::iterator st_it);
+		void check_subtree_size_and_rep(typename subtree_map::iterator st_it);
+		void check_subtree_rep(typename subtree_map::iterator st_it);
 		
 	public:
 		y_fast_trie() = default;
@@ -150,7 +151,7 @@ namespace asm_lsw {
 	// Check the size limit.
 	// FIXME: check this.
 	template <typename t_key, typename t_value>
-	void y_fast_trie <t_key, t_value>::check_subtree_size(typename subtree_map::iterator st_it)
+	void y_fast_trie <t_key, t_value>::check_subtree_size_and_rep(typename subtree_map::iterator st_it)
 	{
 		auto const log2M(std::log2(m_key_limit));
 		if (log2M)
@@ -158,6 +159,8 @@ namespace asm_lsw {
 			auto const size(st_it->second.size());
 			if (2 * log2M < size)
 				split_subtree(st_it);
+			else
+				check_subtree_rep(st_it);
 		}
 	}
 
@@ -181,7 +184,7 @@ namespace asm_lsw {
 		auto st_it(find_subtree(key));
 		st_it->second.emplace(key);
 		
-		check_subtree_size(st_it);
+		check_subtree_size_and_rep(st_it);
 	}
 
 	
@@ -208,7 +211,7 @@ namespace asm_lsw {
 		auto st_it(find_subtree(key));
 		st_it->second.emplace(key, val);
 		
-		check_subtree_size(st_it);
+		check_subtree_size_and_rep(st_it);
 	}
 
 	
@@ -246,7 +249,10 @@ namespace asm_lsw {
 		auto const log2M(std::log2(m_key_limit));
 		auto &tree(st_it->second);
 		if (! (tree.size() < log2M / 4))
+		{
+			check_subtree_rep(st_it);
 			return;
+		}
 		
 		auto &map(this->m_subtrees.map());
 		typename representative_trie_type::leaf_iterator it;
@@ -258,6 +264,10 @@ namespace asm_lsw {
 			{
 				map.erase(st_it);
 				this->m_reps.erase(it->first);
+			}
+			else
+			{
+				check_subtree_rep(st_it);
 			}
 			return;
 		}
@@ -272,6 +282,36 @@ namespace asm_lsw {
 		
 		if (2 * log2M < tree.size())
 			split_subtree(st_it);
+	}
+	
+	
+	template <typename t_key, typename t_value>
+	void y_fast_trie <t_key, t_value>::check_subtree_rep(typename subtree_map::iterator st_it)
+	{
+		using std::swap;
+
+		auto &subtree(st_it->second);
+		assert(subtree.size());
+		
+		auto const old_key(st_it->first);
+		auto const min(this->iterator_key(subtree.begin()));
+
+		// If the subtree minimum is not equal to the old key, associate the subtree with the new minimum.
+		if (min != old_key)
+		{
+			assert(subtree.find(min) != subtree.cend());
+			
+			auto &map(this->m_subtrees.map());
+			auto res(map.emplace(std::piecewise_construct, std::make_tuple(min), std::make_tuple()));
+			assert(res.second);
+			auto &new_subtree(res.first->second);
+			swap(subtree, new_subtree);
+			map.erase(st_it);
+			
+			// Handle the representative trie.
+			this->m_reps.erase(old_key);
+			this->m_reps.insert(min);
+		}
 	}
 	
 	
