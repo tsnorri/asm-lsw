@@ -326,21 +326,32 @@ namespace asm_lsw {
 	template <typename t_spec>
 	void x_fast_trie_base <t_spec>::lss_access::erase_key(key_type const key, key_type const prev, key_type const next)
 	{
+		// Walk from the leaf to the root and remove all nodes the other (not current)
+		// edge of which is a descendant pointer.
 		level_idx_type i(0);
+		bool is_minmax[2]{false, false};	// Whether the left or the right branch contains a min/max.
+		bool origin_branch{0};				// The branch at the end of which the deleted node was the other branch not being a descendant pointer.
 		while (i < s_levels)
 		{
 			typename level_map::iterator node_it;
-			find_node(key, i, node_it);
+			bool const status(find_node(key, i, node_it));
+			assert(status);
 			node node(*node_it);
 
 			key_type const nlk(level_key(key, i));
-			key_type const target_branch(0x1 & nlk);
-			key_type const other_branch(!target_branch);
+			bool const target_branch(0x1 & nlk);
+			bool const other_branch(!target_branch);
 
 			if (node.edge_is_descendant_ptr(i, other_branch))
 				m_lss[i].map().erase(node_it);
 			else
 			{
+				// If the other branch is not a descendant pointer, there must be a min/max in that branch.
+				is_minmax[other_branch] = true;
+				
+				origin_branch = target_branch;
+				
+				// Create a descendant pointer in place of the erased branch.
 				auto &level_map(level(i));
 				node[target_branch] = edge(target_branch ? prev : next);
 				auto pos(level_map.map().erase(node_it));
@@ -351,22 +362,36 @@ namespace asm_lsw {
 			++i;
 		}
 		
+		++i;
 		while (i < s_levels)
 		{
 			typename level_map::iterator node_it;
-			auto &level_map(level(i));
-			find_node(key, i, node_it);
+			bool const status(find_node(key, i, node_it));
+			assert(status);
 			node node(*node_it);
+			auto &level_map(level(i));
 
 			key_type const nlk(level_key(key, i));
-			key_type const target_branch(0x1 & nlk);
-			key_type const other_branch(!target_branch);
+			bool const target_branch(0x1 & nlk);
+			bool const other_branch(!target_branch);
 
-			if (node.edge_is_descendant_ptr(i, other_branch))
+			// The not-origin branch will point to the other side (min / max)
+			// of the subtree and hence needn't be updated.
+			if (other_branch == origin_branch)
 			{
-				node[other_branch] = edge(other_branch ? prev : next);
-				auto pos(level_map.map().erase(node_it));
-				level_map.map().emplace_hint(pos, std::move(node));
+				if (node.edge_is_descendant_ptr(i, other_branch))
+				{
+					node[other_branch] = edge(other_branch ? prev : next);
+					auto pos(level_map.map().erase(node_it));
+					level_map.map().emplace_hint(pos, std::move(node));
+				}
+				else
+				{
+					// If the other branch is not a descendant pointer, there must be a min/max in that branch.
+					is_minmax[other_branch] = true;
+					if (is_minmax[0] && is_minmax[1])
+						break;
+				}
 			}
 			
 			++i;
@@ -513,10 +538,11 @@ namespace asm_lsw {
 		bool const status(find_lowest_ancestor(trie, key, it, level));
 		assert(status);
 		key_type const next_branch(0x1 & (key >> level));
+		auto const &node(*it);
 		
-		assert(1 == level || it->edge_is_descendant_ptr(level, next_branch));
+		assert(1 == level || node.edge_is_descendant_ptr(level, next_branch));
 
-		edge const &edge((*it)[next_branch]);
+		edge const &edge(node[next_branch]);
 		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
 		assert(edge.key() == nearest->first);
