@@ -641,6 +641,29 @@ void y_fast_set_nc_tests()
 		y_fast_set_test_subtree_size(trie, 40);
 		y_fast_set_test_subtree_size(trie, 255);
 	});
+	
+	it("can insert and erase", [](){
+		t_trie trie;
+		std::vector <uint8_t> vec{
+			0x58, 0x50, 0x18, 0x10, 0x0
+		};
+		
+		for (auto const k : vec)
+			trie.insert(k);
+		
+		typename t_trie::const_iterator it;
+		
+		AssertThat(trie.find_successor(0x0, it, false), Equals(true));
+		AssertThat(trie.iterator_key(it), Equals(0x10));
+		
+		trie.erase(0x0);
+		
+		typename t_trie::const_subtree_map_iterator it2;
+		
+		AssertThat(trie.find_subtree_exact(0x10, it2), Equals(true));
+		AssertThat(trie.find_successor(0x5, it, false), Equals(true));
+		AssertThat(trie.iterator_key(it), Equals(0x10));
+	});
 }
 
 
