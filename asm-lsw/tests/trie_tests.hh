@@ -143,6 +143,27 @@ void set_type_tests()
 		AssertThat(trie.contains('b'), Equals(true));
 		AssertThat(trie.contains('k'), Equals(true));
 		AssertThat(trie.contains('j'), Equals(false));
+		
+		// Check predecessors and successors
+		{
+			typename t_trie::const_iterator it;
+			
+			AssertThat(trie.find_successor('a', it, true), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('a'));
+			AssertThat(trie.find_successor('b', it, true), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('b'));
+			AssertThat(trie.find_successor('k', it, true), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('k'));
+			
+			AssertThat(trie.find_predecessor('j', it, true), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('b'));
+			AssertThat(trie.find_successor('j', it, true), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('k'));
+			AssertThat(trie.find_successor('b', it, false), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('k'));
+			AssertThat(trie.find_predecessor('k', it, false), Equals(true));
+			AssertThat(trie.iterator_key(it), Equals('b'));
+		}
 	});
 }
 
