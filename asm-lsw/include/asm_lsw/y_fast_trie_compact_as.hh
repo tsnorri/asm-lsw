@@ -133,7 +133,7 @@ namespace asm_lsw {
 	};
 
 	
-	template <typename t_max_key, typename t_value = void>
+	template <typename t_max_key, typename t_value = void, bool t_enable_serialize = false>
 	class y_fast_trie_compact_as
 	{
 	public:
@@ -266,8 +266,8 @@ namespace asm_lsw {
 	};
 	
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	class y_fast_trie_compact_as_tpl final : public y_fast_trie_compact_as <t_max_key, t_value>
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize = false>
+	class y_fast_trie_compact_as_tpl final : public y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>
 	{
 	protected:
 		typedef y_fast_trie_compact_as <t_max_key, t_value> base_class;
@@ -312,8 +312,8 @@ namespace asm_lsw {
 	};
 	
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::check_find_result(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::check_find_result(
 		bool const res,
 		typename trie_type::const_subtree_iterator it,
 		const_subtree_iterator &out_it
@@ -329,8 +329,8 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find(
 		key_type const key, const_subtree_iterator &out_it
 	) const
 	{
@@ -344,8 +344,8 @@ namespace asm_lsw {
 	}
 	
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_predecessor(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_predecessor(
 		key_type const key, const_subtree_iterator &out_it, bool allow_equal
 	) const
 	{
@@ -359,8 +359,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_successor(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_successor(
 		key_type const key, const_subtree_iterator &out_it, bool allow_equal
 	) const
 	{
@@ -374,8 +374,8 @@ namespace asm_lsw {
 	}
 
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_subtree_min(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_subtree_min(
 		key_type const key, const_subtree_iterator &out_it
 	) const
 	{
@@ -387,8 +387,8 @@ namespace asm_lsw {
 	}
 
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_subtree_max(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_subtree_max(
 		key_type const key, const_subtree_iterator &out_it
 	) const
 	{
@@ -400,8 +400,8 @@ namespace asm_lsw {
 	}
 
 	
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_next_subtree_key(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool y_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_next_subtree_key(
 		key_type &key /* inout */
 	) const
 	{
@@ -419,9 +419,10 @@ namespace asm_lsw {
 	}
 
 	
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_ret_key, typename t_collection, typename t_fill>
-	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct_specific(
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> *
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct_specific(
 		t_collection &collection,
 		t_fill const &fill,
 		key_type const offset,
@@ -438,9 +439,10 @@ namespace asm_lsw {
 
 
 	// FIXME: change the trie type to const or non-const based on t_value (void or non-void).
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_key>
-	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> *
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct(
 		y_fast_trie <t_key, t_value> &trie
 	)
 	{
@@ -455,9 +457,10 @@ namespace asm_lsw {
 
 
 	// FIXME: change the collection type to const or non-const based on t_value (void or non-void).
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_collection>
-	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> *
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct(
 		t_collection &collection,
 		t_max_key const min,
 		t_max_key const max
@@ -481,9 +484,10 @@ namespace asm_lsw {
 
 
 	// FIXME: change the trie type to const or non-const based on t_value (void or non-void).
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_collection, typename t_fill>
-	y_fast_trie_compact_as <t_max_key, t_value> *y_fast_trie_compact_as <t_max_key, t_value>::construct(
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> *
+	y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct(
 		t_collection &collection,
 		t_fill const &fill,
 		t_max_key const min,

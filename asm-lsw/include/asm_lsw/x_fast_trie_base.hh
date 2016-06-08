@@ -39,7 +39,7 @@ namespace asm_lsw {
 		static_assert(std::is_integral <typename t_spec::key_type>::value, "Unsigned integer required.");
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
-		template <typename, typename> friend class x_fast_trie_compact;
+		template <typename, typename, bool> friend class x_fast_trie_compact;
 
 	protected:
 		class lss_access;
@@ -140,6 +140,14 @@ namespace asm_lsw {
 
 			void update_levels(key_type const key);
 			void erase_key(key_type const key, key_type const prev, key_type const next);
+			
+			template <bool t_dummy = true>
+			auto serialize(
+				std::ostream &out, sdsl::structure_tree_node *v, std::string name
+			) const -> typename std::enable_if <level_map::can_serialize && t_dummy, std::size_t>::type;
+					
+			template <bool t_dummy = true>
+			auto load(std::istream &in) -> typename std::enable_if <level_map::can_serialize && t_dummy>::type;
 		};
 
 	protected:
@@ -184,6 +192,9 @@ namespace asm_lsw {
 		x_fast_trie_base(x_fast_trie_base &&) = default;
 		x_fast_trie_base &operator=(x_fast_trie_base const &) & = default;
 		x_fast_trie_base &operator=(x_fast_trie_base &&) & = default;
+		
+		template <typename t_other_spec>
+		bool operator==(x_fast_trie_base <t_other_spec> const &other) const { return std::equal(cbegin(), cend(), other.cbegin(), other.cend()); }
 
 		std::size_t constexpr key_size() const { return sizeof(key_type); }
 		size_type size() const { return m_leaf_links.size(); }
@@ -234,6 +245,36 @@ namespace asm_lsw {
 		assert(0 <= idx);
 		assert(idx < s_levels);
 		return m_lss[idx];
+	}
+	
+	
+	template <typename t_spec>
+	template <bool t_dummy>
+	auto x_fast_trie_base <t_spec>::lss_access::serialize(
+		std::ostream &out, sdsl::structure_tree_node *v, std::string name
+	) const -> typename std::enable_if <level_map::can_serialize && t_dummy, std::size_t>::type
+	{
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		size_type written_bytes(0);
+		
+		size_type i(0);
+		for (auto const &level : m_lss)
+			written_bytes += level.serialize(out, v, "level_" + std::to_string(i++));
+		
+		sdsl::structure_tree::add_size(child, written_bytes);
+		return written_bytes;
+	}
+	
+	
+	template <typename t_spec>
+	template <bool t_dummy>
+	auto x_fast_trie_base <t_spec>::lss_access::load(
+		std::istream &in
+	) -> typename std::enable_if <level_map::can_serialize && t_dummy>::type
+	{
+		// m_lss is an array, hence a constant number of levels.
+		for (auto const &level : m_lss)
+			level.load(in);
 	}
 
 

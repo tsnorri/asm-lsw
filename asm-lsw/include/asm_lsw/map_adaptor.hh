@@ -45,6 +45,8 @@ namespace asm_lsw {
 		typedef typename map_type::iterator iterator;
 		typedef typename map_type::const_iterator const_iterator;
 		typedef typename access_key_fn_type::accessed_type accessed_type;
+
+		enum { can_serialize = false };
 		
 	protected:
 		access_key_fn_type m_access_key_fn;

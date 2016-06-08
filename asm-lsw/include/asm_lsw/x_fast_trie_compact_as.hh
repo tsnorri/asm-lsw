@@ -90,13 +90,157 @@ namespace asm_lsw {
 		
 		t_it_val dereference() const;
 	};
+	
+	
+	// FIXME: move to fast_trie_compact_as_helper.hh.
+	template <typename t_value>
+	struct fast_trie_compact_as_trait
+	{
+		typedef std::function <void(t_value const &, std::istream &)> value_callback_fn_type;
+		enum { is_map = 1 };
+	};
+	
+	
+	template <>
+	struct fast_trie_compact_as_trait <void>
+	{
+		typedef void * value_callback_fn_type;
+		enum { is_map = 0 };
+	};
+	
+	
+	template <typename t_value>
+	struct fast_trie_compact_as_tpl_value_trait
+	{
+		template <typename t_trie, typename Fn>
+		std::size_t serialize_keys(
+			t_trie const &trie,
+			std::ostream &out,
+			Fn value_callback,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const
+		{
+			return trie.serialize_keys(out, value_callback, v, name);
+		}
+
+		template <typename t_trie, typename Fn>
+		void load_keys(
+			t_trie const &trie,
+			std::istream &in,
+			Fn value_callback
+		)
+		{
+			trie.load_keys(in, value_callback);
+		}
+	};
+	
+	
+	template <>
+	struct fast_trie_compact_as_tpl_value_trait <void>
+	{
+		template <typename t_trie, typename Fn>
+		std::size_t serialize_keys(
+			t_trie const &trie,
+			std::ostream &out,
+			Fn value_callback,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const
+		{
+			return 0;
+		}
+
+		template <typename t_trie, typename Fn>
+		void load_keys(
+			t_trie const &trie,
+			std::istream &in,
+			Fn value_callback
+		)
+		{
+		}
+	};
+	
+	
+	template <bool t_enable_serialize>
+	struct fast_trie_compact_as_tpl_serialize_trait
+	{
+		template <typename t_trie, typename Fn>
+		std::size_t serialize_keys(
+			t_trie const &trie,
+			std::ostream &out,
+			Fn value_callback,
+			sdsl::structure_tree_node *v,
+			std::string name
+		)
+		{
+			fast_trie_compact_as_tpl_value_trait <typename t_trie::value_type> trait;
+			return trait.serialize_keys(trie, out, value_callback, v, name);
+		}
+
+		template <typename t_trie>
+		std::size_t serialize(t_trie const &trie, std::ostream &out, sdsl::structure_tree_node *v, std::string name)
+		{
+			return trie.serialize(out, v, name);
+		}
+
+		template <typename t_trie, typename Fn>
+		void load_keys(t_trie &trie, std::istream &in, Fn value_callback)
+		{
+			fast_trie_compact_as_tpl_value_trait <typename t_trie::value_type> trait;
+			trait.load_keys(trie, in, value_callback);
+		}
+
+		template <typename t_trie>
+		void load(t_trie &trie, std::istream &in)
+		{
+			trie.load(in);
+		}
+	};
 
 
-	template <typename t_max_key, typename t_value = void>
+	template <>
+	struct fast_trie_compact_as_tpl_serialize_trait <false>
+	{
+		template <typename t_trie, typename Fn>
+		std::size_t serialize_keys(
+			t_trie const &trie,
+			std::ostream &out,
+			Fn value_callback,
+			sdsl::structure_tree_node *v,
+			std::string name
+		)
+		{
+			return 0;
+		}
+
+		template <typename t_trie>
+		std::size_t serialize(t_trie const &trie, std::ostream &out, sdsl::structure_tree_node *v, std::string name)
+		{
+			return 0;
+		}
+
+		template <typename t_trie, typename Fn>
+		void load_keys(t_trie &trie, std::istream &in, Fn value_callback)
+		{
+		}
+
+		template <typename t_trie>
+		void load(t_trie &trie, std::istream &in)
+		{
+		}
+	};
+
+
+	template <typename t_max_key, typename t_value = void, bool t_enable_serialize = false>
 	class x_fast_trie_compact_as
 	{
 		template <typename, typename>
 		friend class x_fast_trie_compact_as_leaf_link_iterator_tpl;
+
+	protected:
+		typedef detail::x_fast_trie_trait<t_max_key, t_value> trait;
+		typedef fast_trie_compact_as_trait<t_value> as_trait;
 
 	public:
 		typedef t_max_key key_type;
@@ -110,13 +254,12 @@ namespace asm_lsw {
 			key_type,
 			typename value_ref <value_type>::type>
 		> leaf_it_val;
+			
+		typedef typename as_trait::value_callback_fn_type value_callback_fn_type;
 
 		typedef x_fast_trie_compact_as_leaf_link_iterator_tpl <x_fast_trie_compact_as, leaf_it_val const>	const_leaf_iterator;
 		typedef const_leaf_iterator const_iterator;
 
-	protected:
-		typedef detail::x_fast_trie_trait<key_type, value_type> trait;
-		
 	protected:
 		key_type m_offset{0};
 
@@ -168,6 +311,24 @@ namespace asm_lsw {
 		{
 		}
 		
+	protected:
+		virtual std::size_t serialize_keys_(
+			std::ostream &out, value_callback_fn_type value_callback, sdsl::structure_tree_node *v, std::string name
+		) const = 0;
+	
+		virtual std::size_t serialize_(
+			std::ostream &out,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const = 0;
+	
+		virtual void load_keys_(
+			std::istream &in,
+			value_callback_fn_type value_callback
+		) = 0;
+	
+		virtual void load_(std::istream &in) = 0;
+		
 	public:
 		template <typename t_key>
 		static x_fast_trie_compact_as *construct(x_fast_trie <t_key, t_value> &);
@@ -187,17 +348,49 @@ namespace asm_lsw {
 		virtual bool find_predecessor(key_type const key, const_leaf_iterator &pred, bool allow_equal = false) const = 0;
 		virtual bool find_successor(key_type const key, const_leaf_iterator &succ, bool allow_equal = false) const = 0;
 		
+		template <typename t_other_max_key, typename t_other_value, bool t_other_enable_serialize>
+		bool operator==(x_fast_trie_compact_as <t_other_max_key, t_other_value, t_other_enable_serialize> const &other) const
+		{
+			return std::equal(cbegin(), cend(), other.cbegin(), other.cend());
+		}
+		
 		virtual void print() const = 0;
 		
 		typename trait::key_type const iterator_key(const_leaf_iterator const &it) const { trait t; return t.key(it); }
 		typename trait::value_type const &iterator_value(const_leaf_iterator const &it) const { trait t; return t.value(it); }
+		
+		template <bool t_dummy = true>
+		auto serialize_keys(
+			std::ostream &out,
+			value_callback_fn_type value_callback,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const -> typename std::enable_if <t_enable_serialize && as_trait::is_map && t_dummy, std::size_t>::type { return serialize_keys_(out, value_callback, v, name); }
+	
+		template <bool t_dummy = true>
+		auto serialize(
+			std::ostream &out,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const -> typename std::enable_if <t_enable_serialize && t_dummy, std::size_t>::type { return serialize_(out, v, name); }
+	
+		template <bool t_dummy = true>
+		auto load_keys(
+			std::istream &in,
+			value_callback_fn_type value_callback
+		) -> typename std::enable_if <t_enable_serialize && as_trait::is_map && t_dummy>::type { load_keys_(in, value_callback); }
+	
+		template <bool t_dummy = true>
+		auto load(
+			std::istream &in
+		) -> typename std::enable_if <t_enable_serialize && t_dummy>::type { load_(in); }
 
 	protected:
 		virtual leaf_it_val leaf_link(size_type idx) const = 0;
 	};
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
 	class x_fast_trie_compact_as_tpl final : public x_fast_trie_compact_as <t_max_key, t_value>
 	{
 	protected:
@@ -209,6 +402,8 @@ namespace asm_lsw {
 	public:
 		typedef typename base_class::size_type size_type;
 		typedef typename base_class::key_type key_type;
+		typedef typename base_class::value_type value_type;
+		typedef typename base_class::value_callback_fn_type value_callback_fn_type;
 		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 
 	protected:
@@ -237,6 +432,26 @@ namespace asm_lsw {
 		virtual void print() const override							{ m_trie.print(); }
 		
 	protected:
+		virtual std::size_t serialize_keys_(
+			std::ostream &out,
+			value_callback_fn_type value_callback,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const override;
+	
+		virtual std::size_t serialize_(
+			std::ostream &out,
+			sdsl::structure_tree_node *v,
+			std::string name
+		) const override;
+	
+		virtual void load_keys_(
+			std::istream &in,
+			value_callback_fn_type value_callback
+		) override;
+	
+		virtual void load_(std::istream &in) override;
+		
 		virtual leaf_it_val leaf_link(size_type idx) const override;
 		bool check_find_result(bool const, typename trie_type::const_leaf_iterator const &, const_leaf_iterator &) const;
 	};
@@ -255,9 +470,9 @@ namespace asm_lsw {
 	
 	template <typename t_trie, typename t_it_val>
 	template <typename t_other_val>
-	auto x_fast_trie_compact_as_leaf_link_iterator_tpl <t_trie, t_it_val>::equal(
+	bool x_fast_trie_compact_as_leaf_link_iterator_tpl <t_trie, t_it_val>::equal(
 		x_fast_trie_compact_as_leaf_link_iterator_tpl <t_trie, t_other_val> const &other
-	) const -> bool
+	) const
 	{
 		return (this->m_trie == other.m_trie &&
 				this->m_idx == other.m_idx);
@@ -271,8 +486,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::check_find_result(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::check_find_result(
 		bool const res,
 		typename trie_type::const_leaf_iterator const &it,
 		const_leaf_iterator &out_it
@@ -288,8 +503,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find(
 		key_type const key, const_leaf_iterator &out_it
 	) const
 	{
@@ -303,8 +518,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_predecessor(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_predecessor(
 		key_type const key, const_leaf_iterator &out_it, bool allow_equal
 	) const
 	{
@@ -318,8 +533,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_successor(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_successor(
 		key_type const key, const_leaf_iterator &out_it, bool allow_equal
 	) const
 	{
@@ -333,8 +548,10 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	auto x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::leaf_link(size_type const idx) const -> leaf_it_val
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	auto x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::leaf_link(
+		size_type const idx
+	) const -> leaf_it_val
 	{
 		auto const &leaf_link(m_trie.leaf_link(idx));
 		typename leaf_it_val::second_type ret_link(leaf_link.second);
@@ -343,11 +560,58 @@ namespace asm_lsw {
 		leaf_it_val retval{this->m_offset + leaf_link.first, ret_link};
 		return retval;
 	}
+	
+	
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	std::size_t x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::serialize_keys_(
+		std::ostream &out,
+		value_callback_fn_type value_callback,
+		sdsl::structure_tree_node *v,
+		std::string name
+	) const
+	{
+		fast_trie_compact_as_tpl_serialize_trait <t_enable_serialize> trait;
+		return trait.serialize_keys(m_trie, out, value_callback, v, name);
+	}
 
 
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	std::size_t x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::serialize_(
+		std::ostream &out,
+		sdsl::structure_tree_node *v,
+		std::string name
+	) const
+	{
+		fast_trie_compact_as_tpl_serialize_trait <t_enable_serialize> trait;
+		return trait.serialize(m_trie, out, v, name);
+	}
+
+
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	void x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::load_keys_(
+		std::istream &in,
+		value_callback_fn_type value_callback
+	)
+	{
+		fast_trie_compact_as_tpl_serialize_trait <t_enable_serialize> trait;
+		trait.load_keys(m_trie, in, value_callback);
+	}
+
+
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	void x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::load_(
+		std::istream &in
+	)
+	{
+		fast_trie_compact_as_tpl_serialize_trait <t_enable_serialize> trait;
+		trait.load(m_trie, in);
+	}
+
+
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_ret_key, typename t_key>
-	x_fast_trie_compact_as <t_max_key, t_value> *x_fast_trie_compact_as <t_max_key, t_value>::construct_specific(
+	x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> *
+	x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct_specific(
 		x_fast_trie <t_key, t_value> &trie,
 		key_type const offset
 	)
@@ -356,13 +620,14 @@ namespace asm_lsw {
 		fill_trie <decltype(temp_trie), decltype(trie)> ft;
 		ft(temp_trie, trie, offset);
 		x_fast_trie_compact <t_ret_key, t_value> ct(temp_trie);
-		return new x_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value>(ct, offset);
+		return new x_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value, t_enable_serialize>(ct, offset);
 	}
 
 
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_key>
-	x_fast_trie_compact_as <t_max_key, t_value> *x_fast_trie_compact_as <t_max_key, t_value>::construct(
+	x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> *
+	x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct(
 		x_fast_trie <t_key, t_value> &trie
 	)
 	{
