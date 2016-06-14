@@ -140,7 +140,10 @@ namespace asm_lsw
 		const_reverse_iterator rbegin() const	{ return crbegin(); }
 		const_reverse_iterator rend() const		{ return crend(); }
 		
-		std::size_t serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+		template <typename t_other_value>
+		bool operator==(static_binary_tree <t_other_value> const &other) const { return std::equal(cbegin(), cend(), other.cbegin(), other.cend()); }
+
+		size_type serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
 		void load(std::istream& in);
 		
 		void print() const;
@@ -337,7 +340,9 @@ namespace asm_lsw
 	
 	
 	template <typename t_value>
-	std::size_t static_binary_tree <t_value>::serialize(std::ostream& out, sdsl::structure_tree_node *v, std::string name) const
+	auto static_binary_tree <t_value>::serialize(
+		std::ostream &out, sdsl::structure_tree_node *v, std::string name
+	) const -> size_type
 	{
 		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
 		std::size_t written_bytes(0);
@@ -359,8 +364,8 @@ namespace asm_lsw
 		m_values.load(in);
 		m_used_indices.load(in);
 		m_used_indices_r1_support.load(in);
-		read_member(m_leftmost_idx, in);
-		read_member(m_past_end_idx, in);
+		sdsl::read_member(m_leftmost_idx, in);
+		sdsl::read_member(m_past_end_idx, in);
 		
 		m_used_indices_r1_support.set_vector(&this->m_used_indices);
 	}
