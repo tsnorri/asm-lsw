@@ -20,6 +20,8 @@
 #include <asm_lsw/x_fast_tries.hh>
 #include <asm_lsw/y_fast_tries.hh>
 #include <bandit/bandit.h>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/range.hpp>
 #include <boost/range/irange.hpp>
@@ -34,6 +36,14 @@ struct ref_trie_adaptor
 	typedef t_trie &return_type;
 	t_trie &operator()(t_trie &trie) const { return trie; }
 	t_trie const &operator()(t_trie const &trie) const { return trie; }
+
+	template <typename t_istream, typename t_ref_trie>
+	void load_and_compare(t_istream &istream, t_ref_trie const &ref_trie)
+	{
+		trie_type ct;
+		ct.load(istream);
+		AssertThat(ct == ref_trie, Equals(true));
+	}
 };
 
 
@@ -43,6 +53,14 @@ struct compact_trie_adaptor
 	typedef t_compact_trie trie_type;
 	typedef t_compact_trie return_type;
 	t_compact_trie operator()(t_trie &trie) const { return t_compact_trie(trie); }
+	
+	template <typename t_istream, typename t_ref_trie>
+	void load_and_compare(t_istream &istream, t_ref_trie const &ref_trie)
+	{
+		trie_type ct;
+		ct.load(istream);
+		AssertThat(ct == ref_trie, Equals(true));
+	}
 };
 
 
@@ -58,7 +76,15 @@ struct compact_as_trie_adaptor
 	{
 		trie_ptr.reset(t_compact_trie::construct(trie));
 		return *trie_ptr;
-	} 
+	}
+	
+	template <typename t_istream, typename t_ref_trie>
+	void load_and_compare(t_istream &istream, t_ref_trie const &ref_trie)
+	{
+		std::unique_ptr <trie_type> ct(trie_type::load(istream));
+		auto &ref(*ct);
+		AssertThat(ref == ref_trie, Equals(true));
+	}
 };
 
 
@@ -118,7 +144,6 @@ void set_type_tests()
 		t_trie trie;
 		trie.insert('a');
 	});
-
 
 	it("can erase", [](){
 		t_trie trie;
@@ -526,21 +551,56 @@ void compact_any_type_tests()
 }
 
 
+template <typename t_trie, typename t_adaptor>
+void compact_set_type_tests()
+{
+	typedef typename t_trie::key_type trie_key_type;
+	typedef typename t_trie::leaf_link_map::kv_type trie_leaf_link_value_type;
+	it("can serialize", [](){
+		t_adaptor adaptor;
+		std::vector <trie_key_type> const test_values{1, 15, 27, 33, 92, 120, 148, 163, 199, 201, 214, 227, 228, 229, 230, 243, 249, 255};
+		
+		t_trie trie;
+		for (auto const val : test_values)
+			trie.insert(val);
+		AssertThat(trie == trie, Equals(true));
+		t_trie trie_copy(trie);
+		AssertThat(trie_copy == trie, Equals(true));
+		
+		typename t_adaptor::return_type ct((adaptor(trie_copy)));
+		AssertThat(ct == trie, Equals(true));
+		
+		std::size_t const buffer_size(8192);
+		char buffer[buffer_size];
+
+		boost::iostreams::basic_array <char> array(buffer, buffer_size);
+		boost::iostreams::stream <boost::iostreams::basic_array <char>> iostream(array);
+		
+		auto const size(ct.size());
+		auto const serialized_size(ct.serialize(iostream));
+		assert(serialized_size <= buffer_size);
+		AssertThat(ct.size(), Equals(size));
+		
+		iostream.seekp(0);
+		adaptor.load_and_compare(iostream, ct);
+	});
+}
+
+
 template <typename t_trie, typename t_as_trie>
 void common_as_type_tests()
 {
 	typedef t_trie trie_type;
 	typedef t_as_trie ct_type;
 
-	it("should be possible to construct one from an empty trie", [](){
-		
+	it("it possible to construct one from an empty trie", [](){
 		trie_type trie;
 		std::unique_ptr <ct_type> ct(ct_type::construct(trie));
 		AssertThat(ct->key_size(), Equals(1));
 		AssertThat(ct->size(), Equals(0));
 	});
 	
-	it("should choose the correct key size", [](){
+	it("chooses the correct key size", [](){
 		trie_type trie;
 		trie.insert(0x10001);
 		trie.insert(0x10002);
@@ -556,7 +616,7 @@ void common_as_type_tests()
 		AssertThat(ct->max_key(), Equals(0x10004));
 	});
 	
-	it("should handle values outside the allowed range", [](){
+	it("handles values outside the allowed range", [](){
 		trie_type trie;
 		trie.insert(0x10000);
 		trie.insert(0x10001);
@@ -620,7 +680,7 @@ void y_fast_set_test_subtree_size(t_trie &trie, typename t_trie::size_type const
 template <typename t_trie>
 void y_fast_set_nc_tests()
 {
-	it("should retain key limit after moving", [&](){
+	it("retains key limit after moving", [&](){
 		t_trie t1(5);
 		t_trie t2(6);
 
@@ -628,14 +688,14 @@ void y_fast_set_nc_tests()
 		AssertThat(t1.key_limit(), Equals(6));
 	});
 
-	it("should enforce key limit", [&](){
+	it("enforces key limit", [&](){
 		t_trie trie(5);
 
 		AssertThrows(asm_lsw::invalid_argument, trie.insert(6));
 		AssertThat(LastException <asm_lsw::invalid_argument>().error <typename t_trie::error>(), Equals(t_trie::error::out_of_range));
 	});
 	
-	it("should have small subtrees", [&](){
+	it("has small subtrees", [&](){
 		t_trie trie;
 		y_fast_set_test_subtree_size(trie, 20);
 		y_fast_set_test_subtree_size(trie, 40);

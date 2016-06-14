@@ -16,6 +16,9 @@
 
 #include <asm_lsw/static_binary_tree.hh>
 #include <bandit/bandit.h>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <iostream>
 
 using namespace bandit;
 
@@ -32,15 +35,15 @@ void static_binary_tree_tests(sdsl::int_vector <0> vec, t_value lower, t_value e
 	auto const size(vec.size());
 	tree_type tree(vec);
 	
-	it("should preserve input vector size", [&](){
+	it("preserves input vector size", [&](){
 		AssertThat(vec.size(), Equals(size));
 	});
 	
-	it("should have working size()", [&](){
+	it("has working size()", [&](){
 		AssertThat(tree.size(), Equals(size));
 	});
 	
-	it("should have working find()", [&](){
+	it("has working find()", [&](){
 		for (t_value i(0); i < max_value; ++i)
 		{
 			if (ref_set.find(i) == ref_set.cend())
@@ -57,13 +60,13 @@ void static_binary_tree_tests(sdsl::int_vector <0> vec, t_value lower, t_value e
 		}
 	});
 	
-	it("should have working lower_bound()", [&](){
+	it("has working lower_bound()", [&](){
 		auto const it(tree.lower_bound(lower));
 		AssertThat(it, Is().Not().EqualTo(tree.cend()));
 		AssertThat(it, Equals(tree.find(expected)));
 	});
 	
-	it("should have working iterators", [&](){
+	it("has working iterators", [&](){
 		uint64_t i(0);
 		uint64_t const count(vec.size());
 		for (auto const &k : tree)
@@ -72,6 +75,29 @@ void static_binary_tree_tests(sdsl::int_vector <0> vec, t_value lower, t_value e
 			AssertThat(k, Equals(expected));
 			++i;
 		}
+	});
+	
+	it("has working equality comparison operator", [&](){
+		tree_type tree2;
+		AssertThat(tree, Equals(tree));
+		AssertThat(tree, Is().Not().EqualTo(tree2));
+	});
+	
+	it("can serialize", [&](){
+		std::size_t const buffer_size(4096);
+		char buffer[buffer_size];
+
+		boost::iostreams::basic_array <char> array(buffer, buffer_size);
+		boost::iostreams::stream <boost::iostreams::basic_array <char>> iostream(array);
+		
+		auto const size(tree.size());
+		tree.serialize(iostream);
+		AssertThat(tree.size(), Equals(size));
+		
+		tree_type tree2;
+		iostream.seekp(0);
+		tree2.load(iostream);
+		AssertThat(tree2, Equals(tree));
 	});
 }
 

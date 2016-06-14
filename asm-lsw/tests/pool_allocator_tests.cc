@@ -25,7 +25,7 @@ template <typename t_element>
 void typed_tests()
 {
 	it("can allocate memory with different alignments", [](){
-		asm_lsw::pool_allocator <uint16_t> allocator_1(8);
+		asm_lsw::pool_allocator <uint16_t> allocator_1((std::size_t) 8);
 		allocator_1.allocate(1);
 
 		asm_lsw::pool_allocator <uint64_t> allocator_2(allocator_1);
@@ -81,7 +81,7 @@ void common_tests()
 		};
 		
 		int32_t c{0};
-		asm_lsw::pool_allocator <test> allocator(1);
+		asm_lsw::pool_allocator <test> allocator((std::size_t) 1);
 		
 		{
 			test t;
