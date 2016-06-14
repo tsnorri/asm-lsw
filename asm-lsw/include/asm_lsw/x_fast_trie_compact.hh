@@ -42,17 +42,21 @@ namespace asm_lsw {
 		
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
-		typedef typename base_class::leaf_link_map leaf_link_map;
+		typedef typename base_class::leaf_link_type leaf_link_type;
 		typedef typename base_class::node node;
 		typedef typename base_class::edge edge;
+		typedef typename base_class::trait trait;
 		
 	public:
+		typedef typename base_class::leaf_link_map leaf_link_map;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::leaf_iterator leaf_iterator;
 		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 		typedef typename base_class::iterator iterator;
 		typedef typename base_class::const_iterator const_iterator;
+		
+		enum { is_trie = 1 };
 		
 	public:
 		x_fast_trie_compact() = default;
@@ -67,21 +71,21 @@ namespace asm_lsw {
 		auto serialize_keys(
 			std::ostream &out,
 			Fn value_callback,
-			sdsl::structure_tree_node *v,
-			std::string name
-		) const -> typename std::enable_if <t_enable_serialize && t_dummy, std::size_t>::type;
+			sdsl::structure_tree_node *v = nullptr,
+			std::string name = ""
+		) const -> typename std::enable_if <trait::is_map_type && t_dummy, std::size_t>::type;
 	
 		template <bool t_dummy = true>
 		auto serialize(
 			std::ostream &out,
-			sdsl::structure_tree_node *v,
-			std::string name
+			sdsl::structure_tree_node *v = nullptr,
+			std::string name = ""
 		) const -> typename std::enable_if <t_enable_serialize && t_dummy, std::size_t>::type;
 	
 		template <typename Fn, bool t_dummy = true>
 		auto load_keys(
 			std::istream &in, Fn value_callback
-		) -> typename std::enable_if <t_enable_serialize && t_dummy>::type;
+		) -> typename std::enable_if <trait::is_map_type && t_dummy>::type;
 	
 		template <bool t_dummy = true>
 		auto load(std::istream &in) -> typename std::enable_if <t_enable_serialize && t_dummy>::type;
@@ -106,7 +110,7 @@ namespace asm_lsw {
 		typedef typename leaf_link_map_builder_type::adaptor_type leaf_link_map_adaptor_type;
 		
 		// Create an empty allocator to be passed to the builders.
-		pool_allocator <typename level_map::kv_type> allocator;
+		pool_allocator <typename level_map::kv_type> allocator(true);
 		
 		// Create the builders.
 		assert(util::remove_ref_t <decltype(other)>::s_levels == base_class::s_levels);
@@ -170,14 +174,23 @@ namespace asm_lsw {
 		Fn value_callback,
 		sdsl::structure_tree_node *v,
 		std::string name
-	) const -> typename std::enable_if <t_enable_serialize && t_dummy, std::size_t>::type
+	) const -> typename std::enable_if <trait::is_map_type && t_dummy, std::size_t>::type
 	{
 		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
 		std::size_t written_bytes(0);
 		
+		// Pass the given callback to leaf_link's serialization function.
+		auto serialize_leaf_link = [&](
+			leaf_link_type const &leaf_link,
+			std::ostream &out,
+			sdsl::structure_tree_node *node
+		) -> std::size_t {
+			return leaf_link.serialize(out, value_callback, child, name);
+		};
+		
 		written_bytes += sdsl::write_member(this->m_min, out, child, "min");
 		written_bytes += this->m_lss.serialize(out, child, "lss");
-		written_bytes += this->m_leaf_links.serialize_keys(out, value_callback, child, "leaf_links");
+		written_bytes += this->m_leaf_links.serialize_keys(out, serialize_leaf_link, child, "leaf_links");
 		
 		sdsl::structure_tree::add_size(child, written_bytes);
 		return written_bytes;
@@ -209,11 +222,19 @@ namespace asm_lsw {
 	auto x_fast_trie_compact <t_key, t_value, t_enable_serialize>::load_keys(
 		std::istream &in,
 		Fn value_callback
-	) -> typename std::enable_if <t_enable_serialize && t_dummy>::type
+	) -> typename std::enable_if <trait::is_map_type && t_dummy>::type
 	{
-		read_member(this->m_min, in);
+		// Pass the given callback to leaf_link's load function.
+		auto load_leaf_link = [&](
+			leaf_link_type &leaf_link,
+			std::istream &in
+		){
+			leaf_link.load(in, value_callback);
+		};
+		
+		sdsl::read_member(this->m_min, in);
 		this->m_lss.load(in);
-		this->m_leaf_links.load_keys(in, value_callback);
+		this->m_leaf_links.load_keys(in, load_leaf_link);
 	}
 	
 	
@@ -223,7 +244,7 @@ namespace asm_lsw {
 		std::istream &in
 	) -> typename std::enable_if <t_enable_serialize && t_dummy>::type
 	{
-		read_member(this->m_min, in);
+		sdsl::read_member(this->m_min, in);
 		this->m_lss.load(in);
 		this->m_leaf_links.load(in);
 	}

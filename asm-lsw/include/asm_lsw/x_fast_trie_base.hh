@@ -40,6 +40,9 @@ namespace asm_lsw {
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
 		template <typename, typename, bool> friend class x_fast_trie_compact;
+		
+		template <typename t_other_spec>
+		friend class x_fast_trie_base;
 
 	protected:
 		class lss_access;
@@ -53,22 +56,26 @@ namespace asm_lsw {
 	protected:
 		typedef detail::x_fast_trie_edge <key_type> edge;
 		typedef detail::x_fast_trie_node <key_type> node;
-		typedef detail::x_fast_trie_leaf_link <key_type, value_type> leaf_link;
+	public:
+		typedef detail::x_fast_trie_leaf_link <key_type, value_type> leaf_link_type;
+	protected:
 		typedef detail::x_fast_trie_trait<key_type, value_type> trait;
-		typedef typename t_spec::template map_adaptor_trait <node, void, typename node::access_key> level_map_trait;
-		typedef typename t_spec::template map_adaptor_trait <key_type, leaf_link> leaf_link_map_trait;
+		typedef typename t_spec::template map_adaptor_trait <node, void, true, typename node::access_key> level_map_trait;
+		typedef typename t_spec::template map_adaptor_trait <key_type, leaf_link_type> leaf_link_map_trait;
 		typedef typename level_map_trait::type level_map;
-		typedef typename leaf_link_map_trait::type leaf_link_map;
 		typedef typename t_spec::lss_find_fn lss_find_fn;
 
 	public:
+		typedef typename leaf_link_map_trait::type leaf_link_map;
 		typedef typename lss_access::level_idx_type level_idx_type;
 		typedef typename leaf_link_map::iterator leaf_iterator;
 		typedef typename leaf_link_map::const_iterator const_leaf_iterator;
 		typedef typename leaf_link_map::size_type size_type;
 		typedef leaf_iterator iterator;
 		typedef const_leaf_iterator const_iterator;
-
+		
+		enum { is_trie = 1 };
+		
 	protected:
 		// Conditionally use iterator or const_iterator.
 		template <typename t_container, typename t_check, typename t_enable = void>
@@ -194,7 +201,7 @@ namespace asm_lsw {
 		x_fast_trie_base &operator=(x_fast_trie_base &&) & = default;
 		
 		template <typename t_other_spec>
-		bool operator==(x_fast_trie_base <t_other_spec> const &other) const { return std::equal(cbegin(), cend(), other.cbegin(), other.cend()); }
+		bool operator==(x_fast_trie_base <t_other_spec> const &other) const { return m_leaf_links == other.m_leaf_links; }
 
 		std::size_t constexpr key_size() const { return sizeof(key_type); }
 		size_type size() const { return m_leaf_links.size(); }
@@ -219,6 +226,21 @@ namespace asm_lsw {
 
 		void print() const;
 	};
+	
+	
+	template <typename T, typename U>
+	auto operator==(
+		T const &trie_1, U const &trie_2
+	) -> typename std::enable_if <
+		T::is_trie &&
+		U::is_trie &&
+		std::is_same <typename T::mapped_type, typename U::mapped_type>::value,
+		bool
+	>::type
+	{
+		typename detail::x_fast_trie_cmp <typename T::mapped_type> cmp;
+		return cmp.contains(trie_1, trie_2) && cmp.contains(trie_2, trie_1);
+	}
 
 
 	template <typename t_spec>
@@ -273,7 +295,7 @@ namespace asm_lsw {
 	) -> typename std::enable_if <level_map::can_serialize && t_dummy>::type
 	{
 		// m_lss is an array, hence a constant number of levels.
-		for (auto const &level : m_lss)
+		for (auto &level : m_lss)
 			level.load(in);
 	}
 

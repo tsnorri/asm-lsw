@@ -33,11 +33,11 @@ namespace asm_lsw {
 		typedef x_fast_trie_base <detail::x_fast_trie_spec <t_key, t_value>> base_class;
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
-		typedef typename base_class::leaf_link_map leaf_link_map;
 		typedef typename base_class::node node;
 		typedef typename base_class::edge edge;
 
 	public:
+		typedef typename base_class::leaf_link_map leaf_link_map;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::leaf_iterator leaf_iterator;

@@ -29,7 +29,8 @@ namespace asm_lsw { namespace detail {
 	template <
 		typename t_key,
 		typename t_value,
-		template <typename, typename, typename> class t_map_adaptor_trait,
+		template <typename, typename, bool, typename> class t_map_adaptor_trait,
+		bool t_enable_serialize,
 		typename t_lss_find_fn
 	>
 	struct x_fast_trie_base_spec
@@ -39,8 +40,13 @@ namespace asm_lsw { namespace detail {
 
 		// A class that has a member type “type” which is the actual adaptor.
 		// Other parameteres are supposed to have been fixed earlier.
-		template <typename t_map_key, typename t_map_value, typename t_map_access_key = map_adaptor_access_key <t_map_key>>
-		using map_adaptor_trait = t_map_adaptor_trait <t_map_key, t_map_value, t_map_access_key>;
+		template <
+			typename t_map_key,
+			typename t_map_value,
+			bool t_default_enable_serialize = t_enable_serialize,
+			typename t_map_access_key = map_adaptor_access_key <t_map_key>
+		>
+		using map_adaptor_trait = t_map_adaptor_trait <t_map_key, t_map_value, t_default_enable_serialize, t_map_access_key>;
 		
 		typedef t_lss_find_fn lss_find_fn;
 	};
@@ -72,6 +78,9 @@ namespace asm_lsw { namespace detail {
 	template <typename t_key>
 	class x_fast_trie_node : protected std::array <x_fast_trie_edge <t_key>, 2>
 	{
+	public:
+		typedef std::size_t size_type; // Needed for has_serialize.
+		
 	protected:
 		typedef x_fast_trie_edge <t_key> edge_type;
 		typedef std::array <edge_type, 2> base_class;
@@ -115,6 +124,22 @@ namespace asm_lsw { namespace detail {
 			{
 				return node[0].level_key(m_level);
 			}
+			
+			size_type serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const
+			{
+				auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+				std::size_t written_bytes(0);
+
+				written_bytes += sdsl::write_member(m_level, out, child, "level");
+		
+				sdsl::structure_tree::add_size(child, written_bytes);
+				return written_bytes;
+			}
+			
+			void load(std::istream& in)
+			{
+				sdsl::read_member(m_level, in);
+			}
 		};
 	};
 	
@@ -145,6 +170,38 @@ namespace asm_lsw { namespace detail {
 			assert(other.prev <= std::numeric_limits <t_key>::max());
 			assert(other.next <= std::numeric_limits <t_key>::max());
 		}
+		
+		bool operator==(x_fast_trie_leaf_link const &other) const
+		{
+			return prev == other.prev && next == other.next && value == other.value;
+		}
+		
+		template <typename Fn>
+		std::size_t serialize(
+			std::ostream &out,
+			Fn value_callback,
+			sdsl::structure_tree_node *v = nullptr,
+			std::string name = ""
+		) const
+		{
+			auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+			std::size_t written_bytes(0);
+
+			written_bytes += sdsl::write_member(prev, out, child, "prev");
+			written_bytes += sdsl::write_member(next, out, child, "next");
+			written_bytes += value_callback(value, out, child);
+	
+			sdsl::structure_tree::add_size(child, written_bytes);
+			return written_bytes;
+		}
+		
+		template <typename Fn>
+		void load(std::istream &in, Fn value_callback)
+		{
+			sdsl::read_member(prev, in);
+			sdsl::read_member(next, in);
+			value_callback(value, in);
+		}
 	};
 	
 	
@@ -152,6 +209,8 @@ namespace asm_lsw { namespace detail {
 	template <typename t_key>
 	struct x_fast_trie_leaf_link <t_key, void>
 	{
+		typedef std::size_t size_type; // Needed for has_serialize.
+		
 		// FIXME: use iterators instead for prev and next?
 		t_key prev;
 		t_key next;
@@ -167,6 +226,29 @@ namespace asm_lsw { namespace detail {
 			assert(other.prev <= std::numeric_limits <t_key>::max());
 			assert(other.next <= std::numeric_limits <t_key>::max());
 		}
+		
+		bool operator==(x_fast_trie_leaf_link const &other) const
+		{
+			return prev == other.prev && next == other.next;
+		}
+		
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const
+		{
+			auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+			std::size_t written_bytes(0);
+
+			written_bytes += sdsl::write_member(prev, out, child, "prev");
+			written_bytes += sdsl::write_member(next, out, child, "next");
+	
+			sdsl::structure_tree::add_size(child, written_bytes);
+			return written_bytes;
+		}
+		
+		void load(std::istream& in)
+		{
+			sdsl::read_member(prev, in);
+			sdsl::read_member(next, in);
+		}
 	};
 	
 	
@@ -175,11 +257,6 @@ namespace asm_lsw { namespace detail {
 	{
 		typedef t_key key_type;
 		typedef t_value value_type;
-
-		constexpr bool has_value() const
-		{
-			return true;
-		}
 		
 		template <typename t_iterator>
 		key_type key(t_iterator it) const
@@ -192,6 +269,8 @@ namespace asm_lsw { namespace detail {
 		{
 			return it->second.value;
 		}
+
+		enum { is_map_type = 1 };
 	};
 	
 	
@@ -200,11 +279,6 @@ namespace asm_lsw { namespace detail {
 	{
 		typedef t_key key_type;
 		typedef t_key value_type;
-		
-		constexpr bool has_value() const
-		{
-			return false;
-		}
 
 		template <typename t_iterator>
 		key_type key(t_iterator it)
@@ -216,6 +290,57 @@ namespace asm_lsw { namespace detail {
 		value_type const &value(t_iterator it)
 		{
 			return it->first;
+		}
+		
+		enum { is_map_type = 0 };
+		
+		static_assert(
+			sdsl::has_serialize <x_fast_trie_leaf_link <t_key, void>>::value,
+			"Leaf link needs to have serialize."
+		);
+			
+		static_assert(
+			sdsl::has_load <x_fast_trie_leaf_link <t_key, void>>::value,
+			"Leaf link needs to have load."
+		);
+	};
+	
+	
+	template <typename t_mapped_type, bool t_dummy = true>
+	struct x_fast_trie_cmp
+	{
+		template <typename T, typename U>
+		bool contains(T const &trie_1, U const &trie_2)
+		{
+			typename T::const_iterator it;
+			for (auto const &kv : trie_2)
+			{
+				if (!trie_1.find(kv.first, it))
+					return false;
+				
+				if (! (kv.second.value == it->second.value))
+					return false;
+			}
+			
+			return true;
+		}
+	};
+	
+	
+	template <bool t_dummy>
+	struct x_fast_trie_cmp <void, t_dummy>
+	{
+		template <typename T, typename U>
+		bool contains(T const &trie_1, U const &trie_2)
+		{
+			typename T::const_iterator it;
+			for (auto const &kv : trie_2)
+			{
+				if (!trie_1.find(kv.first, it))
+					return false;
+			}
+			
+			return true;
 		}
 	};
 }}

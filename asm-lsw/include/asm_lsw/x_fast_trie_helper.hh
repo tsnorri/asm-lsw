@@ -25,7 +25,13 @@
 
 namespace asm_lsw { namespace detail {
 
-	template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
+	// Only for non-compact, hence t_enable_serialize may be ignored.
+	template <
+		typename t_key,
+		typename t_value,
+		bool t_enable_serialize = false,
+		typename t_access_key = map_adaptor_access_key <t_key>
+	>
 	struct x_fast_trie_map_adaptor_tpl
 	{
 		typedef map_adaptor <fast_trie_map_adaptor_map <t_value>::template type, t_key, t_value, t_access_key> type;
@@ -34,8 +40,8 @@ namespace asm_lsw { namespace detail {
 	
 	
 	// Specialization for nodes / edges with a custom hash function.
-	template <typename t_key, typename t_value>
-	struct x_fast_trie_map_adaptor_tpl <x_fast_trie_node <t_key>, t_value, typename x_fast_trie_node <t_key>::access_key>
+	template <typename t_key, typename t_value, bool t_enable_serialize>
+	struct x_fast_trie_map_adaptor_tpl <x_fast_trie_node <t_key>, t_value, t_enable_serialize, typename x_fast_trie_node <t_key>::access_key>
 	{
 		typedef x_fast_trie_node <t_key> key_type;
 		typedef map_adaptor <
@@ -91,6 +97,7 @@ namespace asm_lsw { namespace detail {
 		t_key,
 		t_value,
 		x_fast_trie_map_adaptor_tpl,
+		false,
 		x_fast_trie_lss_find_fn
 	>;
 }}
