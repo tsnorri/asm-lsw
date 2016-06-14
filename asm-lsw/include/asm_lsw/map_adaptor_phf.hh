@@ -528,6 +528,7 @@ namespace asm_lsw {
 	template <typename t_adaptor, typename t_it_val>
 	auto map_iterator_phf_tpl <t_adaptor, t_it_val>::dereference() const -> t_it_val
 	{
+#warning make this return a reference.
 		return m_adaptor->m_vector[m_idx];
 	}
 
