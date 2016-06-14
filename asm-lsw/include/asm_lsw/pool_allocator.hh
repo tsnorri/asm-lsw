@@ -158,11 +158,18 @@ namespace asm_lsw {
 		template <typename T, typename U> friend bool operator==(pool_allocator <T> const &, pool_allocator <U> const &);
 		
 	public:
-		typedef t_element value_type;
-		typedef std::true_type propagate_on_container_copy_assignment;
-		typedef std::true_type propagate_on_container_move_assignment;
-		typedef std::true_type propagate_on_container_swap;
-		typedef std::false_type is_always_equal;
+		typedef t_element			value_type;
+		typedef	value_type *		pointer;
+		typedef value_type const *	const_pointer;
+		typedef	value_type &		reference;
+		typedef value_type const &	const_reference;
+		typedef std::size_t			size_type;
+		typedef std::ptrdiff_t		difference_type;
+		
+		typedef std::true_type		propagate_on_container_copy_assignment;
+		typedef std::true_type		propagate_on_container_move_assignment;
+		typedef std::true_type		propagate_on_container_swap;
+		typedef std::false_type		is_always_equal;
 		
 		template <typename U>
 		struct rebind
@@ -174,8 +181,14 @@ namespace asm_lsw {
 		std::shared_ptr <detail::pool_allocator_impl> m_a;
 		
 	public:
-		pool_allocator():
-			m_a(new detail::pool_allocator_impl())
+		// Use std::allocator by default in order to get a working allocator with
+		// the default constructor.
+		pool_allocator(bool instantiate_empty_alloctor = false):
+			m_a(
+				instantiate_empty_alloctor ?
+				new detail::pool_allocator_impl :
+				nullptr
+			)
 		{
 		}
 		
@@ -193,7 +206,7 @@ namespace asm_lsw {
 		
 		void allocate_pool(space_requirement const &sr)
 		{
-			// The called function contains the required assertion.
+			assert(m_a.get());
 			m_a->allocate_pool_bytes <value_type>(sr.amount());
 		}
 		
@@ -209,15 +222,31 @@ namespace asm_lsw {
 			return pool_allocator(*this);
 		}
 		
-		value_type *allocate(std::size_t n)
+		value_type *allocate(std::size_t n, std::allocator <void>::const_pointer hint = nullptr)
 		{
-			return reinterpret_cast <value_type *>(m_a->allocate <value_type>(n));
+			detail::pool_allocator_impl *allocator(m_a.get());
+			if (allocator)
+				return reinterpret_cast <value_type *>(allocator->allocate <value_type>(n));
+			else
+			{
+				std::allocator <value_type> allocator;
+				return allocator.allocate(n, hint);
+			}
 		}
 		
-		void deallocate(value_type *, std::size_t n) {} // No-op.
+		void deallocate(value_type *ptr, std::size_t n)
+		{
+			auto *allocator(m_a.get());
+			if (!allocator)
+			{
+				std::allocator <value_type> allocator;
+				allocator.deallocate(ptr, n);
+			}
+		}
 		
 		std::size_t bytes_left() const
 		{
+			assert(m_a.get());
 			return m_a->bytes_left();
 		}
 	};
