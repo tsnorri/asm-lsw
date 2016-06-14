@@ -28,6 +28,9 @@ namespace asm_lsw {
 	// Wrapper for struct phf since it needs a custom destructor.
 	class phf_wrapper
 	{
+	public:
+		typedef std::size_t size_type; // Needed for has_serialize.
+		
 	protected:
 		struct phf m_phf{};
 		
@@ -36,8 +39,8 @@ namespace asm_lsw {
 
 		~phf_wrapper() { if (is_valid()) PHF::destroy(&m_phf); }
 		
-		phf_wrapper(phf_wrapper const &) = delete;
-		phf_wrapper &operator=(phf_wrapper const &) & = delete;
+		phf_wrapper(phf_wrapper const &);
+		phf_wrapper &operator=(phf_wrapper const &) &;
 		
 		phf_wrapper(phf_wrapper &&other):
 			m_phf(other.m_phf)
@@ -59,15 +62,27 @@ namespace asm_lsw {
 		struct phf const &get() const	{ return m_phf; }
 		
 		void load(std::istream &in);
-		std::size_t serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
 		
 	protected:
 		template <typename T>
 		void load_g(std::istream &in);
 		
 		template <typename T>
-		std::size_t serialize_g(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+		size_type serialize_g(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+
+		template <typename T>
+		void copy_g(phf_wrapper const &other);
 	};
+	
+	
+	template <typename T>
+	void phf_wrapper::copy_g(phf_wrapper const &other)
+	{
+		// Allocate g with malloc and copy the values.
+		m_phf.g = reinterpret_cast <uint32_t *>(malloc(m_phf.r * sizeof(T)));
+		std::copy_n(reinterpret_cast <T const *>(other.m_phf.g), m_phf.r, reinterpret_cast <T *>(m_phf.g));
+	}
 	
 	
 	template <typename T>
@@ -78,7 +93,7 @@ namespace asm_lsw {
 		
 		// Allocate g with malloc and copy the values.
 		m_phf.g = reinterpret_cast <uint32_t *>(malloc(m_phf.r * sizeof(T)));
-		assert(m_phf.r == std::distance(g_vec.cbegin(), g_vec.cend()));
+		assert(m_phf.r == g_vec.size());
 		std::copy_n(g_vec.cbegin(), m_phf.r, reinterpret_cast <T *>(m_phf.g));
 	}
 	
