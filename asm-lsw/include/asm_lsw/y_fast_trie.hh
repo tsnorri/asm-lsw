@@ -58,7 +58,7 @@ namespace asm_lsw {
 	template <typename t_key, typename t_value = void>
 	class y_fast_trie : public y_fast_trie_base <detail::y_fast_trie_spec <t_key, t_value>>
 	{
-		template <typename, typename, bool> friend class y_fast_trie_compact_as;
+		template <typename, typename> friend class y_fast_trie_compact_as;
 
 	public:
 		typedef y_fast_trie_base <detail::y_fast_trie_spec <t_key, t_value>> base_class;

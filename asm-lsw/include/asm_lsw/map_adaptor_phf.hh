@@ -43,7 +43,6 @@ namespace asm_lsw {
 		template <typename> class t_allocator,
 		typename t_key,
 		typename t_val,
-		bool t_enable_serialize = false,
 		typename t_access_key_fn = map_adaptor_access_key <t_key>
 	>
 	struct map_adaptor_phf_spec
@@ -53,8 +52,6 @@ namespace asm_lsw {
 		typedef t_key key_type;
 		typedef t_val value_type;
 		typedef t_access_key_fn access_key_fn_type;
-		
-		enum { enable_serialize = t_enable_serialize };
 	};
 	
 	
@@ -75,8 +72,6 @@ namespace asm_lsw {
 		typedef typename vector_type::size_type									size_type;
 		typedef typename t_spec::access_key_fn_type								access_key_fn_type;
 		
-		enum { can_serialize = t_spec::enable_serialize };
-
 	protected:
 		phf_wrapper m_phf;
 		vector_type m_vector;
@@ -232,9 +227,6 @@ namespace asm_lsw {
 			t_adaptor &adaptor,
 			accessed_type const &key
 		);
-			
-		std::size_t serialize_common(std::ostream &out, sdsl::structure_tree_node *child) const;
-		void load_common(std::istream &in);
 
 	public:
 		map_adaptor_phf() = default;
@@ -279,34 +271,6 @@ namespace asm_lsw {
 		const_iterator end() const								{ return const_iterator(this, this->m_vector.size()); }
 		const_iterator cend() const								{ return const_iterator(this, this->m_vector.size()); }
 		kv_type const &operator[](size_type const idx) const	{ return this->m_vector[idx]; }
-		
-		// Enable _keys variants if the container is a set-type. For load and serialize,
-		// require enable_serialize since implementing the required function in value_type
-		// and possibly access_key_fn might not be trivial.
-		
-		template <typename Fn, bool t_dummy = true>
-		auto serialize_keys(
-			std::ostream &out,
-			Fn value_callback,
-			sdsl::structure_tree_node *v,
-			std::string name
-		) const -> typename std::enable_if <trait_type::is_map_type && t_dummy, std::size_t>::type;
-	
-		template <bool t_dummy = true>
-		auto serialize(
-			std::ostream &out,
-			sdsl::structure_tree_node *v,
-			std::string name
-		) const -> typename std::enable_if <t_spec::enable_serialize && t_dummy, std::size_t>::type;
-	
-		template <typename Fn, bool t_dummy = true>
-		auto load_keys(
-			std::istream &in,
-			Fn value_callback
-		) -> typename std::enable_if <trait_type::is_map_type && t_dummy>::type;
-			
-		template <bool t_dummy = true>
-		auto load(std::istream &in) -> typename std::enable_if <t_spec::enable_serialize && t_dummy>::type;
 	};
 
 
@@ -484,104 +448,8 @@ namespace asm_lsw {
 		m_used_indices_select1_support.set_vector(&this->m_used_indices);
 		return *this;
 	}
-	
-	
-	template <typename t_spec>
-	auto map_adaptor_phf <t_spec>::serialize_common(
-		std::ostream &out,
-		sdsl::structure_tree_node *child
-	) const -> std::size_t
-	{
-		std::size_t written_bytes(0);
-		
-		written_bytes += this->m_phf.serialize(out, child, "phf");
-		written_bytes += this->m_used_indices.serialize(out, child, "used_indices");
-		written_bytes += this->m_access_key_fn.serialize(out, child, "access_key");
-		written_bytes += m_used_indices_rank0_support.serialize(out, child, "used_indices_r0_support");
-		written_bytes += m_used_indices_select1_support.serialize(out, child, "used_indices_s1_support");
-		written_bytes += write_member(this->m_size, out, child, "size");
-		
-		return written_bytes;
-	}
-	
-	
-	template <typename t_spec>
-	void map_adaptor_phf <t_spec>::load_common(std::istream &in)
-	{
-		this->m_phf.load(in);
-		this->m_used_indices.load(in);
-		this->m_access_key_fn.load(in);
-		m_used_indices_rank0_support.load(in);
-		m_used_indices_select1_support.load(in);
-		read_member(this->m_size, in);
-		
-		m_used_indices_rank0_support.set_vector(&this->m_used_indices);
-		m_used_indices_select1_support.set_vector(&this->m_used_indices);
-	}
-	
-	
-	template <typename t_spec>
-	template <typename Fn, bool t_dummy>
-	auto map_adaptor_phf <t_spec>::serialize_keys(
-		std::ostream &out,
-		Fn value_callback,
-		sdsl::structure_tree_node *v,
-		std::string name
-	) const -> typename std::enable_if <trait_type::is_map_type && t_dummy, std::size_t>::type
-	{
-		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
-		size_type written_bytes(0);
 
-		written_bytes += serialize_common(out, child);
-		written_bytes += trait_type::serialize_keys(this->m_vector, this->m_used_indices, value_callback, out, child);
-		
-		sdsl::structure_tree::add_size(child, written_bytes);
-		return written_bytes;
-	}
-	
-	
-	template <typename t_spec>
-	template <bool t_dummy>
-	auto map_adaptor_phf <t_spec>::serialize(
-		std::ostream &out,
-		sdsl::structure_tree_node *v,
-		std::string name
-	) const -> typename std::enable_if <t_spec::enable_serialize && t_dummy, std::size_t>::type
-	{
-		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
-		size_type written_bytes(0);
 
-		written_bytes += serialize_common(out, child);
-		written_bytes += trait_type::serialize(this->m_vector, this->m_used_indices, out, child);
-		
-		sdsl::structure_tree::add_size(child, written_bytes);
-		return written_bytes;
-	}
-	
-	
-	template <typename t_spec>
-	template <typename Fn, bool t_dummy>
-	auto map_adaptor_phf <t_spec>::load_keys(
-		std::istream &in,
-		Fn value_callback
-	) -> typename std::enable_if <trait_type::is_map_type && t_dummy>::type
-	{
-		load_common(in);
-		trait_type::load_keys(this->m_vector, this->m_used_indices, value_callback, in);
-	}
-	
-	
-	template <typename t_spec>
-	template <bool t_dummy>
-	auto map_adaptor_phf <t_spec>::load(
-		std::istream &in
-	) -> typename std::enable_if <t_spec::enable_serialize && t_dummy>::type
-	{
-		load_common(in);
-		trait_type::load(this->m_vector, this->m_used_indices, in);
-	}
-	
-	
 	template <typename t_spec>
 	template <typename t_map>
 	map_adaptor_phf <t_spec>::map_adaptor_phf(t_map &map):

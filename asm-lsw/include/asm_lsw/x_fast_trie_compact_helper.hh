@@ -41,24 +41,19 @@ namespace asm_lsw { namespace detail {
 	};
 	
 	
-	// Fix t_enable_serialize in order to pass it only from the compact trie.
-	template <bool t_enable_serialize>
+	template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
 	struct x_fast_trie_compact_map_adaptor_trait
 	{
-		template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
-		struct trait_type
-		{
-			using type = fast_trie_compact_map_adaptor <t_key, t_value, t_enable_serialize, t_access_key>;
-			static constexpr bool needs_custom_constructor() { return false; }
-		};
+		using type = fast_trie_compact_map_adaptor <t_key, t_value, t_access_key>;
+		static constexpr bool needs_custom_constructor() { return false; }
 	};
 	
 	
-	template <typename t_key, typename t_value, bool t_enable_serialize>
+	template <typename t_key, typename t_value>
 	using x_fast_trie_compact_spec = x_fast_trie_base_spec <
 		t_key,
 		t_value,
-		x_fast_trie_compact_map_adaptor_trait <t_enable_serialize>::template trait_type,
+		x_fast_trie_compact_map_adaptor_trait,
 		x_fast_trie_compact_lss_find_fn
 	>;
 }}
