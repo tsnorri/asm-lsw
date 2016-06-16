@@ -2,6 +2,7 @@
 *.gcda
 *.gcno
 asm-lsw/smoke-test/*.cc
+asm-lsw/src/libasm_lsw.a
 
 local.mk
 asm-lsw/smoke-test/tests.mk
