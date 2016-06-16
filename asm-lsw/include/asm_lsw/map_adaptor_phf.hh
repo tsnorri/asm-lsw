@@ -137,7 +137,7 @@ namespace asm_lsw {
 			m_adaptor(adaptor),
 			m_idx(idx)
 		{
-			if (convert)
+			if (convert && adaptor->m_vector.size())
 			{
 				auto const next(m_adaptor->m_used_indices_select1_support(1 + idx));
 				m_idx = next;
@@ -208,8 +208,8 @@ namespace asm_lsw {
 		);
 
 	protected:
-		typename base_class::used_indices_type::rank_0_type m_used_indices_rank0_support;
-		typename base_class::used_indices_type::select_1_type m_used_indices_select1_support;
+		typename base_class::used_indices_type::rank_0_type m_used_indices_rank0_support{};
+		typename base_class::used_indices_type::select_1_type m_used_indices_select1_support{};
 		
 	protected:
 		typename vector_type::size_type adapted_key(typename vector_type::size_type key) const { 
@@ -486,41 +486,47 @@ namespace asm_lsw {
 		t_access_value_fn &access_value_fn
 	): base_class(phf, size, alloc, access_key_fn)
 	{
-		// Reserve the required space for m_used_indices.
-		// Make select1(count) return a value that may be used in the end() itearator.
+		if (size)
 		{
-			assert(size < 1 + size);
-			decltype(this->m_used_indices) tmp(1 + size, 0);
-			tmp[size] = 1;
-			this->m_used_indices = std::move(tmp);
-		}
-		
-		// Create the mapping. Since all possible values are known at this time,
-		// PHF::hash will return unique values and no sublists are needed.
-		// FIXME: since the template parameter of PHF::hash is independent of that of PHF::init,
-		// the function may return incorrect hashes thus making its use rather error-prone.
-		// For now, using the same type with PHF::init and adapted_key() needs to be ensured.
-		for (auto &kv : map)
-		{
-			auto const key(this->m_access_key_fn(trait_type::key(kv)));
-			auto const hash(this->adapted_key(key));
-			assert(!this->m_used_indices[hash]);
-
-			this->m_vector[hash] = std::move(access_value_fn(kv));
-			this->m_used_indices[hash] = 1;
-			++this->m_size;
-		}
-		
-		// Set up rank0 support.
-		{
-			decltype(m_used_indices_rank0_support) tmp(&this->m_used_indices);
-			m_used_indices_rank0_support = std::move(tmp);
-		}
-		
-		// Set up select1 support.
-		{
-			decltype(m_used_indices_select1_support) tmp(&this->m_used_indices);
-			m_used_indices_select1_support = std::move(tmp);
+			// Reserve the required space for m_used_indices.
+			// Make select1(count) return a value that may be used in the end() itearator.
+			{
+				assert(size < 1 + size);
+				decltype(this->m_used_indices) tmp(1 + size, 0);
+				tmp[size] = 1;
+				this->m_used_indices = std::move(tmp);
+			}
+			
+			// Create the mapping. Since all possible values are known at this time,
+			// PHF::hash will return unique values and no sublists are needed.
+			// FIXME: since the template parameter of PHF::hash is independent of that of PHF::init,
+			// the function may return incorrect hashes thus making its use rather error-prone.
+			// For now, using the same type with PHF::init and adapted_key() needs to be ensured.
+			{
+				auto const map_size(map.size());
+				for (auto &kv : map)
+				{
+					auto const key(this->m_access_key_fn(trait_type::key(kv)));
+					auto const hash(this->adapted_key(key));
+					assert(!this->m_used_indices[hash]);
+					
+					this->m_vector[hash] = std::move(access_value_fn(kv));
+					this->m_used_indices[hash] = 1;
+					++this->m_size;
+				}
+			}
+			
+			// Set up rank0 support.
+			{
+				decltype(m_used_indices_rank0_support) tmp(&this->m_used_indices);
+				m_used_indices_rank0_support = std::move(tmp);
+			}
+			
+			// Set up select1 support.
+			{
+				decltype(m_used_indices_select1_support) tmp(&this->m_used_indices);
+				m_used_indices_select1_support = std::move(tmp);
+			}
 		}
 	}
 	
