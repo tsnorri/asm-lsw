@@ -2,6 +2,7 @@
 *.gcda
 *.gcno
 asm-lsw/aligner/cmdline.h
+asm-lsw/aligner/asm-lsw-aligner
 asm-lsw/smoke-test/*.cc
 asm-lsw/src/libasm_lsw.a
 
