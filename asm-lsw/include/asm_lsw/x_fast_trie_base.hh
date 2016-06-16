@@ -39,7 +39,8 @@ namespace asm_lsw {
 		static_assert(std::is_integral <typename t_spec::key_type>::value, "Unsigned integer required.");
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
-		template <typename, typename, bool> friend class x_fast_trie_compact;
+		template <typename, typename, bool>
+		friend class x_fast_trie_compact;
 		
 		template <typename t_other_spec>
 		friend class x_fast_trie_base;
@@ -147,14 +148,6 @@ namespace asm_lsw {
 
 			void update_levels(key_type const key);
 			void erase_key(key_type const key, key_type const prev, key_type const next);
-			
-			template <bool t_dummy = true>
-			auto serialize(
-				std::ostream &out, sdsl::structure_tree_node *v, std::string name
-			) const -> typename std::enable_if <level_map::can_serialize && t_dummy, std::size_t>::type;
-					
-			template <bool t_dummy = true>
-			auto load(std::istream &in) -> typename std::enable_if <level_map::can_serialize && t_dummy>::type;
 		};
 
 	protected:

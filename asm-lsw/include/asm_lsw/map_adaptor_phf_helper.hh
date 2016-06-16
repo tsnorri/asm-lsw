@@ -18,7 +18,6 @@
 #ifndef ASM_LSW_MAP_ADAPTOR_PHF_HELPER_HH
 #define ASM_LSW_MAP_ADAPTOR_PHF_HELPER_HH
 
-#include <sdsl/io.hpp>
 #include <utility>
 
 
@@ -79,7 +78,6 @@ namespace asm_lsw { namespace detail {
 	struct map_adaptor_phf_trait
 	{
 	};
-
 
 	template <typename t_spec>
 	struct map_adaptor_phf_trait <t_spec, true>
@@ -180,7 +178,6 @@ namespace asm_lsw { namespace detail {
 			load(vector, used_indices, in);
 		}
 	};
-
 
 	template <typename t_spec>
 	struct map_adaptor_phf_trait <t_spec, false>

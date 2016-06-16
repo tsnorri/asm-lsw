@@ -1,11 +1,12 @@
 # Ignore Xcode's setting since the SDK may contain older versions of Clang and libc++.
 unexport SDKROOT
 
-CC		?= gcc
-CXX		?= g++
-GCOVR	?= gcovr
-MKDIR	?= mkdir
-CLOC	?= cloc
+CC			?= gcc
+CXX			?= g++
+GCOVR		?= gcovr
+MKDIR		?= mkdir
+CLOC		?= cloc
+GENGETOPT	?= gengetopt
 
 WARNING_FLAGS	?=
 WARNING_FLAGS	+= \

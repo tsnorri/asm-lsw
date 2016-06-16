@@ -279,7 +279,7 @@ void test_adaptors(t_map <t_args ...> const &test_values)
 
 	{
 		typedef asm_lsw::map_adaptor_phf_spec <
-			std::vector, asm_lsw::pool_allocator, key_type, value_type, true, typename test_traits <key_type>::access_key
+			std::vector, asm_lsw::pool_allocator, key_type, value_type, typename test_traits <key_type>::access_key
 		> adaptor_spec;
 		auto tv_copy(test_values);
 		asm_lsw::map_adaptor_phf_builder <adaptor_spec, decltype(test_values)> builder(tv_copy);
@@ -342,7 +342,7 @@ go_bandit([](){
 
 			it("should propagate and use access_key_fn", [&](){
 				asm_lsw::map_adaptor_phf_builder <
-					asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, true, access_key>,
+					asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, access_key>,
 					decltype(adaptor)
 				> builder(adaptor, acc);
 				decltype(builder)::adaptor_type adaptor_phf(builder);

@@ -69,34 +69,73 @@ namespace asm_lsw {
 			typename cst_type::size_type i(0), j(0);
 			h_u_intermediate_type hl_tmp, hr_tmp;
 			
-			while ((i = 1 + j * log2n) < leaf_count)
+			// i is an SA index s.t.
+			//  i ∈  {i | i ≡ 1 (mod log₂²n)}
+			//     = {i | i - 1 divisible by log₂²n}
+			//     = {1 + j log₂²n | j ∈ ℕ}
+			//
+			// Find SA indices from the sample that are slightly lower and higher than k.
+			// Suppose k is in the sample. Then it holds that
+			//   1 + j log₂²n = k
+			// ⇔     j log₂²n = k - 1
+			// ⇔            j = (k - 1) / log₂²n
+			//
+			// Continue by checking LCP lengths for values of i that are lower and higher than
+			// the initial value since they are sorted by LCP length s.t. the greatest length is
+			// at index k.
+			
 			{
-				// Now i is an SA index s.t.
-				//  i ∈  {i | i ≡ 1 (mod log₂²n)}
-				//     = {i | i - 1 divisible by log₂²n}
-				//     = {1 + j log₂²n | j ∈ ℕ}
-				
-				// Check |lcp(k, i)| ≥ plen(v).
-				auto const lcp_len(i == k ? plen_u : matcher.lcp_length(std::min(k, i), std::max(k, i)));
-				
-				// Check that LCP returns csa_type::size_type (for key).
+				typename cst_type::size_type j_low(0), j_high(0);
+				if (k <= 1)
 				{
-					typedef typename h_u_intermediate_type::key_type hu_key_type;
-					static_assert(
-						std::numeric_limits <decltype(lcp_len)>::max() <= std::numeric_limits <hu_key_type>::max(),
-						""
-					);
+					j_high = 1;
+				}
+				else
+				{
+					auto j_initial((k - 1) / double(log2n));
+					j_low = std::floor(j_initial);
+					j_high = std::ceil(j_initial);
+					
+					while (true)
+					{
+						typename cst_type::size_type i(1 + j_low * log2n);
+						if (i != k)
+						{
+							assert(i < k);
+							auto const lcp_len(matcher.lcp_length(i, k));
+							
+							// Diverges from the paper (section 3.1), the case where i = k is handled in Lemma 19 Case 2 (CP).
+							if (plen_v <= lcp_len)
+								hl_tmp.insert(std::make_pair(lcp_len, i));
+							else
+								break;
+						}
+						
+						if (0 == j_low)
+							break;
+						
+						--j_low;
+					}
 				}
 				
-				if (plen_v <= lcp_len)
+				while (true)
 				{
-					if (i < k) // Diverges from the paper (section 3.1), the case where i = k is handled in Lemma 19 Case 2 (CP).
-						hl_tmp.insert(std::make_pair(lcp_len, i));
-					else if (k < i)
-						hr_tmp.insert(std::make_pair(lcp_len, i));
+					typename cst_type::size_type i(1 + j_high * log2n);
+					if (! (i < leaf_count))
+						break;
+
+					if (i != k)
+					{
+						assert(k < i);
+						auto const lcp_len(matcher.lcp_length(k, i));
+						if (plen_v <= lcp_len)
+							hr_tmp.insert(std::make_pair(lcp_len, i));
+						else
+							break;
+					}
+					
+					++j_high;
 				}
-				
-				++j;
 			}
 			
 			// Compress hl and hr.
@@ -135,6 +174,7 @@ namespace asm_lsw {
 			auto const count(ce_bps.rank(ce_bps.size() - 1));
 			
 			h_map_intermediate maps_i;
+			
 			for (util::remove_c_t<decltype(count)> i{0}; i < count; ++i)
 			{
 				// Find the index of each opening parenthesis and its counterpart,

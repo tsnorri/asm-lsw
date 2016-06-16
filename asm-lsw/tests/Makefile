@@ -4,7 +4,7 @@ include ../../common.mk
 .PHONY: run_tests
 .PRECIOUS: tests
 
-LDFLAGS_COVERAGE ?= -lgcov -L../src -lasm_lsw
+LDFLAGS_COVERAGE ?= -lgcov
 
 CPPFLAGS	+= -DASM_LSW_EXCEPTIONS
 CXXFLAGS	+= -fprofile-arcs -ftest-coverage
@@ -16,7 +16,6 @@ OBJECTS		=	bp_support_sparse_tests.o \
 				map_adaptor_tests.o \
 				matrix_tests.o \
 				pool_allocator_tests.o \
-				static_binary_tree_tests.o \
 				x_fast_trie_tests.o \
 				x_fast_trie_compact_tests.o \
 				x_fast_trie_compact_as_tests.o \

@@ -3,7 +3,7 @@ include ../../common.mk
 
 CPPFLAGS	+= -DASM_LSW_EXCEPTIONS
 
-OBJECTS		=	phf_wrapper.o
+OBJECTS		=	vector_source.o
 
 all: libasm_lsw.a
 

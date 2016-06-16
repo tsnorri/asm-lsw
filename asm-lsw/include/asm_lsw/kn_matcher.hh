@@ -116,6 +116,7 @@ namespace asm_lsw {
 		k1_matcher_type	m_matcher;
 		
 	public:
+		kn_matcher() {}
 		
 		kn_matcher(cst_type const &cst):
 			m_cst(&cst),

@@ -54,7 +54,7 @@ namespace asm_lsw { namespace detail {
 	};
 	
 	
-	template <typename t_key, typename t_value, bool t_enable_serialize>
+	template <typename t_key, typename t_value>
 	using x_fast_trie_compact_spec = x_fast_trie_base_spec <
 		t_key,
 		t_value,

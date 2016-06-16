@@ -484,6 +484,7 @@ namespace asm_lsw {
 		auto const &isa(csa.isa);
 
 		// cst.begin() returns an iterator that visits inner nodes twice.
+		std::size_t ii(0);
 		for (auto it(m_cst->begin_bottom_up()), end(m_cst->end_bottom_up()); it != end; ++it)
 		{
 			typename cst_type::node_type v(*it);
@@ -521,6 +522,8 @@ namespace asm_lsw {
 					}
 					++j;
 				}
+				
+				++ii;
 			}
 		}
 	}
