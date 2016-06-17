@@ -87,7 +87,7 @@ namespace asm_lsw { namespace detail {
 		typedef typename t_spec::access_key_fn_type::key_type				key_type;
 		typedef typename t_spec::value_type									value_type;	// FIXME: mapped_type?
 		typedef key_type													kv_type;	// FIXME: value_type?
-		typedef key_type const												const_kv_type;	// FIXME: value_type?
+		typedef key_type const &											const_iterator_return_type;
 		
 		enum { is_map_type = 0 };
 
@@ -99,6 +99,12 @@ namespace asm_lsw { namespace detail {
 
 		template <typename t_kv>
 		static kv_type kv(t_kv &kv)
+		{
+			return kv;
+		}
+		
+		template <typename t_kv>
+		static const_iterator_return_type &dereference(t_kv &kv)
 		{
 			return kv;
 		}
@@ -188,7 +194,7 @@ namespace asm_lsw { namespace detail {
 		typedef typename t_spec::access_key_fn_type::key_type				key_type;
 		typedef typename t_spec::value_type									value_type;	// FIXME: mapped_type?
 		typedef std::pair <key_type, value_type>							kv_type;	// FIXME: value_type?
-		typedef std::pair <key_type const, value_type>						const_kv_type;	// FIXME: value_type?
+		typedef std::pair <key_type const, value_type const &>				const_iterator_return_type;
 
 		enum { is_map_type = 1 };
 
@@ -202,6 +208,13 @@ namespace asm_lsw { namespace detail {
 		static kv_type kv(t_kv &kv)
 		{
 			return std::make_pair(kv.first, std::move(kv.second));
+		}
+		
+		template <typename t_kv>
+		static const_iterator_return_type dereference(t_kv &kv)
+		{
+			const_iterator_return_type retval(kv.first, kv.second);
+			return retval;
 		}
 		
 		template <typename t_map, typename t_other>

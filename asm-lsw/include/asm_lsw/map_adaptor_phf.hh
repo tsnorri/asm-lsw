@@ -27,6 +27,7 @@
 #include <sdsl/int_vector.hpp>
 #include <sdsl/rank_support.hpp>
 #include <sdsl/select_support.hpp>
+#include <type_traits>
 
 
 namespace asm_lsw {
@@ -77,7 +78,7 @@ namespace asm_lsw {
 		typedef typename t_spec::value_type										value_type; //FIXME: replace this with kv_type.
 		typedef typename t_spec::value_type										mapped_type;
 		typedef typename trait_type::kv_type									kv_type;
-		typedef typename trait_type::const_kv_type								const_kv_type;
+		typedef typename trait_type::const_iterator_return_type					const_iterator_return_type;
 		typedef typename t_spec::template allocator_type <kv_type>				allocator_type;
 		typedef typename t_spec::template vector_type <kv_type, allocator_type>	vector_type;
 		typedef typename vector_type::size_type									size_type;
@@ -171,13 +172,17 @@ namespace asm_lsw {
 				m_idx = next;
 			}
 		}
-		
+
 		// Remove the conversion from iterator to const_iterator as per
 		// http://www.boost.org/doc/libs/1_58_0/libs/iterator/doc/iterator_facade.html#telling-the-truth
 		template <typename t_other_val>
 		map_iterator_phf_tpl(
 			map_iterator_phf_tpl <t_adaptor, t_other_val> const &other, typename boost::enable_if<
-				boost::is_convertible<t_other_val *, t_it_val *>, enabler
+				boost::is_convertible<
+					typename std::remove_reference <t_other_val>::type *,
+					typename std::remove_reference <t_it_val>::type *
+				>,
+				enabler
 			>::type = enabler()
 		):
 			m_adaptor(other.m_adaptor), m_idx(other.m_idx)
@@ -216,14 +221,17 @@ namespace asm_lsw {
 		typedef typename base_class::key_type							key_type;
 		typedef typename base_class::value_type							value_type; // FIXME: replace kv_type with this.
 		typedef typename base_class::mapped_type						mapped_type; // FIXME: replace value_type with this.
-		typedef typename base_class::kv_type							kv_type;
-		typedef typename base_class::const_kv_type						const_kv_type;
+		typedef typename base_class::kv_type							kv_type;		// FIXME: replace.
+		typedef typename base_class::const_iterator_return_type			const_iterator_return_type;	// FIXME: replace.
 		typedef typename base_class::allocator_type						allocator_type;
 		typedef typename base_class::vector_type						vector_type;
 		typedef typename base_class::size_type							size_type;
 		// If value_type is void, kv_type is the same as key_type.
-		typedef map_iterator_phf_tpl <map_adaptor_phf, const_kv_type const>	const_iterator;
-		typedef const_iterator												iterator;
+		typedef map_iterator_phf_tpl <
+			map_adaptor_phf,
+			const_iterator_return_type
+		>																const_iterator;
+		typedef const_iterator											iterator;
 		
 		template <typename t_map, typename t_access_value_fn = detail::map_adaptor_phf_access_value <t_spec>>
 		using builder_type = map_adaptor_phf_builder <t_spec, t_map, t_access_value_fn>;
@@ -528,8 +536,12 @@ namespace asm_lsw {
 	template <typename t_adaptor, typename t_it_val>
 	auto map_iterator_phf_tpl <t_adaptor, t_it_val>::dereference() const -> t_it_val
 	{
-TODO(make this return a reference.)
-		return m_adaptor->m_vector[m_idx];
+		// std::pair <key_type, mapped_type> apparently isn't convertible to
+		// std::pair <key_type, mapped_type const>, so the set type container
+		// returns a reference from m_vector and the map type container
+		// constructs a pair the second element of which is a reference to the
+		// mapped value.
+		return t_adaptor::trait_type::dereference(m_adaptor->m_vector[m_idx]);
 	}
 
 	
