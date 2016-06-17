@@ -46,9 +46,9 @@ namespace asm_lsw {
 	
 	
 
-	template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
+	template <typename t_key, typename t_value, bool t_enable_serialize = false, typename t_access_key = map_adaptor_access_key <t_key>>
 	using fast_trie_compact_map_adaptor = map_adaptor_phf <
-		map_adaptor_phf_spec <std::vector, pool_allocator, t_key, t_value, t_access_key>
+		map_adaptor_phf_spec <std::vector, pool_allocator, t_key, t_value, t_enable_serialize, t_access_key>
 	>;
 }
 

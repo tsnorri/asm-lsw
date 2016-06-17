@@ -31,14 +31,14 @@ namespace asm_lsw {
 	
 	
 	// Uses perfect hashing instead of the one provided by STL.
-	template <typename t_key, typename t_value = void>
-	class x_fast_trie_compact : public x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value>>
+	template <typename t_key, typename t_value = void, bool t_enable_serialize = false>
+	class x_fast_trie_compact : public x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value, t_enable_serialize>>
 	{
-		template <typename, typename, typename>
+		template <typename, typename, typename, bool>
 		friend class x_fast_trie_compact_as_tpl;
 
 	protected:
-		typedef x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value>> base_class;
+		typedef x_fast_trie_base <detail::x_fast_trie_compact_spec <t_key, t_value, t_enable_serialize>> base_class;
 		
 		typedef typename base_class::level_idx_type level_idx_type;
 		typedef typename base_class::level_map level_map;
@@ -95,8 +95,8 @@ namespace asm_lsw {
 	};
 	
 	
-	template <typename t_key, typename t_value>
-	x_fast_trie_compact <t_key, t_value>::x_fast_trie_compact(x_fast_trie <key_type, value_type> &other):
+	template <typename t_key, typename t_value, bool t_enable_serialize>
+	x_fast_trie_compact <t_key, t_value, t_enable_serialize>::x_fast_trie_compact(x_fast_trie <key_type, value_type> &other):
 		x_fast_trie_compact()
 	{
 		typedef util::remove_ref_t <decltype(other)> other_adaptor_type;

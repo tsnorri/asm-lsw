@@ -48,7 +48,7 @@ namespace asm_lsw {
 		typedef typename map_type::iterator iterator;
 		typedef typename map_type::const_iterator const_iterator;
 		typedef typename access_key_fn_type::accessed_type accessed_type;
-		
+
 		// For compatibility with map_adaptor_phf.
 		template <template <typename> class t_new_allocator>
 		using rebind_allocator = map_adaptor;

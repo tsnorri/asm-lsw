@@ -223,6 +223,10 @@ namespace asm_lsw {
 		template <typename, typename>
 		friend class x_fast_trie_compact_as_leaf_link_iterator_tpl;
 
+	protected:
+		typedef detail::x_fast_trie_trait<t_max_key, t_value> trait;
+		typedef fast_trie_compact_as_trait<t_value> as_trait;
+
 	public:
 		typedef t_max_key key_type;
 		typedef t_value value_type; // FIXME: replace.
@@ -236,7 +240,7 @@ namespace asm_lsw {
 			key_type,
 			typename value_ref <value_type>::type>
 		> leaf_it_val;
-
+			
 		typedef std::pair <key_type const, detail::x_fast_trie_leaf_link <
 			key_type,
 			typename value_ref <value_type>::type>
@@ -253,9 +257,6 @@ namespace asm_lsw {
 		
 		enum { is_trie = 1 };
 
-	protected:
-		typedef detail::x_fast_trie_trait<key_type, value_type> trait;
-		
 	protected:
 		key_type m_offset{0};
 
@@ -350,6 +351,12 @@ namespace asm_lsw {
 		virtual bool find(key_type const key, const_leaf_iterator &it) const = 0;
 		virtual bool find_predecessor(key_type const key, const_leaf_iterator &pred, bool allow_equal = false) const = 0;
 		virtual bool find_successor(key_type const key, const_leaf_iterator &succ, bool allow_equal = false) const = 0;
+		
+		template <typename t_other_max_key, typename t_other_value, bool t_other_enable_serialize>
+		bool operator==(x_fast_trie_compact_as <t_other_max_key, t_other_value, t_other_enable_serialize> const &other) const
+		{
+			return std::equal(cbegin(), cend(), other.cbegin(), other.cend());
+		}
 		
 		virtual void print() const = 0;
 		
@@ -490,9 +497,9 @@ namespace asm_lsw {
 	
 	template <typename t_trie, typename t_it_val>
 	template <typename t_other_val>
-	auto x_fast_trie_compact_as_leaf_link_iterator_tpl <t_trie, t_it_val>::equal(
+	bool x_fast_trie_compact_as_leaf_link_iterator_tpl <t_trie, t_it_val>::equal(
 		x_fast_trie_compact_as_leaf_link_iterator_tpl <t_trie, t_other_val> const &other
-	) const -> bool
+	) const
 	{
 		return (this->m_trie == other.m_trie &&
 				this->m_idx == other.m_idx);
@@ -609,8 +616,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::check_find_result(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::check_find_result(
 		bool const res,
 		typename trie_type::const_leaf_iterator const &it,
 		const_leaf_iterator &out_it
@@ -626,8 +633,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find(
 		key_type const key, const_leaf_iterator &out_it
 	) const
 	{
@@ -641,8 +648,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_predecessor(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_predecessor(
 		key_type const key, const_leaf_iterator &out_it, bool allow_equal
 	) const
 	{
@@ -656,8 +663,8 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::find_successor(
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	bool x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::find_successor(
 		key_type const key, const_leaf_iterator &out_it, bool allow_equal
 	) const
 	{
@@ -671,8 +678,10 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_key, typename t_value>
-	auto x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value>::leaf_link(size_type const idx) const -> leaf_it_val
+	template <typename t_max_key, typename t_key, typename t_value, bool t_enable_serialize>
+	auto x_fast_trie_compact_as_tpl <t_max_key, t_key, t_value, t_enable_serialize>::leaf_link(
+		size_type const idx
+	) const -> leaf_it_val
 	{
 		auto const &leaf_link(m_trie.leaf_link(idx));
 		typename leaf_it_val::second_type ret_link(leaf_link.second);
@@ -729,7 +738,7 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_ret_key, typename t_key>
 	auto x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct_specific(
 		x_fast_trie <t_key, t_value> &trie,
@@ -744,7 +753,7 @@ namespace asm_lsw {
 	}
 
 
-	template <typename t_max_key, typename t_value>
+	template <typename t_max_key, typename t_value, bool t_enable_serialize>
 	template <typename t_key>
 	auto x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>::construct(
 		x_fast_trie <t_key, t_value> &trie

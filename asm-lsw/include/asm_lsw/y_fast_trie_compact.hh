@@ -28,7 +28,7 @@ namespace asm_lsw {
 	template <typename t_spec>
 	class map_adaptor_phf;
 	
-	template <typename t_key, typename t_value>
+	template <typename t_key, typename t_value, bool t_enable_serialize>
 	class x_fast_trie_compact;
 	
 	template <typename t_key, typename t_value>
@@ -38,12 +38,21 @@ namespace asm_lsw {
 
 namespace asm_lsw { namespace detail {
 
-	template <typename t_key, typename t_value>
+	// Fix t_enable_serialize in order to pass it only from the compact trie.
+	template <bool t_enable_serialize>
+	struct y_fast_trie_compact_map_adaptor_trait
+	{
+		template <typename t_key, typename t_value, typename t_access_key = map_adaptor_access_key <t_key>>
+		using map_type = fast_trie_compact_map_adaptor <t_key, t_value, t_enable_serialize, t_access_key>;
+	};
+	
+
+	template <typename t_key, typename t_value, bool t_enable_serialize>
 	using y_fast_trie_compact_spec = y_fast_trie_base_spec <
 		t_key,
 		t_value,
-		fast_trie_compact_map_adaptor,
-		x_fast_trie_compact <t_key, void>
+		y_fast_trie_compact_map_adaptor_trait <t_enable_serialize>::template map_type,
+		x_fast_trie_compact <t_key, void, t_enable_serialize>
 	>;
 }}
 
@@ -51,11 +60,11 @@ namespace asm_lsw { namespace detail {
 namespace asm_lsw {
 
 	// Use perfect hashing instead of the one provided by STL.
-	template <typename t_key, typename t_value = void>
-	class y_fast_trie_compact : public y_fast_trie_base <detail::y_fast_trie_compact_spec <t_key, t_value>>
+	template <typename t_key, typename t_value = void, bool t_enable_serialize = false>
+	class y_fast_trie_compact : public y_fast_trie_base <detail::y_fast_trie_compact_spec <t_key, t_value, t_enable_serialize>>
 	{
 	public:
-		typedef y_fast_trie_base <detail::y_fast_trie_compact_spec <t_key, t_value>> base_class;
+		typedef y_fast_trie_base <detail::y_fast_trie_compact_spec <t_key, t_value, t_enable_serialize>> base_class;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::value_type value_type;
 		typedef typename base_class::size_type size_type;

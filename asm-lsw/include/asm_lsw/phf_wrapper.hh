@@ -20,6 +20,8 @@
 
 #include <cstring>
 #include <phf.h>
+#include <sdsl/int_vector.hpp>
+
 
 namespace asm_lsw {
 
@@ -34,7 +36,7 @@ namespace asm_lsw {
 		
 	public:
 		phf_wrapper() {}
-                
+
 		~phf_wrapper() { if (is_valid()) PHF::destroy(&m_phf); }
 		
 		phf_wrapper(phf_wrapper const &);

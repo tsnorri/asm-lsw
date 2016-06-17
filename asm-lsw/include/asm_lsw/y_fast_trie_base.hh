@@ -35,8 +35,8 @@ namespace asm_lsw {
 		static_assert(std::is_integral <typename t_spec::key_type>::value, "Unsigned integer required.");
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
-		template <typename, typename> friend class y_fast_trie_compact;
-		template <typename, typename, typename> friend class y_fast_trie_compact_as_tpl;
+		template <typename, typename, bool> friend class y_fast_trie_compact;
+		template <typename, typename, typename, bool> friend class y_fast_trie_compact_as_tpl;
 
 	public:
 		typedef typename t_spec::key_type key_type;
