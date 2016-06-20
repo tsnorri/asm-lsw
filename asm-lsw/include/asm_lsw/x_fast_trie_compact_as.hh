@@ -100,7 +100,7 @@ namespace asm_lsw {
 			std::size_t(t_value const &, std::ostream &, sdsl::structure_tree_node *)
 		> serialize_value_callback_type;
 		typedef std::function <
-			void(t_value const &, std::istream &)
+			void(t_value &, std::istream &)
 		> load_value_callback_type;
 		enum { is_map_type = 1 };
 	};
