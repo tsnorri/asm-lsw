@@ -20,7 +20,11 @@
 
 #include <algorithm>
 #include <limits>
+#include <sdsl/io.hpp>
 #include <type_traits>
+
+#define DO_PRAGMA(x) _Pragma (#x)
+#define TODO(x) DO_PRAGMA(message ("TODO - " #x))
 
 #ifdef HAVE_ATTRIBUTE_PURE
 #define ASM_LSW_PURE __attribute__((pure))
@@ -120,6 +124,52 @@ namespace asm_lsw { namespace util {
 			}
 		}
 	}
+	
+	
+	// Choose either write_member or serialize. The latter probably isn't needed much.
+	template <typename t_value, bool t_has_serialize = sdsl::has_serialize <t_value>::value>
+	struct serialize_value_fn {};
+
+	template <typename t_value>
+	struct serialize_value_fn <t_value, true>
+	{
+		std::size_t operator()(t_value const &value, std::ostream &out, sdsl::structure_tree_node *node)
+		{
+			return value.serialize(out, node, "");
+		}
+	};
+	
+	template <typename t_value>
+	struct serialize_value_fn <t_value, false>
+	{
+		std::size_t operator()(t_value const &value, std::ostream &out, sdsl::structure_tree_node *node)
+		{
+			return sdsl::write_member_nn(value, out);
+		}
+	};
+	
+	
+	// Choose either read_member or load. The latter probably isn't needed much.
+	template <typename t_value, bool t_has_load = sdsl::has_load <t_value>::value>
+	struct load_value_fn {};
+
+	template <typename t_value>
+	struct load_value_fn <t_value, true>
+	{
+		void operator()(t_value &value, std::istream &in)
+		{
+			value.load(in);
+		}
+	};
+	
+	template <typename t_value>
+	struct load_value_fn <t_value, false>
+	{
+		void operator()(t_value &value, std::istream &in)
+		{
+			sdsl::read_member(value, in);
+		}
+	};
 }}
 
 #endif

@@ -17,6 +17,7 @@
 #ifndef ASM_LSW_STATIC_BINARY_TREE_HH
 #define ASM_LSW_STATIC_BINARY_TREE_HH
 
+#include <asm_lsw/static_binary_tree_helper.hh>
 #include <asm_lsw/util.hh>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
@@ -26,22 +27,22 @@
 
 namespace asm_lsw { namespace detail {
 	
-	template <typename t_tree>
+	template <typename t_tree, typename t_it_val, typename t_it_ref>
 	class static_binary_tree_iterator_tpl : public boost::iterator_facade <
-		static_binary_tree_iterator_tpl <t_tree>,
-		typename t_tree::key_type,
-		boost::random_access_traversal_tag,
-		typename t_tree::key_type
+		static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref>,
+		t_it_val,
+		boost::bidirectional_traversal_tag,
+		t_it_ref
 	>
 	{
 		friend class boost::iterator_core_access;
 
 	protected:
 		typedef boost::iterator_facade <
-			static_binary_tree_iterator_tpl <t_tree>,
-			typename t_tree::key_type,
+			static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref>,
+			t_it_val,
 			boost::bidirectional_traversal_tag,
-			typename t_tree::key_type
+			t_it_ref
 		> base_class;
 		
 	public:
@@ -70,9 +71,9 @@ namespace asm_lsw { namespace detail {
 		void increment();
 		void decrement();
 		
-		bool equal(static_binary_tree_iterator_tpl <t_tree> const &other) const ASM_LSW_PURE;
+		bool equal(static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref> const &other) const ASM_LSW_PURE;
 		
-		typename t_tree::key_type dereference() const;
+		t_it_ref dereference() const;
 	};
 }}
 
@@ -82,20 +83,26 @@ namespace asm_lsw
 	template <typename t_key, typename t_mapped = void, bool t_enable_serialize = false>
 	class static_binary_tree
 	{
-		template <typename> friend class detail::static_binary_tree_iterator_tpl;
+		template <typename, typename, typename> friend class detail::static_binary_tree_iterator_tpl;
 		
 	public:
-		typedef t_key															key_type;
-		typedef t_mapped														mapped_type;
-		typedef sdsl::int_vector <std::numeric_limits <t_key>::digits>			key_vector_type;
-		typedef typename key_vector_type::size_type								size_type;
+		typedef detail::static_binary_tree_helper <t_key, t_mapped, t_enable_serialize>	helper_type;
+		typedef typename helper_type::key_type											key_type;
+		typedef typename helper_type::mapped_type										mapped_type;
+		typedef typename helper_type::value_type										value_type;
+		typedef typename helper_type::size_type											size_type;
 		
-		typedef detail::static_binary_tree_iterator_tpl <static_binary_tree>	const_iterator;
-		typedef boost::reverse_iterator <const_iterator>						const_reverse_iterator;
+		typedef detail::static_binary_tree_iterator_tpl <
+			static_binary_tree,
+			typename helper_type::iterator_val,
+			typename helper_type::iterator_ref
+		>																				const_iterator;
+		typedef boost::reverse_iterator <const_iterator>								const_reverse_iterator;
 		
+		enum { is_map_type = helper_type::is_map_type };
 		
 	protected:
-		key_vector_type					m_keys;
+		helper_type						m_helper;
 		sdsl::bit_vector				m_used_indices;
 		sdsl::bit_vector::rank_1_type	m_used_indices_r1_support;
 		size_type						m_leftmost_idx{0};
@@ -113,22 +120,24 @@ namespace asm_lsw
 		
 		bool find_leftmost(size_type &i /* inout */) const;
 		
-		template <typename t_int_vector>
-		void fill_used_indices(t_int_vector const &keys, size_type const target, size_type const begin, size_type const end);
+		void fill_used_indices(size_type const target, size_type const begin, size_type const end);
 
-		template <typename t_int_vector>
-		void fill_keys(t_int_vector const &keys, size_type const target, size_type const begin, size_type const end);
+		template <typename t_vector>
+		void fill_tree(t_vector const &input_vec, size_type const target, size_type const begin, size_type const end);
 		
 		bool lower_bound_subtree(key_type const &key, size_type idx, const_iterator &it /* out */) const;
+		
+		size_type serialize_common(std::ostream &out, sdsl::structure_tree_node *child) const;
+		void load_common(std::istream &in);
 		
 	public:
 		static_binary_tree() {}
 		
-		template <typename t_int_vector>
-		static_binary_tree(t_int_vector &keys);
+		template <typename t_vector>
+		static_binary_tree(t_vector &input_vec);
 		
 		bool empty() const { return 0 == size(); }
-		size_type size() const { return m_keys.size(); }
+		size_type size() const { return m_helper.size(); }
 		const_iterator find(key_type const &key) const;
 		const_iterator lower_bound(key_type const &key) const;
 		
@@ -141,63 +150,90 @@ namespace asm_lsw
 		const_reverse_iterator rbegin() const	{ return crbegin(); }
 		const_reverse_iterator rend() const		{ return crend(); }
 		
-		template <typename t_other_key>
-		bool operator==(static_binary_tree <t_other_key> const &other) const { return std::equal(cbegin(), cend(), other.cbegin(), other.cend()); }
+		template <typename t_other_key, typename t_other_value, bool t_other_enable_serialize>
+		bool operator==(
+			static_binary_tree <t_other_key, t_other_value, t_other_enable_serialize> const &other
+		) const
+		{
+			return std::equal(cbegin(), cend(), other.cbegin(), other.cend());
+		}
 
-		size_type serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
-		void load(std::istream& in);
+		template <typename Fn, bool t_dummy = true>
+		auto serialize_keys(
+			std::ostream &out,
+			Fn value_callback,
+			sdsl::structure_tree_node *v = nullptr,
+			std::string name = ""
+		) const -> typename std::enable_if <is_map_type && t_dummy, size_type>::type;
+	
+		template <bool t_dummy = true>
+		auto serialize(
+			std::ostream &out,
+			sdsl::structure_tree_node *v = nullptr,
+			std::string name = ""
+		) const -> typename std::enable_if <t_enable_serialize && t_dummy, size_type>::type;
+	
+		template <typename Fn, bool t_dummy = true>
+		auto load_keys(
+			std::istream &in,
+			Fn value_callback
+		) -> typename std::enable_if <is_map_type && t_dummy>::type;
+	
+		template <bool t_dummy = true>
+		auto load(
+			std::istream &in
+		) -> typename std::enable_if <t_enable_serialize && t_dummy>::type;
 		
 		void print() const;
 	};
 	
 	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
-	template <typename t_int_vector>
 	void static_binary_tree <t_key, t_mapped, t_enable_serialize>::fill_used_indices(
-		t_int_vector const &keys, size_type const target, size_type const lb, size_type const rb
+		size_type const target, size_type const lb, size_type const rb
 	)
 	{
 		size_type const mid(lb + (rb - lb) / 2);
 		m_used_indices[target] = 1;
 		
 		if (lb < mid)
-			fill_used_indices(keys, left_child(target), lb, mid - 1);
+			fill_used_indices(left_child(target), lb, mid - 1);
 		
 		if (mid < rb)
-			fill_used_indices(keys, right_child(target), 1 + mid, rb);
+			fill_used_indices(right_child(target), 1 + mid, rb);
 	}
 	
 	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
-	template <typename t_int_vector>
-	void static_binary_tree <t_key, t_mapped, t_enable_serialize>::fill_keys(
-		t_int_vector const &keys, size_type const target, size_type const lb, size_type const rb
+	template <typename t_vector>
+	void static_binary_tree <t_key, t_mapped, t_enable_serialize>::fill_tree(
+		t_vector const &input_vec, size_type const target, size_type const lb, size_type const rb
 	)
 	{
 		size_type const mid(lb + (rb - lb) / 2);
 		size_type pos(m_used_indices_r1_support.rank(target));
-		m_keys[pos] = keys[mid];
+		m_helper.value(pos) = std::move(input_vec[mid]);
 		
 		if (lb < mid)
-			fill_keys(keys, left_child(target), lb, mid - 1);
+			fill_tree(input_vec, left_child(target), lb, mid - 1);
 		
 		if (mid < rb)
-			fill_keys(keys, right_child(target), 1 + mid, rb);
+			fill_tree(input_vec, right_child(target), 1 + mid, rb);
 	}
 	
 	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
-	template <typename t_int_vector>
+	template <typename t_vector>
 	static_binary_tree <t_key, t_mapped, t_enable_serialize>::static_binary_tree(
-		t_int_vector &keys
+		t_vector &input_vec
 	)
 	{
-		auto const size(keys.size());
+		auto const size(input_vec.size());
 		if (size)
 		{
 			{
-				key_vector_type vec(size, 0);
-				m_keys = std::move(vec);
+				helper_type h(size);
+				m_helper = std::move(h);
 			}
 			
 			{
@@ -206,12 +242,12 @@ namespace asm_lsw
 				m_used_indices = std::move(vec);
 			}
 			
-			std::sort(keys.begin(), keys.end());
-			fill_used_indices(keys, 0, 0, size - 1);
-			
+			fill_used_indices(0, 0, size - 1);
 			sdsl::bit_vector::rank_1_type used_indices_r1_support(&m_used_indices);
 			m_used_indices_r1_support = std::move(used_indices_r1_support);
-			fill_keys(keys, 0, 0, size - 1);
+			
+			m_helper.sort(input_vec);
+			fill_tree(input_vec, 0, 0, size - 1);
 			
 			// For iterators.
 			find_leftmost(m_leftmost_idx);
@@ -301,12 +337,13 @@ namespace asm_lsw
 		while (true)
 		{
 			size_type key_idx(m_used_indices_r1_support.rank(idx));
-			if (key < m_keys[key_idx])
+			auto const found_key(m_helper.key(key_idx));
+			if (key < found_key)
 			{
 				if (!left_child_c(idx))
 					return cend();
 			}
-			else if (m_keys[key_idx] < key)
+			else if (found_key < key)
 			{
 				if (!right_child_c(idx))
 					return cend();
@@ -342,7 +379,8 @@ namespace asm_lsw
 			return false;
 		
 		size_type key_idx(m_used_indices_r1_support.rank(idx));
-		if (key < m_keys[key_idx])
+		auto const found_key(m_helper.key(key_idx));
+		if (key < found_key)
 		{
 			// The found value is not less than key. Continue by trying to find a lesser value.
 			if (! (left_child_c(idx) && lower_bound_subtree(key, idx, it)))
@@ -361,18 +399,34 @@ namespace asm_lsw
 	
 	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
-	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::serialize(
-		std::ostream &out, sdsl::structure_tree_node *v, std::string name
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::serialize_common(
+		std::ostream &out,
+		sdsl::structure_tree_node *child
 	) const -> size_type
 	{
-		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
-		std::size_t written_bytes(0);
-		
-		written_bytes += m_keys.serialize(out, child, "keys");
+		size_type written_bytes(0);
 		written_bytes += m_used_indices.serialize(out, child, "used_indices");
 		written_bytes += m_used_indices_r1_support.serialize(out, child, "used_indices_r1_support");
 		written_bytes += write_member(m_leftmost_idx, out, child, "leftmost_idx");
 		written_bytes += write_member(m_past_end_idx, out, child, "past_end_idx");
+		return written_bytes;
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	template <typename Fn, bool t_dummy>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::serialize_keys(
+		std::ostream &out,
+		Fn value_callback,
+		sdsl::structure_tree_node *v,
+		std::string name
+	) const -> typename std::enable_if <is_map_type && t_dummy, size_type>::type
+	{
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		std::size_t written_bytes(0);
+		
+		written_bytes += m_helper.serialize_keys(out, value_callback, child, "helper");
+		written_bytes += serialize_common(out, child);
 		
 		sdsl::structure_tree::add_size(child, written_bytes);
 		return written_bytes;
@@ -380,17 +434,54 @@ namespace asm_lsw
 	
 	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
-	void static_binary_tree <t_key, t_mapped, t_enable_serialize>::load(
-		std::istream& in
-	)
+	template <bool t_dummy>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::serialize(
+		std::ostream &out, sdsl::structure_tree_node *v, std::string name
+	) const -> typename std::enable_if <t_enable_serialize && t_dummy, size_type>::type
 	{
-		m_keys.load(in);
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		std::size_t written_bytes(0);
+		
+		written_bytes += m_helper.serialize(out, child, "helper");
+		written_bytes += serialize_common(out, child);
+		
+		sdsl::structure_tree::add_size(child, written_bytes);
+		return written_bytes;
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	void static_binary_tree <t_key, t_mapped, t_enable_serialize>::load_common(std::istream &in)
+	{
 		m_used_indices.load(in);
 		m_used_indices_r1_support.load(in);
 		sdsl::read_member(m_leftmost_idx, in);
 		sdsl::read_member(m_past_end_idx, in);
 		
 		m_used_indices_r1_support.set_vector(&this->m_used_indices);
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	template <typename Fn, bool t_dummy>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::load_keys(
+		std::istream &in,
+		Fn value_callback
+	) -> typename std::enable_if <is_map_type && t_dummy>::type
+	{
+		m_helper.load_keys(in, value_callback);
+		load_common(in);
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	template <bool t_dummy>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::load(
+		std::istream& in
+	) -> typename std::enable_if <t_enable_serialize && t_dummy>::type
+	{
+		m_helper.load(in);
+		load_common(in);
 	}
 	
 	
@@ -409,6 +500,7 @@ namespace asm_lsw
 			std::cerr << " " << std::hex << std::setw(2) << std::setfill('0') << +(m_used_indices[i]);
 		std::cerr << std::endl;
 		
+#if 0
 		std::cerr << "Keys: ";
 		auto it(m_keys.cbegin());
 		for (size_type i(0); i < count; ++i)
@@ -424,15 +516,15 @@ namespace asm_lsw
 			}
 		}
 		std::cerr << std::endl;
-
+#endif
 	}
 }
 
 
 namespace asm_lsw { namespace detail {
 
-	template <typename t_tree>
-	void static_binary_tree_iterator_tpl <t_tree>::increment()
+	template <typename t_tree, typename t_it_val, typename t_it_ref>
+	void static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref>::increment()
 	{
 		size_type next_idx(m_idx);
 		if (m_tree->right_child_c(next_idx))
@@ -461,8 +553,8 @@ namespace asm_lsw { namespace detail {
 	}
 	
 	
-	template <typename t_tree>
-	void static_binary_tree_iterator_tpl <t_tree>::decrement()
+	template <typename t_tree, typename t_it_val, typename t_it_ref>
+	void static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref>::decrement()
 	{
 		size_type prev_idx(m_idx);
 		
@@ -490,9 +582,9 @@ namespace asm_lsw { namespace detail {
 	}
 	
 	
-	template <typename t_tree>
-	bool static_binary_tree_iterator_tpl <t_tree>::equal(
-		static_binary_tree_iterator_tpl <t_tree> const &other
+	template <typename t_tree, typename t_it_val, typename t_it_ref>
+	bool static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref>::equal(
+		static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref> const &other
 	) const
 	{
 		return (this->m_tree == other.m_tree &&
@@ -500,13 +592,12 @@ namespace asm_lsw { namespace detail {
 	}
 	
 	
-	template <typename t_tree>
-	auto static_binary_tree_iterator_tpl <t_tree>::dereference() const -> typename t_tree::key_type
+	template <typename t_tree, typename t_it_val, typename t_it_ref>
+	auto static_binary_tree_iterator_tpl <t_tree, t_it_val, t_it_ref>::dereference() const -> t_it_ref
 	{
 		assert(m_idx < m_tree->m_used_indices.size());
 		size_type const key_idx(m_tree->m_used_indices_r1_support.rank(m_idx));
-		auto const retval(m_tree->m_keys[key_idx]);
-		return retval;
+		return m_tree->m_helper.dereference(key_idx);
 	}
 }}
 

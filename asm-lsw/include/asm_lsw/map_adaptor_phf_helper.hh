@@ -28,52 +28,6 @@ namespace asm_lsw { namespace detail {
 	class map_adaptor_phf_base;
 	
 	
-	// Choose either write_member or serialize. The latter probably isn't needed much.
-	template <typename t_value, bool t_has_serialize = sdsl::has_serialize <t_value>::value>
-	struct map_adaptor_serialize_value_fn {};
-
-	template <typename t_value>
-	struct map_adaptor_serialize_value_fn <t_value, true>
-	{
-		std::size_t operator()(t_value const &value, std::ostream &out, sdsl::structure_tree_node *node)
-		{
-			return value.serialize(out, node, "");
-		}
-	};
-	
-	template <typename t_value>
-	struct map_adaptor_serialize_value_fn <t_value, false>
-	{
-		std::size_t operator()(t_value const &value, std::ostream &out, sdsl::structure_tree_node *node)
-		{
-			return sdsl::write_member_nn(value, out);
-		}
-	};
-	
-	
-	// Choose either read_member or load. The latter probably isn't needed much.
-	template <typename t_value, bool t_has_load = sdsl::has_load <t_value>::value>
-	struct map_adaptor_load_value_fn {};
-
-	template <typename t_value>
-	struct map_adaptor_load_value_fn <t_value, true>
-	{
-		void operator()(t_value &value, std::istream &in)
-		{
-			value.load(in);
-		}
-	};
-	
-	template <typename t_value>
-	struct map_adaptor_load_value_fn <t_value, false>
-	{
-		void operator()(t_value &value, std::istream &in)
-		{
-			sdsl::read_member(value, in);
-		}
-	};
-
-
 	// Specialize when t_value = void.
 	template <typename t_spec, bool t_value_is_void = std::is_void <typename t_spec::value_type>::value>
 	struct map_adaptor_phf_trait
@@ -277,7 +231,7 @@ namespace asm_lsw { namespace detail {
 			sdsl::structure_tree_node *v
 		)
 		{
-			map_adaptor_serialize_value_fn <value_type> serialize_value;
+			util::serialize_value_fn <value_type> serialize_value;
 			auto cb = [&](value_type const &value, std::ostream &out, sdsl::structure_tree_node *node) {
 				return serialize_value(value, out, node);
 			};
@@ -321,7 +275,7 @@ namespace asm_lsw { namespace detail {
 			std::istream &in
 		)
 		{
-			map_adaptor_load_value_fn <value_type> load_value;
+			util::load_value_fn <value_type> load_value;
 			auto cb = [&](value_type &value, std::istream &in) {
 				return load_value(value, in);
 			};
