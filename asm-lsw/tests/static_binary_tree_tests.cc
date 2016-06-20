@@ -23,15 +23,15 @@
 using namespace bandit;
 
 
-template <typename t_value>
-void static_binary_tree_tests(sdsl::int_vector <0> vec, t_value lower, t_value expected) // Copy.
+template <typename t_key>
+void static_binary_tree_tests(sdsl::int_vector <0> vec, t_key lower, t_key expected) // Copy.
 {
-	std::set <t_value> ref_set;
+	std::set <t_key> ref_set;
 	for (auto const &v : vec)
 		ref_set.insert(v);
-	auto const max_value(*ref_set.crbegin());
+	auto const max_key(*ref_set.crbegin());
 	
-	typedef asm_lsw::static_binary_tree <t_value> tree_type;
+	typedef asm_lsw::static_binary_tree <t_key> tree_type;
 	auto const size(vec.size());
 	tree_type tree(vec);
 	
@@ -44,7 +44,7 @@ void static_binary_tree_tests(sdsl::int_vector <0> vec, t_value lower, t_value e
 	});
 	
 	it("has working find()", [&](){
-		for (t_value i(0); i < max_value; ++i)
+		for (t_key i(0); i < max_key; ++i)
 		{
 			if (ref_set.find(i) == ref_set.cend())
 			{
