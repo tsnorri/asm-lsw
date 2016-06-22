@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_MAP_ADAPTOR_PHF_HELPER_HH
 #define ASM_LSW_MAP_ADAPTOR_PHF_HELPER_HH
 
+#include <asm_lsw/util.hh>
 #include <sdsl/io.hpp>
 #include <utility>
 
@@ -26,6 +27,23 @@ namespace asm_lsw { namespace detail {
 
 	template <typename t_spec>
 	class map_adaptor_phf_base;
+	
+	
+	struct map_adaptor_phf_tag {};
+	
+	
+	// Using the idea from http://stackoverflow.com/a/9644512/856976
+	template <typename T, typename t_enable = void>
+	struct is_map_adaptor_phf
+	{
+		enum { value = false };
+	};
+
+	template <typename T>
+	struct is_map_adaptor_phf <T, typename util::enable_if_type <typename T::map_adaptor_phf_tag>::type>
+	{
+		enum { value = std::is_same <typename T::map_adaptor_phf_tag, map_adaptor_phf_tag>::value };
+	};
 	
 	
 	// Specialize when t_value = void.

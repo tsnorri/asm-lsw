@@ -49,6 +49,28 @@ namespace asm_lsw { namespace util {
 
 	template <typename T>
 	using remove_c_ref_t = remove_c_t <remove_ref_t <T>>;
+	
+	
+	template <typename t_check, typename t_type = void>
+	struct enable_if_type
+	{
+		typedef t_type type;
+	};
+	
+	
+	template <typename t_collection>
+	struct is_sequence_container
+	{
+		enum { value =
+			std::is_same <
+				std::random_access_iterator_tag,
+				typename std::iterator_traits <
+					typename remove_ref_t <t_collection>::iterator
+				>::iterator_category
+			>::value
+		};
+	};
+		
 
 	template <typename t_value>
 	struct iterator_access

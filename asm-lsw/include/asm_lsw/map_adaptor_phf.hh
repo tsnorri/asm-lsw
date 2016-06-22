@@ -32,8 +32,6 @@
 
 namespace asm_lsw {
 	
-	struct map_adaptor_phf_tag {};
-
 	template <template <typename ...> class, typename, typename, typename, typename, typename>
 	class map_adaptor;
 	
@@ -213,8 +211,8 @@ namespace asm_lsw {
 		template <typename, typename, typename> friend class map_adaptor_phf_builder;
 
 	protected:
-		typedef map_adaptor_phf_base <t_spec> base_class;
-		typedef map_adaptor_phf_tag map_adaptor_phf_tag;
+		typedef map_adaptor_phf_base <t_spec>	base_class;
+		typedef detail::map_adaptor_phf_tag		map_adaptor_phf_tag;
 		
 	public:
 		typedef	typename base_class::trait_type							trait_type;
@@ -301,7 +299,7 @@ namespace asm_lsw {
 		// Disable the constructor for map_adaptor_phf.
 		template <
 			typename t_map,
-			typename std::enable_if <std::is_same <map_adaptor_phf_tag, typename t_map::map_adaptor_phf_tag>::value> * = nullptr
+			typename std::enable_if <false == detail::is_map_adaptor_phf <t_map>::value> * = nullptr
 		>
 		explicit map_adaptor_phf(t_map &map);
 		
@@ -732,7 +730,7 @@ namespace asm_lsw {
 	template <typename t_spec>
 	template <
 		typename t_map,
-		typename std::enable_if <std::is_same <map_adaptor_phf_tag, typename t_map::map_adaptor_phf_tag>::value> *
+		typename std::enable_if <false == detail::is_map_adaptor_phf <t_map>::value> *
 	>
 	map_adaptor_phf <t_spec>::map_adaptor_phf(t_map &map):
 		map_adaptor_phf()
