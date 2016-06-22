@@ -84,6 +84,8 @@ namespace asm_lsw
 	class static_binary_tree
 	{
 		template <typename, typename, typename> friend class detail::static_binary_tree_iterator_tpl;
+		template <typename, typename, bool> friend class detail::static_binary_tree_helper;
+		
 		
 	public:
 		typedef detail::static_binary_tree_helper <t_key, t_mapped, t_enable_serialize>	helper_type;
@@ -94,10 +96,12 @@ namespace asm_lsw
 		
 		typedef detail::static_binary_tree_iterator_tpl <
 			static_binary_tree,
-			typename helper_type::iterator_val,
-			typename helper_type::iterator_ref
+			typename helper_type::iterator_val const,
+			typename helper_type::iterator_ref const
 		>																				const_iterator;
 		typedef boost::reverse_iterator <const_iterator>								const_reverse_iterator;
+		typedef const_iterator															iterator;
+		typedef const_reverse_iterator													reverse_iterator;
 		
 		enum { is_map_type = helper_type::is_map_type };
 		
@@ -109,6 +113,9 @@ namespace asm_lsw
 		size_type						m_past_end_idx{0};
 		
 	protected:
+		template <typename t_collection>
+		static std::vector <value_type> move_to_vector(t_collection &collection);
+		
 		// Ahnentafel system.
 		size_type left_child(size_type const i) const ASM_LSW_CONST { return 2 * i + 1; }
 		size_type right_child(size_type const i) const ASM_LSW_CONST { return 2 * i + 2; }
@@ -133,8 +140,45 @@ namespace asm_lsw
 	public:
 		static_binary_tree() {}
 		
-		template <typename t_vector>
-		static_binary_tree(t_vector &input_vec);
+		// Check that the passed collection satisfies SequenceContainer (for operator[]).
+		template <
+			typename t_vector,
+			typename std::enable_if <util::is_sequence_container <t_vector>::value>::type * = nullptr
+		>
+		explicit static_binary_tree(t_vector &input_vec);
+		
+		template <
+			typename t_vector,
+			typename std::enable_if <util::is_sequence_container <t_vector>::value>::type * = nullptr
+		>
+		explicit static_binary_tree(t_vector &&input_vec):
+			static_binary_tree(input_vec) // Convert to lvalue, constructor moves contents anyway.
+		{
+		}
+		
+		// Not SequenceContainer, move the contents to a vector first.
+		template <
+			typename t_collection,
+			typename std::enable_if <!util::is_sequence_container <t_collection>::value>::type * = nullptr
+		>
+		explicit static_binary_tree(t_collection &collection):
+			static_binary_tree(move_to_vector(collection))
+		{
+		}
+		
+		template <
+			typename t_collection,
+			typename std::enable_if <!util::is_sequence_container <t_collection>::value>::type * = nullptr
+		>
+		explicit static_binary_tree(t_collection &&collection):
+			static_binary_tree(collection) // Convert to lvalue.
+		{
+		}
+		
+		static_binary_tree(static_binary_tree const &);
+		static_binary_tree(static_binary_tree &&);
+		static_binary_tree &operator=(static_binary_tree const &) &;
+		static_binary_tree &operator=(static_binary_tree &&) &;
 		
 		bool empty() const { return 0 == size(); }
 		size_type size() const { return m_helper.size(); }
@@ -188,6 +232,79 @@ namespace asm_lsw
 	};
 	
 	
+	// FIXME: most of these could be made automatic by creating a base class without the r1 support.
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	static_binary_tree <t_key, t_mapped, t_enable_serialize>::static_binary_tree (
+		static_binary_tree const &other
+	):
+		m_helper(other.m_helper),
+		m_used_indices(other.m_used_indices),
+		m_used_indices_r1_support(other.m_used_indices_r1_support),
+		m_leftmost_idx(other.m_leftmost_idx),
+		m_past_end_idx(other.m_past_end_idx)
+	{
+		m_used_indices_r1_support.set_vector(&this->m_used_indices);
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	static_binary_tree <t_key, t_mapped, t_enable_serialize>::static_binary_tree (
+		static_binary_tree &&other
+	):
+		m_helper(std::move(other.m_helper)),
+		m_used_indices(std::move(other.m_used_indices)),
+		m_used_indices_r1_support(std::move(other.m_used_indices_r1_support)),
+		m_leftmost_idx(std::move(other.m_leftmost_idx)),
+		m_past_end_idx(std::move(other.m_past_end_idx))
+	{
+		m_used_indices_r1_support.set_vector(&this->m_used_indices);
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::operator=(
+		static_binary_tree const &other
+	) & -> static_binary_tree &
+	{
+		static_binary_tree tmp(other); // Copy
+		*this = std::move(tmp);
+		return *this;
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::operator=(
+		static_binary_tree &&other
+	) & -> static_binary_tree &
+	{
+		m_helper = std::move(other.m_helper);
+		m_used_indices = std::move(other.m_used_indices);
+		m_used_indices_r1_support = std::move(other.m_used_indices_r1_support);
+		m_leftmost_idx = std::move(other.m_leftmost_idx);
+		m_past_end_idx = std::move(other.m_past_end_idx);
+			
+		m_used_indices_r1_support.set_vector(&this->m_used_indices);
+		
+		return *this;
+	}
+	
+	
+	template <typename t_key, typename t_mapped, bool t_enable_serialize>
+	template <typename t_collection>
+	auto static_binary_tree <t_key, t_mapped, t_enable_serialize>::move_to_vector(
+		t_collection &collection
+	) -> std::vector <value_type>
+	{
+		std::vector <value_type> retval;
+		retval.reserve(collection.size());
+		
+		for (auto &kv : collection)
+			retval.emplace_back(std::move(kv));
+		
+		return retval;
+	}
+	
+	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
 	void static_binary_tree <t_key, t_mapped, t_enable_serialize>::fill_used_indices(
 		size_type const target, size_type const lb, size_type const rb
@@ -223,7 +340,10 @@ namespace asm_lsw
 	
 	
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
-	template <typename t_vector>
+	template <
+		typename t_vector,
+		typename std::enable_if <util::is_sequence_container <t_vector>::value>::type *
+	>
 	static_binary_tree <t_key, t_mapped, t_enable_serialize>::static_binary_tree(
 		t_vector &input_vec
 	)
@@ -380,20 +500,21 @@ namespace asm_lsw
 		
 		size_type key_idx(m_used_indices_r1_support.rank(idx));
 		auto const found_key(m_helper.key(key_idx));
-		if (key < found_key)
-		{
-			// The found value is not less than key. Continue by trying to find a lesser value.
-			if (! (left_child_c(idx) && lower_bound_subtree(key, idx, it)))
-				it = const_iterator(*this, idx);
-			return true;
-		}
-		else
+		if (found_key < key)
 		{
 			// The found value is less than key. Try to find a greater value.
 			if (right_child_c(idx))
 				return lower_bound_subtree(key, idx, it);
 			
 			return false;
+		}
+		else
+		{
+			auto next_idx(idx);
+			// The found value is not less than key. Continue by trying to find a lesser value.
+			if (! (left_child_c(next_idx) && lower_bound_subtree(key, next_idx, it)))
+				it = const_iterator(*this, idx);
+			return true;
 		}
 	}
 	
@@ -500,23 +621,7 @@ namespace asm_lsw
 			std::cerr << " " << std::hex << std::setw(2) << std::setfill('0') << +(m_used_indices[i]);
 		std::cerr << std::endl;
 		
-#if 0
-		std::cerr << "Keys: ";
-		auto it(m_keys.cbegin());
-		for (size_type i(0); i < count; ++i)
-		{
-			if (m_used_indices[i])
-			{
-				std::cerr << " " << std::hex << std::setw(2) << std::setfill('0') << +(*it);
-				++it;
-			}
-			else
-			{
-				std::cerr << "   ";
-			}
-		}
-		std::cerr << std::endl;
-#endif
+		m_helper.print(*this);
 	}
 }
 
@@ -567,11 +672,11 @@ namespace asm_lsw { namespace detail {
 			return;
 		}
 		
-		// Otherwise, go to parent and skip if the node was the right child.
+		// Otherwise, go to parent and skip if the node was the left child.
 		size_type cur(m_idx);
 		while (m_tree->parent_c(prev_idx))
 		{
-			if (m_tree->left_child(prev_idx) == cur)
+			if (m_tree->right_child(prev_idx) == cur)
 			{
 				m_idx = prev_idx;
 				return;

@@ -38,6 +38,13 @@ struct trait
 		std::pair <t_key const, t_value> retval(kv.first, kv.second);
 		return retval;
 	}
+	
+	template <typename T, typename U>
+	void compare(T const &val, U const &ref_val)
+	{
+		AssertThat(val.first, Equals(ref_val.first));
+		AssertThat(val.second, Equals(ref_val.second));
+	}
 };
 
 
@@ -52,6 +59,12 @@ struct trait <t_key, void>
 	t_key const &transform_vector_val(t_key const &key)
 	{
 		return key;
+	}
+	
+	template <typename T, typename U>
+	void compare(T const &val, U const &ref_val)
+	{
+		AssertThat(val, Equals(ref_val));
 	}
 };
 
@@ -93,7 +106,7 @@ void static_binary_tree_tests(t_vec vec, t_key lower, t_key expected) // Copy.
 				auto const val(*it);
 				auto const ref_val(*ref_it);
 				AssertThat(it, Is().Not().EqualTo(tree.cend()));
-				AssertThat(val, Equals(ref_val));
+				trait.compare(val, ref_val);
 			}
 		}
 	});
@@ -111,11 +124,11 @@ void static_binary_tree_tests(t_vec vec, t_key lower, t_key expected) // Copy.
 		{
 			auto const val(vec[i]);
 			auto const expected(trait.transform_vector_val(val));
-			AssertThat(k, Equals(expected));
+			trait.compare(k, expected);
 			++i;
 		}
 	});
-	
+
 	it("has working equality comparison operator", [&](){
 		tree_type tree2;
 		AssertThat(tree, Equals(tree));

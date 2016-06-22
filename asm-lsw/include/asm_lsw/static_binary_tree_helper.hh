@@ -38,7 +38,13 @@ namespace asm_lsw { namespace detail {
 		typedef typename value_vector_type::reference						reference;
 		typedef typename value_vector_type::const_reference					const_reference;
 		
-		typedef std::pair <t_key const, t_mapped>							iterator_val;
+		// constness is required for making the pairs eligible for equality comparison.
+		// References are required since the trie classes have accessors for iterator keys
+		// and values but Boost's implementation returns a proxy object in case the iterator
+		// doesn't return a reference. As a consequence, the returned reference to
+		// it->second would become invalid at the time of returning from the accessor.
+		// Keys are required to be unsigned integers anyway, so the said accessors copy them.
+		typedef std::pair <t_key const, t_mapped const &>					iterator_val;
 		typedef iterator_val												iterator_ref;
 		
 		enum { is_map_type = 1 };
@@ -58,11 +64,15 @@ namespace asm_lsw { namespace detail {
 		
 		key_type const &key(size_type idx) const { return m_values[idx].first; }
 		mapped_type const &mapped(size_type idx) const { return m_values[idx].second; }
-		const_reference value(size_type idx) const { return m_values[idx]; }
 
 		reference value(size_type idx) { return m_values[idx]; }
+		const_reference value(size_type idx) const { return m_values[idx]; }
 		
-		const_reference const dereference(size_type idx) const { return value(idx); }
+		iterator_ref const dereference(size_type idx) const
+		{
+			auto &kv(value(idx));
+			return iterator_ref(kv.first, kv.second);
+		}
 		
 		template <typename t_vector>
 		void sort(t_vector &vec) { std::sort(vec.begin(), vec.end(), [](auto &left, auto &right){ return left.first < right.first; }); }
@@ -124,6 +134,12 @@ namespace asm_lsw { namespace detail {
 			asm_lsw::util::load_value_fn <mapped_type> load_value;
 			load_keys(in, load_value);
 		}
+		
+		template <typename t_tree>
+		void print(t_tree const &tree) const
+		{
+			std::cerr << "FIXME: implement me." << std::endl;
+		}
 	};
 	
 	
@@ -143,7 +159,7 @@ namespace asm_lsw { namespace detail {
 		typedef value_type													iterator_val;
 		typedef const_reference												iterator_ref;
 		
-		enum { is_map_type = 1 };
+		enum { is_map_type = 0 };
 		
 	protected:
 		key_vector_type		m_keys;
@@ -188,6 +204,28 @@ namespace asm_lsw { namespace detail {
 		void load(std::istream& in)
 		{
 			m_keys.load(in);
+		}
+		
+		template <typename t_tree>
+		void print(t_tree const &tree) const
+		{
+			size_type const count(tree.m_used_indices.size());
+
+			std::cerr << "Keys:   ";
+			auto it(m_keys.cbegin());
+			for (size_type i(0); i < count; ++i)
+			{
+				if (tree.m_used_indices[i])
+				{
+					std::cerr << " " << std::hex << std::setw(2) << std::setfill('0') << +(*it);
+					++it;
+				}
+				else
+				{
+					std::cerr << "   ";
+				}
+			}
+			std::cerr << std::endl;
 		}
 	};
 }}
