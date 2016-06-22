@@ -179,7 +179,8 @@ namespace asm_lsw { namespace detail {
 		template <typename t_kv>
 		static kv_type kv(t_kv &kv)
 		{
-			return std::make_pair(kv.first, std::move(kv.second));
+			value_type val(std::move(kv.second));
+			return std::make_pair(kv.first, std::move(val));
 		}
 		
 		template <typename t_kv>
