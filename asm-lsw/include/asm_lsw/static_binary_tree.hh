@@ -667,7 +667,12 @@ namespace asm_lsw { namespace detail {
 		// the previous one, unless that node has a right child.
 		if (m_tree->left_child_c(prev_idx))
 		{
-			m_tree->right_child_c(prev_idx);
+			while (true)
+			{
+				if (!m_tree->right_child_c(prev_idx))
+					break;
+			}
+			
 			m_idx = prev_idx;
 			return;
 		}
