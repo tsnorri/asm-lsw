@@ -19,6 +19,7 @@
 #define ASM_LSW_Y_FAST_TRIE_HELPER_HH
 
 #include <asm_lsw/map_adaptor_helper.hh>
+#include <asm_lsw/static_binary_tree.hh>
 #include <map>
 #include <set>
 
@@ -60,22 +61,20 @@ namespace asm_lsw { namespace detail {
 		typename t_key,
 		typename t_value,
 		template <typename, typename, typename> class t_map_adaptor,
-		typename t_x_fast_trie
+		typename t_x_fast_trie,
+		typename t_subtree_type
 	>
 	struct y_fast_trie_base_spec
 	{
-		typedef t_key key_type;				// Trie key type.
-		typedef t_value value_type;			// Trie value type.
+		typedef t_key			key_type;		// Trie key type.
+		typedef t_value			value_type;		// Trie value type.
+		typedef t_x_fast_trie	trie_type;		// Representative trie type.
+		typedef t_subtree_type	subtree_type;	// Subtree type.
 		
 		// Hash map adaptor. Parameters are map type, key type and value type.
 		// Key type and allocator are supposed to have been fixed earlier.
 		template <typename t_map_key, typename t_map_value, typename t_map_access_key = map_adaptor_access_key <t_key>>
 		using map_adaptor = t_map_adaptor <t_map_key, t_map_value, t_map_access_key>;
-		
-		typedef t_x_fast_trie trie_type;	// Representative trie type.
-		
-		// Subtree type.
-		typedef typename y_fast_trie_trait <key_type, value_type>::subtree_type subtree_type;
 	};
 
 	
@@ -84,12 +83,8 @@ namespace asm_lsw { namespace detail {
 	{
 		typedef t_key key_type;
 		typedef t_value value_type;
-		typedef std::map <t_key, t_value> subtree_type;
 
-		constexpr bool has_value() const
-		{
-			return true;
-		}
+		enum { is_map_type = 1 };
 		
 		template <typename t_iterator>
 		key_type key(t_iterator const &it) const
@@ -110,12 +105,8 @@ namespace asm_lsw { namespace detail {
 	{
 		typedef t_key key_type;
 		typedef t_key value_type;
-		typedef std::set <t_key> subtree_type;
 		
-		constexpr bool has_value() const
-		{
-			return false;
-		}
+		enum { is_map_type = 0 };
 
 		template <typename t_iterator>
 		key_type key(t_iterator const &it)
@@ -128,6 +119,27 @@ namespace asm_lsw { namespace detail {
 		{
 			return *it;
 		}
+	};
+	
+	
+	template <typename t_key, typename t_val>
+	struct y_fast_trie_subtree_trait
+	{
+		typedef std::map <t_key, t_val> subtree_type;
+	};
+	
+	
+	template <typename t_key>
+	struct y_fast_trie_subtree_trait <t_key, void>
+	{
+		typedef std::set <t_key> subtree_type;
+	};
+	
+	
+	template <typename t_key, typename t_val, bool t_enable_serialize>
+	struct y_fast_trie_compact_subtree_trait
+	{
+		typedef static_binary_tree <t_key, t_val, t_enable_serialize> subtree_type;
 	};
 	
 	

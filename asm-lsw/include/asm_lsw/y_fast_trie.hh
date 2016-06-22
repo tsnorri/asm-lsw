@@ -48,7 +48,8 @@ namespace asm_lsw { namespace detail {
 		t_key,
 		t_value,
 		y_fast_trie_map_adaptor,
-		x_fast_trie <t_key, void>
+		x_fast_trie <t_key, void>,
+		typename y_fast_trie_subtree_trait <t_key, t_value>::subtree_type
 	>;
 }}	
 	
