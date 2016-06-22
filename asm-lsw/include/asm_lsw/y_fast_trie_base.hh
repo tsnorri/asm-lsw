@@ -380,8 +380,11 @@ namespace asm_lsw {
 		{
 			auto const key(st_it->first);
 			std::cerr << boost::format("\t%02x: ") % (+key);
+			// FIXME: enable.
+#if 0
 			for (auto it(st_it->second.cbegin()), end(st_it->second.cend()); it != end; ++it)
 				std::cerr << boost::format("%02x ") % (+iterator_value(it));
+#endif
 
 			std::cerr << "\n";
 		}
