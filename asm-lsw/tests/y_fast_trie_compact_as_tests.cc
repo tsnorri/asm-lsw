@@ -24,7 +24,7 @@ go_bandit([](){
 		common_as_type_tests <asm_lsw::y_fast_trie <uint32_t>, asm_lsw::y_fast_trie_compact_as <uint32_t>>();
 
 		it("can be constructed with a vector", [](){
-			typedef asm_lsw::y_fast_trie_compact_as <uint32_t> trie_type;
+			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, void, true> trie_type;
 			std::vector <uint32_t> vec{5, 18, 22, 35, 108};
 
 			std::unique_ptr <trie_type> trie_ptr(trie_type::construct(vec, 5, 108));
@@ -36,7 +36,7 @@ go_bandit([](){
 		});
 
 		it("can be constructed with a map", [](){
-			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t> trie_type;
+			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t, true> trie_type;
 			std::map <uint32_t, uint32_t> map{{5, 8}, {18, 21}, {22, 3}, {35, 7}, {108, 99}};
 
 			std::unique_ptr <trie_type> trie_ptr(trie_type::construct(map, 5, 108));
