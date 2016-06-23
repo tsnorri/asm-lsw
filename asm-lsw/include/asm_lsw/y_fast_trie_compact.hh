@@ -53,7 +53,7 @@ namespace asm_lsw { namespace detail {
 		t_key,
 		t_value,
 		y_fast_trie_compact_map_adaptor_trait <t_enable_serialize>::template map_type,
-		x_fast_trie_compact <t_key, void, std::is_void <t_value>::value>,
+		x_fast_trie_compact <t_key, void, t_enable_serialize>,
 		typename y_fast_trie_compact_subtree_trait <t_key, t_value, t_enable_serialize>::subtree_type
 	>;
 }}
@@ -75,10 +75,11 @@ namespace asm_lsw {
 		typedef typename base_class::iterator				iterator;
 		typedef typename base_class::const_iterator			const_iterator;
 		
-		typedef detail::y_fast_trie_tag y_fast_trie_tag;
+		typedef detail::y_fast_trie_tag						y_fast_trie_tag;
 		
 	protected:
 		typedef typename base_class::trait					trait;
+		typedef typename base_class::subtree				subtree;
 		typedef typename base_class::subtree_map			subtree_map;
 		
 	public:
@@ -127,11 +128,19 @@ namespace asm_lsw {
 	template <typename Fn, bool t_dummy>
 	auto y_fast_trie_compact <t_key, t_value, t_enable_serialize>::serialize_keys(
 		std::ostream &out,
-		Fn serialize_subtree,
+		Fn serialize_value,
 		sdsl::structure_tree_node *v,
 		std::string name
 	) const -> typename std::enable_if <trait::is_map_type && t_dummy, std::size_t>::type
 	{
+		auto serialize_subtree = [&](
+			subtree const &st,
+			std::ostream &out,
+			sdsl::structure_tree_node *node
+		) -> std::size_t {
+			return st.serialize_keys(out, serialize_value, node, name);
+		};
+		
 		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
 		std::size_t written_bytes(0);
 		
@@ -152,7 +161,6 @@ namespace asm_lsw {
 		std::string name
 	) const -> typename std::enable_if <t_enable_serialize && t_dummy, std::size_t>::type
 	{
-		// FIXME: repeating the previous function.
 		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
 		std::size_t written_bytes(0);
 		
@@ -169,9 +177,17 @@ namespace asm_lsw {
 	template <typename Fn, bool t_dummy>
 	auto y_fast_trie_compact <t_key, t_value, t_enable_serialize>::load_keys(
 		std::istream &in,
-		Fn load_subtree
+		Fn load_value
 	) -> typename std::enable_if <trait::is_map_type && t_dummy>::type
 	{
+		// Pass the given callback to subtree's load function.
+		auto load_subtree = [&](
+			subtree &st,
+			std::istream &in
+		){
+			st.load_keys(in, load_value);
+		};
+		
 		sdsl::read_member(this->m_size, in);
 		this->m_reps.load(in);
 		this->m_subtrees.load_keys(in, load_subtree);
