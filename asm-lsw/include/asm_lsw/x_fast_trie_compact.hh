@@ -56,7 +56,7 @@ namespace asm_lsw {
 		typedef typename base_class::iterator iterator;
 		typedef typename base_class::const_iterator const_iterator;
 		
-		enum { is_trie = 1 };
+		typedef detail::x_fast_trie_tag x_fast_trie_tag;
 		
 	public:
 		x_fast_trie_compact() = default;

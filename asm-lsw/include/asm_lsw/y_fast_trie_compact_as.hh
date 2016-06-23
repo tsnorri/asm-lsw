@@ -150,6 +150,8 @@ namespace asm_lsw {
 		
 		typedef const_subtree_iterator const_iterator;
 		
+		typedef detail::y_fast_trie_tag y_fast_trie_tag;
+		
 	protected:
 		key_type m_offset{0};
 	
@@ -270,7 +272,7 @@ namespace asm_lsw {
 	class y_fast_trie_compact_as_tpl final : public y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize>
 	{
 	protected:
-		typedef y_fast_trie_compact_as <t_max_key, t_value> base_class;
+		typedef y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> base_class;
 		typedef y_fast_trie_compact <t_key, t_value> trie_type;
 		
 		typedef detail::y_fast_trie_base_subtree_iterator_wrapper <
@@ -280,6 +282,8 @@ namespace asm_lsw {
 		typedef typename base_class::size_type size_type;
 		typedef typename base_class::key_type key_type;
 		typedef typename base_class::const_subtree_iterator const_subtree_iterator;
+		
+		typedef detail::y_fast_trie_tag y_fast_trie_tag;
 		
 	protected:
 		trie_type m_trie;
@@ -434,7 +438,7 @@ namespace asm_lsw {
 		
 		fill(temp_trie, collection, offset);
 		y_fast_trie_compact <t_ret_key, t_value> ct(temp_trie);
-		return new y_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value>(ct, offset);
+		return new y_fast_trie_compact_as_tpl <t_max_key, t_ret_key, t_value, t_enable_serialize>(ct, offset);
 	}
 
 

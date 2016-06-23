@@ -75,6 +75,8 @@ namespace asm_lsw {
 		typedef typename base_class::iterator				iterator;
 		typedef typename base_class::const_iterator			const_iterator;
 		
+		typedef detail::y_fast_trie_tag y_fast_trie_tag;
+		
 	protected:
 		typedef typename base_class::trait					trait;
 		typedef typename base_class::subtree_map			subtree_map;

@@ -255,7 +255,7 @@ namespace asm_lsw {
 		>							const_leaf_iterator;
 		typedef const_leaf_iterator	const_iterator;
 		
-		enum { is_trie = 1 };
+		typedef detail::x_fast_trie_tag x_fast_trie_tag;
 
 	protected:
 		key_type m_offset{0};
@@ -429,7 +429,7 @@ namespace asm_lsw {
 		typedef typename base_class::load_value_callback_type load_value_callback_type;
 		typedef typename base_class::const_leaf_iterator const_leaf_iterator;
 
-		enum { is_trie = 1 };
+		typedef detail::x_fast_trie_tag x_fast_trie_tag;
 
 	protected:
 		trie_type m_trie;

@@ -304,45 +304,6 @@ namespace asm_lsw { namespace detail {
 			"Leaf link needs to have load."
 		);
 	};
-	
-	
-	template <typename t_mapped_type, bool t_dummy = true>
-	struct x_fast_trie_cmp
-	{
-		template <typename T, typename U>
-		bool contains(T const &trie_1, U const &trie_2)
-		{
-			typename T::const_iterator it;
-			for (auto const &kv : trie_2)
-			{
-				if (!trie_1.find(kv.first, it))
-					return false;
-				
-				if (! (kv.second.value == it->second.value))
-					return false;
-			}
-			
-			return true;
-		}
-	};
-	
-	
-	template <bool t_dummy>
-	struct x_fast_trie_cmp <void, t_dummy>
-	{
-		template <typename T, typename U>
-		bool contains(T const &trie_1, U const &trie_2)
-		{
-			typename T::const_iterator it;
-			for (auto const &kv : trie_2)
-			{
-				if (!trie_1.find(kv.first, it))
-					return false;
-			}
-			
-			return true;
-		}
-	};
 }}
 
 #endif

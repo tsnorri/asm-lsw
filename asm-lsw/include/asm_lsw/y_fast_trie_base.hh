@@ -62,6 +62,7 @@ namespace asm_lsw {
 		typedef reverse_subtree_iterator reverse_iterator;
 		typedef const_reverse_subtree_iterator const_reverse_iterator;
 		
+		typedef detail::y_fast_trie_tag y_fast_trie_tag;
 		
 	protected:
 		representative_trie_type m_reps;
@@ -113,7 +114,7 @@ namespace asm_lsw {
 		void print() const;
 
 		y_fast_trie_subtree_map_proxy <subtree_map> subtree_map_proxy() { return y_fast_trie_subtree_map_proxy <subtree_map>(&m_subtrees); }
-		y_fast_trie_subtree_map_proxy <subtree_map const> subtree_map_proxy() const { return y_fast_trie_subtree_map_proxy <subtree_map const>(&m_subtrees); }
+		y_fast_trie_subtree_map_proxy <subtree_map const> const subtree_map_proxy() const { return y_fast_trie_subtree_map_proxy <subtree_map const>(&m_subtrees); }
 
 		typename subtree_map::const_iterator subtree_cbegin() const { return m_subtrees.cbegin(); }
 		typename subtree_map::const_iterator subtree_cend() const { return m_subtrees.cend(); }

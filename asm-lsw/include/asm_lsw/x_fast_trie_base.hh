@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_X_FAST_TRIE_BASE_HH
 #define ASM_LSW_X_FAST_TRIE_BASE_HH
 
+#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/map_adaptors.hh>
 #include <asm_lsw/util.hh>
 #include <asm_lsw/x_fast_trie_base_helper.hh>
@@ -75,7 +76,7 @@ namespace asm_lsw {
 		typedef leaf_iterator iterator;
 		typedef const_leaf_iterator const_iterator;
 		
-		enum { is_trie = 1 };
+		typedef detail::x_fast_trie_tag x_fast_trie_tag;
 		
 	protected:
 		// Conditionally use iterator or const_iterator.
@@ -229,21 +230,6 @@ namespace asm_lsw {
 	};
 	
 	
-	template <typename T, typename U>
-	auto operator==(
-		T const &trie_1, U const &trie_2
-	) -> typename std::enable_if <
-		T::is_trie &&
-		U::is_trie &&
-		std::is_same <typename T::mapped_type, typename U::mapped_type>::value,
-		bool
-	>::type
-	{
-		typename detail::x_fast_trie_cmp <typename T::mapped_type> cmp;
-		return cmp.contains(trie_1, trie_2) && cmp.contains(trie_2, trie_1);
-	}
-
-
 	template <typename t_spec>
 	auto x_fast_trie_base <t_spec>::lss_access::level_size(level_idx_type const idx) const -> typename level_map::size_type
 	{
