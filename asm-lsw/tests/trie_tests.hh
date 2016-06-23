@@ -555,7 +555,6 @@ template <typename t_trie, typename t_adaptor>
 void compact_set_type_tests()
 {
 	typedef typename t_trie::key_type trie_key_type;
-	typedef typename t_trie::leaf_link_map::kv_type trie_leaf_link_value_type;
 	it("can serialize", [](){
 		t_adaptor adaptor;
 		std::vector <trie_key_type> const test_values{1, 15, 27, 33, 92, 120, 148, 163, 199, 201, 214, 227, 228, 229, 230, 243, 249, 255};
