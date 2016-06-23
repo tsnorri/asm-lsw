@@ -80,6 +80,7 @@ namespace asm_lsw {
 	void phf_wrapper::copy_g(phf_wrapper const &other)
 	{
 		// Allocate g with malloc and copy the values.
+		assert(m_phf.r);
 		m_phf.g = reinterpret_cast <uint32_t *>(malloc(m_phf.r * sizeof(T)));
 		std::copy_n(reinterpret_cast <T const *>(other.m_phf.g), m_phf.r, reinterpret_cast <T *>(m_phf.g));
 	}
@@ -93,6 +94,7 @@ namespace asm_lsw {
 		
 		// Allocate g with malloc and copy the values.
 		m_phf.g = reinterpret_cast <uint32_t *>(malloc(m_phf.r * sizeof(T)));
+		assert(m_phf.r);
 		assert(m_phf.r == g_vec.size());
 		std::copy_n(g_vec.cbegin(), m_phf.r, reinterpret_cast <T *>(m_phf.g));
 	}
@@ -102,6 +104,7 @@ namespace asm_lsw {
 	std::size_t phf_wrapper::serialize_g(std::ostream &out, sdsl::structure_tree_node *child, std::string name) const
 	{
 		// There are m_phf.r items in m_phf.g. Copy them to an int_vector and serialize.
+		assert(m_phf.r);
 		std::size_t const size(sizeof(T));
 		sdsl::int_vector <0> g_vec(m_phf.r, 0, 8 * size);
 		std::copy_n(reinterpret_cast <T const *>(m_phf.g), m_phf.r, g_vec.begin());

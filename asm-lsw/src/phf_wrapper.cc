@@ -66,13 +66,17 @@ std::size_t phf_wrapper::serialize(std::ostream &out, sdsl::structure_tree_node 
 	
 	// Don't serialize g_jmp.
 	
-	// The items in m_phf.g are either uint8_t, uint16_t or uint32_t. Compare to PHF::compact.
-	if (m_phf.d_max <= 255)
-		written_bytes += serialize_g <uint8_t>(out, child, name);
-	else if (m_phf.d_max <= 65535)
-		written_bytes += serialize_g <uint16_t>(out, child, name);
-	else
-		written_bytes += serialize_g <uint32_t>(out, child, name);
+	// Also don't serialize m_phf.g if it is empty.
+	if (m_phf.r)
+	{
+		// The items in m_phf.g are either uint8_t, uint16_t or uint32_t. Compare to PHF::compact.
+		if (m_phf.d_max <= 255)
+			written_bytes += serialize_g <uint8_t>(out, child, name);
+		else if (m_phf.d_max <= 65535)
+			written_bytes += serialize_g <uint16_t>(out, child, name);
+		else
+			written_bytes += serialize_g <uint32_t>(out, child, name);
+	}
 	
 	sdsl::structure_tree::add_size(child, written_bytes);
 	return written_bytes;
@@ -91,10 +95,13 @@ void phf_wrapper::load(std::istream &in)
 	sdsl::read_member(m_phf.d_max, in);
 	sdsl::read_member(m_phf.g_op, in);
 	
-	if (m_phf.d_max <= 255)
-		load_g <uint8_t>(in);
-	else if (m_phf.d_max <= 65535)
-		load_g <uint16_t>(in);
-	else
-		load_g <uint32_t>(in);
+	if (m_phf.r)
+	{
+		if (m_phf.d_max <= 255)
+			load_g <uint8_t>(in);
+		else if (m_phf.d_max <= 65535)
+			load_g <uint16_t>(in);
+		else
+			load_g <uint32_t>(in);
+	}
 }
