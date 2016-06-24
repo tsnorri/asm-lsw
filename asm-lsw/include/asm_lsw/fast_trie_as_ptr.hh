@@ -37,8 +37,19 @@ namespace asm_lsw {
 		pointer_type m_ptr;
 			
 	public:
+		fast_trie_as_ptr():
+			m_ptr(nullptr)
+		{
+		}
+		
+		fast_trie_as_ptr(typename pointer_type::pointer ptr):
+			m_ptr(ptr)
+		{
+		}
+		
 		inline typename pointer_type::pointer get() const { return m_ptr.get(); }
 		inline typename pointer_type::pointer operator->() const { return m_ptr.operator->(); }
+		inline void reset(typename pointer_type::pointer ptr) { m_ptr.reset(ptr); }
 		
 		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const
 		{
