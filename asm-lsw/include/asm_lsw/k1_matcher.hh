@@ -18,6 +18,7 @@
 #define ASM_LSW_K1_MATCHER_HH
 
 #include <asm_lsw/bp_support_sparse.hh>
+#include <asm_lsw/fast_trie_as_ptr.hh>
 #include <asm_lsw/x_fast_tries.hh>
 #include <asm_lsw/y_fast_tries.hh>
 #include <sdsl/csa_rao.hpp>
@@ -34,7 +35,7 @@ namespace asm_lsw {
 	{
 	protected:
 		template <typename t_key, typename t_value>
-		using unordered_map = map_adaptor_phf<map_adaptor_phf_spec<std::vector, pool_allocator, t_key, t_value>>;
+		using unordered_map = map_adaptor_phf <map_adaptor_phf_spec <std::vector, pool_allocator, t_key, t_value, true>>;
 		
 	public:
 		typedef sdsl::int_vector <>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
@@ -48,12 +49,16 @@ namespace asm_lsw {
 			typename cst_type::size_type,
 			gamma_v_intermediate_type
 		>																gamma_intermediate_type;
-			
+	
 		// Indexed by identifiers from node_id().
-		typedef y_fast_trie_compact_as <typename csa_type::value_type>	gamma_v_type;
+		typedef y_fast_trie_compact_as <
+			typename csa_type::value_type,
+			void,
+			true
+		>																gamma_v_type;
 		typedef unordered_map <
 			typename cst_type::size_type,
-			std::unique_ptr <gamma_v_type>
+			fast_trie_as_ptr <gamma_v_type>
 		>																gamma_type;
 		
 		// Indexed by identifiers from node_id().
@@ -219,7 +224,7 @@ namespace asm_lsw {
 		) const;
 		
 		bool tree_search_side_node(
-			gamma_v_type const &gamma_v,
+			gamma_v_type const *gamma_v,
 			typename cst_type::node_type const u,
 			typename cst_type::node_type const v,
 			typename csa_type::size_type const st,
@@ -681,7 +686,7 @@ namespace asm_lsw {
 		// since k has the longest lcp with itself.
 
 		// Try i^l.
-		if (hx.l->find_successor(r_len, it, true))
+		if (hx.l.get() && hx.l->find_successor(r_len, it, true))
 		{
 			r = hx.l->iterator_value(it);
 			l = ((h_diff <= r) ? (r - h_diff) : 0);
@@ -692,7 +697,7 @@ namespace asm_lsw {
 		}
 
 		// Try i^r.
-		if (hx.r->find_predecessor(r_len, it, true))
+		if (hx.r.get() && hx.r->find_predecessor(r_len, it, true))
 		{
 			l = hx.r->iterator_value(it);
 			r = ((l + h_diff <= lcp_rmq_max) ? (l + h_diff) : lcp_rmq_max);
@@ -772,7 +777,7 @@ namespace asm_lsw {
 	// Lemma 19 (with v being a side node).
 	template <typename t_cst>
 	bool k1_matcher <t_cst>::tree_search_side_node(
-		gamma_v_type const &gamma_v,
+		gamma_v_type const *gamma_v,
 		typename cst_type::node_type const u,
 		typename cst_type::node_type const v,
 		typename csa_type::size_type const st,
@@ -786,7 +791,7 @@ namespace asm_lsw {
 		auto const v_le(m_cst->lb(v));
 		auto const v_ri(m_cst->rb(v));
 
-		if (0 == gamma_v.size())
+		if (gamma_v == nullptr)
 		{
 			// Case 1.
 			if (find_pattern_occurrence(pat1_len, st, ed, v_le, v_ri, i))
@@ -796,7 +801,8 @@ namespace asm_lsw {
 		{
 			// Find a j s.t. st ≤ j ≤ ed by allowing equality and checking the upper bound.
 			typename gamma_v_type::const_subtree_iterator it;
-			if (gamma_v.find_successor(st, it, true) && *it <= ed)
+			assert(gamma_v->size());
+			if (gamma_v->find_successor(st, it, true) && *it <= ed)
 			{
 				// Case 2.
 				// Get i from j = ISA[SA[i] + |P₁| + 1].
@@ -814,13 +820,13 @@ namespace asm_lsw {
 				typename gamma_v_type::const_subtree_iterator a_val_it, b_val_it;
 				typename csa_type::size_type a(v_le), b(v_ri);
 				
-				if (gamma_v.find_predecessor(st, a_val_it))
+				if (gamma_v->find_predecessor(st, a_val_it))
 				{
 					auto const a_val(*a_val_it);
 					a = sa_idx_of_stored_isa_val(a_val, pat1_len);
 				}
 				
-				if (gamma_v.find_successor(ed, b_val_it))
+				if (gamma_v->find_successor(ed, b_val_it))
 				{
 					auto const b_val(*b_val_it);
 					b = sa_idx_of_stored_isa_val(b_val, pat1_len);
@@ -891,7 +897,7 @@ namespace asm_lsw {
 			auto const h_it(m_h.maps().find(x_id));
 			assert(m_h.maps().cend() != h_it);
 			auto const &hx(h_it->second);
-			if (hx.l->size() == 0 && hx.r->size() == 0)
+			if (hx.l.get() == nullptr && hx.r.get() == nullptr)
 			{
 				// Case 1.
 				// The number of leaves hanging from the core path is < log₂²n.
@@ -978,7 +984,7 @@ namespace asm_lsw {
 				}
 			}
 		}
-		else if (tree_search_side_node(*(g_it->second), u, v, st, ed, i))
+		else if (tree_search_side_node(g_it->second.get(), u, v, st, ed, i))
 		{
 			left = i;
 			right = i;

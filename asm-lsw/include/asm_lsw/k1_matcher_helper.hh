@@ -26,25 +26,29 @@ namespace asm_lsw {
 	class k1_matcher <t_cst>::h_type
 	{
 	public:
-		typedef std::map<
+		typedef std::map <
 			typename csa_type::size_type,
 			typename csa_type::size_type
-		>															h_u_intermediate_type;
-		typedef y_fast_trie_compact_as<
+		>														h_u_intermediate_type;
+		typedef y_fast_trie_compact_as <
 			typename csa_type::size_type,
-			typename csa_type::size_type
-		>															h_u_type;
+			typename csa_type::size_type,
+			true
+		>														h_u_type;
 
 		struct h_pair
 		{
-			std::unique_ptr <h_u_type> l;
-			std::unique_ptr <h_u_type> r;
+			fast_trie_as_ptr <h_u_type> l;
+			fast_trie_as_ptr <h_u_type> r;
 		};
 
 	protected:
 		// Indexed by identifiers from node_id().
-		typedef unordered_map <typename cst_type::size_type, h_pair> h_map;
-		typedef std::map <typename cst_type::size_type, h_pair> h_map_intermediate;
+		typedef unordered_map <
+			typename cst_type::size_type,
+			h_pair
+		>														h_map;
+		typedef std::map <typename cst_type::size_type, h_pair>	h_map_intermediate;
 
 	protected:
 		h_map m_maps;
@@ -142,13 +146,9 @@ namespace asm_lsw {
 			// Another option would be using a value transformer similar to transform_gamma_v.
 			if (hl_tmp.size())
 				h.l.reset(h_u_type::construct(hl_tmp, hl_tmp.cbegin()->first, hl_tmp.crbegin()->first));
-			else
-				h.l.reset(h_u_type::construct(hl_tmp, 0, 0));
 			
 			if (hr_tmp.size())
 				h.r.reset(h_u_type::construct(hr_tmp, hr_tmp.cbegin()->first, hr_tmp.crbegin()->first));
-			else
-				h.r.reset(h_u_type::construct(hr_tmp, 0, 0));
 		}
 
 	public:
@@ -304,17 +304,20 @@ namespace asm_lsw {
 		{
 			if (kv.second.size())
 			{
-				typename gamma_type::mapped_type value(gamma_v_type::construct(
+				auto value(gamma_v_type::construct(
 					kv.second,
 					*kv.second.cbegin(),
 					*kv.second.crbegin()
 				));
-				return std::make_pair(kv.first, std::move(value));
+					
+				fast_trie_as_ptr <gamma_v_type> ptr(value);
+				return std::make_pair(kv.first, std::move(ptr));
 			}
 			else
 			{
-				typename gamma_type::mapped_type value(gamma_v_type::construct(kv.second, 0, 0));
-				return std::make_pair(kv.first, std::move(value));
+				fast_trie_as_ptr <gamma_v_type> ptr;
+				assert(ptr.get() == nullptr);
+				return std::make_pair(kv.first, std::move(ptr));
 			}
 		}
 	};
