@@ -109,6 +109,24 @@ namespace asm_lsw {
 				mask_rank1_support.set_vector(&mask);
 				mask_select1_support.set_vector(&mask);
 			}
+			
+			size_type serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const
+			{
+				auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+				size_type written_bytes(0);
+
+				written_bytes += mask_rank1_support.serialize(out, child, name);
+				written_bytes += mask_select1_support.serialize(out, child, name);
+		
+				sdsl::structure_tree::add_size(child, written_bytes);
+				return written_bytes;
+			}
+			
+			void load(std::istream &in)
+			{
+				mask_rank1_support.load(in);
+				mask_select1_support.load(in);
+			}
 		};
 		
 	protected:
@@ -176,6 +194,9 @@ namespace asm_lsw {
 		// TODO: implement enclose
 		// TODO: implement rr_enclose
 		// TODO: implement double_enclose
+		
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const;
+		void load(std::istream &in);
 	};
 	
 	
@@ -289,23 +310,29 @@ namespace asm_lsw {
 	template <typename t_bps, typename t_vector>
 	auto bp_support_sparse <t_bps, t_vector>::operator=(bp_support_sparse const &other) & -> bp_support_sparse &
 	{
-		base_class::operator=(other);
-		m_bps = other.m_bps;
-		m_rss = other.m_rss;
-		m_bps.set_vector(&this->m_bp);
-		m_rss.fix_support(this->m_mask);
+		if (&other != this)
+		{
+			base_class::operator=(other);
+			m_bps = other.m_bps;
+			m_bps = other.m_rss;
+			m_bps.set_vector(&this->m_bp);
+			m_rss.fix_support(this->m_mask);
+		}
 		return *this;
 	}
 	
 	
 	template <typename t_bps, typename t_vector>
-	auto bp_support_sparse <t_bps, t_vector>::operator=(bp_support_sparse && other) & -> bp_support_sparse &
+	auto bp_support_sparse <t_bps, t_vector>::operator=(bp_support_sparse &&other) & -> bp_support_sparse &
 	{
-		base_class::operator=(std::move(other));
-		m_bps = std::move(other.m_bps);
-		m_rss = std::move(other.m_rss);
-		m_bps.set_vector(&this->m_bp);
-		m_rss.fix_support(this->m_mask);
+		if (&other != this)
+		{
+			base_class::operator=(std::move(other));
+			m_bps = std::move(other.m_bps);
+			m_rss = std::move(other.m_rss);
+			m_bps.set_vector(&this->m_bp);
+			m_rss.fix_support(this->m_mask);
+		}
 		return *this;
 	}
 	
@@ -464,6 +491,37 @@ namespace asm_lsw {
 		auto bp_i(m_bps.select(i));
 		auto retval(m_rss.mask_select1_support(1 + bp_i));
 		return retval;
+	}
+	
+	
+	template <typename t_bps, typename t_vector>
+	auto bp_support_sparse <t_bps, t_vector>::serialize(
+		std::ostream &out, sdsl::structure_tree_node *v, std::string name
+	) const -> size_type
+	{
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		size_type written_bytes(0);
+
+		written_bytes += this->m_bp.serialize(out, child, name);
+		written_bytes += this->m_mask.serialize(out, child, name);
+		written_bytes += m_bps.serialize(out, child, name);
+		written_bytes += m_rss.serialize(out, child, name);
+		
+		sdsl::structure_tree::add_size(child, written_bytes);
+		return written_bytes;
+	}
+	
+	
+	template <typename t_bps, typename t_vector>
+	void bp_support_sparse <t_bps, t_vector>::load(std::istream &in)
+	{
+		this->m_bp.load(in);
+		this->m_mask.load(in);
+		m_bps.load(in, &this->m_bp);
+		m_rss.load(in);
+		
+		m_bps.set_vector(&this->m_bp);
+		m_rss.fix_support(this->m_mask);
 	}
 }
 
