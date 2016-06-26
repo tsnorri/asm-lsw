@@ -18,6 +18,8 @@
 #include <asm_lsw/k1_matcher.hh>
 #include <asm_lsw/k1_matcher_helper.hh>
 #include <bandit/bandit.h>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 #include <sdsl/csa_rao.hpp>
 #include <sdsl/csa_rao_builder.hpp>
 
@@ -41,12 +43,59 @@ struct input_pattern
 
 
 template <typename t_matcher, typename t_input_pattern>
+void serialize(t_input_pattern const &ip, std::ostream &ostream, std::size_t const buffer_size)
+{
+	// Create the CST and the matcher.
+	typename t_matcher::cst_type temp_cst;
+	t_matcher temp_matcher(ip.input, temp_cst);
+	
+	// Serialize temp_cst and temp_matcher.
+	auto const serialized_cst_size(temp_cst.serialize(ostream));
+	auto const serialized_matcher_size(temp_matcher.serialize(ostream));
+	
+	assert(serialized_cst_size + serialized_matcher_size <= buffer_size);
+}
+
+
+template <typename t_matcher>
+void load(typename t_matcher::cst_type &cst, t_matcher &matcher, std::istream &istream)
+{
+	// Load the CST.
+	cst.load(istream);
+	
+	// Load the matcher into another variable and move.
+	t_matcher temp_matcher_2(cst, false);
+	temp_matcher_2.load(istream);
+	matcher = std::move(temp_matcher_2);
+}
+
+
+template <typename t_matcher, bool t_serialize, typename t_input_pattern>
 void typed_tests(t_input_pattern const &ip)
 {
 	describe(("input '" + ip.input + "'").c_str(), [&](){
 		
 		typename t_matcher::cst_type cst;
-		t_matcher matcher(ip.input, cst);
+		t_matcher matcher;
+		
+		if (t_serialize)
+		{
+			// Back the stream with an array.
+			std::size_t const buffer_size(16384);
+			std::vector <char> buffer(buffer_size);
+			
+			boost::iostreams::basic_array <char> array(buffer.data(), buffer_size);
+			boost::iostreams::stream <boost::iostreams::basic_array <char>> iostream(array);
+			
+			serialize <t_matcher>(ip, iostream, buffer_size);
+			iostream.seekp(0);
+			load(cst, matcher, iostream);
+		}
+		else
+		{
+			t_matcher temp_matcher(ip.input, cst);
+			matcher = std::move(temp_matcher);
+		}
 		
 		for (auto const &p : ip.patterns)
 		{
@@ -72,7 +121,7 @@ void typed_tests(t_input_pattern const &ip)
 }
 
 
-template <typename t_cst>
+template <typename t_cst, bool t_serialize>
 void typed_tests()
 {
 	typedef asm_lsw::k1_matcher <t_cst> k1_matcher;
@@ -117,16 +166,24 @@ void typed_tests()
 	};
 	
 	for (auto const &ip : input_patterns)
-		typed_tests <k1_matcher>(ip);
+		typed_tests <k1_matcher, t_serialize>(ip);
 }
 
 
 go_bandit([](){
-	describe("k1_matcher <cst_sada <>>:", [](){
-		typed_tests <sdsl::cst_sada <>>();
+	describe("k1_matcher <cst_sada <>> (without serialization):", [](){
+		typed_tests <sdsl::cst_sada <>, false>();
 	});
 
-	describe("k1_matcher <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>>:", [](){
-		typed_tests <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>>();
+	describe("k1_matcher <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>> (without serialization):", [](){
+		typed_tests <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>, false>();
+	});
+	
+	describe("k1_matcher <cst_sada <>> (with serialization):", [](){
+		typed_tests <sdsl::cst_sada <>, true>();
+	});
+
+	describe("k1_matcher <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>> (with serialization):", [](){
+		typed_tests <sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <4, 0>>, sdsl::lcp_support_sada <>>, true>();
 	});
 });
