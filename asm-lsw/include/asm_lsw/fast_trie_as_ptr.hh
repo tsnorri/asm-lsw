@@ -37,12 +37,7 @@ namespace asm_lsw {
 		pointer_type m_ptr;
 			
 	public:
-		fast_trie_as_ptr():
-			m_ptr(nullptr)
-		{
-		}
-		
-		fast_trie_as_ptr(typename pointer_type::pointer ptr):
+		fast_trie_as_ptr(typename pointer_type::pointer ptr = nullptr):
 			m_ptr(ptr)
 		{
 		}
@@ -51,14 +46,27 @@ namespace asm_lsw {
 		inline typename pointer_type::pointer operator->() const { return m_ptr.operator->(); }
 		inline void reset(typename pointer_type::pointer ptr) { m_ptr.reset(ptr); }
 		
-		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const
 		{
-			return m_ptr->serialize(out, v, name);
+			auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+			size_type written_bytes(0);
+			
+			bool is_nullptr(nullptr == m_ptr.get());
+			written_bytes += sdsl::write_member(is_nullptr, out, child, "is_nullptr");
+			
+			if (!is_nullptr)
+				written_bytes += m_ptr->serialize(out, v, name);
+			
+			sdsl::structure_tree::add_size(child, written_bytes);
+			return written_bytes;
 		}
 		
 		void load(std::istream &in)
 		{
-			m_ptr.reset(trie_type::load(in));
+			bool is_nullptr(false);
+			sdsl::read_member(is_nullptr, in);
+			if (!is_nullptr)
+				m_ptr.reset(trie_type::load(in));
 		}
 	};
 }
