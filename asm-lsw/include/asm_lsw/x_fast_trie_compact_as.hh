@@ -180,7 +180,7 @@ namespace asm_lsw {
 		template <typename t_ret_key, typename t_key>
 		static x_fast_trie_compact_as *construct_specific(x_fast_trie <t_key, t_value> &, key_type const);
 
-		x_fast_trie_compact_as(key_type const offset):
+		x_fast_trie_compact_as(key_type const offset = 0):
 			m_offset(offset)
 		{
 		}
@@ -290,6 +290,9 @@ namespace asm_lsw {
 		template <bool>
 		friend struct detail::fast_trie_compact_as_tpl_serialize_trait;
 		
+		template <typename, typename, bool>
+		friend class x_fast_trie_compact_as;
+		
 	protected:
 		typedef x_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> base_class;
 		typedef x_fast_trie_compact <t_key, t_value, t_enable_serialize> trie_type;
@@ -310,9 +313,10 @@ namespace asm_lsw {
 	protected:
 		trie_type m_trie;
 
-	public:
+	protected:
 		x_fast_trie_compact_as_tpl(): base_class(0) {}
-		
+
+	public:
 		x_fast_trie_compact_as_tpl(trie_type &trie, t_max_key offset):
 			base_class(offset),
 			m_trie(std::move(trie))

@@ -243,7 +243,7 @@ namespace asm_lsw {
 			t_max_key const max
 		);
 
-		y_fast_trie_compact_as(key_type const offset):
+		y_fast_trie_compact_as(key_type const offset = 0):
 			m_offset(offset)
 		{
 		}
@@ -341,6 +341,9 @@ namespace asm_lsw {
 		template <bool>
 		friend struct detail::fast_trie_compact_as_tpl_serialize_trait;
 		
+		template <typename, typename, bool>
+		friend class y_fast_trie_compact_as;
+		
 	protected:
 		typedef y_fast_trie_compact_as <t_max_key, t_value, t_enable_serialize> base_class;
 		typedef y_fast_trie_compact <t_key, t_value, t_enable_serialize> trie_type;
@@ -360,6 +363,9 @@ namespace asm_lsw {
 		
 	protected:
 		trie_type m_trie;
+		
+	protected:
+		y_fast_trie_compact_as_tpl() = default;
 		
 	public:
 		y_fast_trie_compact_as_tpl(trie_type &trie, t_max_key offset):
