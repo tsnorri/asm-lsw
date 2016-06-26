@@ -50,8 +50,11 @@ namespace asm_lsw {
 		
 		phf_wrapper &operator=(phf_wrapper &&other) &
 		{
-			m_phf = other.m_phf;
-			memset(&other.m_phf, 0, sizeof(struct phf));
+			if (&other != this)
+			{
+				m_phf = other.m_phf;
+				memset(&other.m_phf, 0, sizeof(struct phf));
+			}
 			return *this;
 		}
 

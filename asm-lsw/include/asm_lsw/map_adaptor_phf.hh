@@ -608,11 +608,14 @@ namespace asm_lsw {
 	template <typename t_spec>
 	auto map_adaptor_phf <t_spec>::operator=(map_adaptor_phf const &other) & -> map_adaptor_phf &
 	{
-		base_class::operator=(other);
-		m_used_indices_rank0_support = other.m_used_indices_rank0_support;
-		m_used_indices_rank0_support.set_vector(&this->m_used_indices);
-		m_used_indices_select1_support = other.m_used_indices_select1_support;
-		m_used_indices_select1_support.set_vector(&this->m_used_indices);
+		if (&other != this)
+		{
+			base_class::operator=(other);
+			m_used_indices_rank0_support = other.m_used_indices_rank0_support;
+			m_used_indices_rank0_support.set_vector(&this->m_used_indices);
+			m_used_indices_select1_support = other.m_used_indices_select1_support;
+			m_used_indices_select1_support.set_vector(&this->m_used_indices);
+		}
 		return *this;
 	}
 
@@ -620,11 +623,14 @@ namespace asm_lsw {
 	template <typename t_spec>
 	auto map_adaptor_phf <t_spec>::operator=(map_adaptor_phf &&other) & -> map_adaptor_phf &
 	{
-		base_class::operator=(std::move(other));
-		m_used_indices_rank0_support = std::move(other.m_used_indices_rank0_support);
-		m_used_indices_rank0_support.set_vector(&this->m_used_indices);
-		m_used_indices_select1_support = std::move(other.m_used_indices_select1_support);
-		m_used_indices_select1_support.set_vector(&this->m_used_indices);
+		if (&other != this)
+		{
+			base_class::operator=(std::move(other));
+			m_used_indices_rank0_support = std::move(other.m_used_indices_rank0_support);
+			m_used_indices_rank0_support.set_vector(&this->m_used_indices);
+			m_used_indices_select1_support = std::move(other.m_used_indices_select1_support);
+			m_used_indices_select1_support.set_vector(&this->m_used_indices);
+		}
 		return *this;
 	}
 	

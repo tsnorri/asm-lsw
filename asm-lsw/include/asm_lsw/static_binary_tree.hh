@@ -266,8 +266,11 @@ namespace asm_lsw
 		static_binary_tree const &other
 	) & -> static_binary_tree &
 	{
-		static_binary_tree tmp(other); // Copy
-		*this = std::move(tmp);
+		if (&other != this)
+		{
+			static_binary_tree tmp(other); // Copy
+			*this = std::move(tmp);
+		}
 		return *this;
 	}
 	
@@ -277,14 +280,16 @@ namespace asm_lsw
 		static_binary_tree &&other
 	) & -> static_binary_tree &
 	{
-		m_helper = std::move(other.m_helper);
-		m_used_indices = std::move(other.m_used_indices);
-		m_used_indices_r1_support = std::move(other.m_used_indices_r1_support);
-		m_leftmost_idx = std::move(other.m_leftmost_idx);
-		m_past_end_idx = std::move(other.m_past_end_idx);
-			
-		m_used_indices_r1_support.set_vector(&this->m_used_indices);
-		
+		if (&other != this)
+		{
+			m_helper = std::move(other.m_helper);
+			m_used_indices = std::move(other.m_used_indices);
+			m_used_indices_r1_support = std::move(other.m_used_indices_r1_support);
+			m_leftmost_idx = std::move(other.m_leftmost_idx);
+			m_past_end_idx = std::move(other.m_past_end_idx);
+				
+			m_used_indices_r1_support.set_vector(&this->m_used_indices);
+		}
 		return *this;
 	}
 	

@@ -40,12 +40,14 @@ phf_wrapper::phf_wrapper(phf_wrapper const &other)
 
 phf_wrapper &phf_wrapper::operator=(phf_wrapper const &other) &
 {
-	if (is_valid())
-		PHF::destroy(&m_phf);
+	if (&other != this)
+	{
+		if (is_valid())
+			PHF::destroy(&m_phf);
 	
-	phf_wrapper tmp(other); // Copy.
-	*this = std::move(tmp);
-	
+		phf_wrapper tmp(other); // Copy.
+		*this = std::move(tmp);
+	}
 	return *this;
 }
 
