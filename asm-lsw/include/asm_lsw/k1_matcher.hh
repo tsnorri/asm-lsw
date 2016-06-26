@@ -38,6 +38,8 @@ namespace asm_lsw {
 		using unordered_map = map_adaptor_phf <map_adaptor_phf_spec <std::vector, pool_allocator, t_key, t_value, true>>;
 		
 	public:
+		typedef std::size_t												size_type;
+		
 		typedef sdsl::int_vector <>										int_vector_type;		// FIXME: make sure that this works with CSA's and CST's alphabet type.
 		typedef int_vector_type											f_vector_type;
 		typedef t_cst													cst_type;
@@ -111,31 +113,34 @@ namespace asm_lsw {
 			*this = std::move(tmp_matcher);
 		}
 		
-		k1_matcher(cst_type const &cst):
+		k1_matcher(cst_type const &cst, bool construct_ivars = true):
 			m_cst(&cst)
 		{
-			// Core path nodes
-			core_nodes_type cn;
-			construct_core_paths(cn);
+			if (construct_ivars)
+			{
+				// Core path nodes
+				core_nodes_type cn;
+				construct_core_paths(cn);
 
-			// Gamma
-			gamma_type gamma;
-			construct_gamma_sets(cn, gamma);
-			m_gamma = std::move(gamma);
+				// Gamma
+				gamma_type gamma;
+				construct_gamma_sets(cn, gamma);
+				m_gamma = std::move(gamma);
 			
-			// Core path endpoints
-			core_endpoints_type ce;
-			construct_core_path_endpoints(cn, ce);
-			m_ce = std::move(ce);
+				// Core path endpoints
+				core_endpoints_type ce;
+				construct_core_path_endpoints(cn, ce);
+				m_ce = std::move(ce);
 			
-			// LCP RMQ
-			lcp_rmq_type lcp_rmq;
-			construct_lcp_rmq(lcp_rmq);
-			m_lcp_rmq = std::move(lcp_rmq);
+				// LCP RMQ
+				lcp_rmq_type lcp_rmq;
+				construct_lcp_rmq(lcp_rmq);
+				m_lcp_rmq = std::move(lcp_rmq);
 			
-			// H
-			h_type h(*this);
-			m_h = std::move(h);
+				// H
+				h_type h(*this);
+				m_h = std::move(h);
+			}
 		}
 		
 		
@@ -270,6 +275,9 @@ namespace asm_lsw {
 		// Section 3.3.
 		template <typename t_pattern>
 		void find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const;
+		
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+		void load(std::istream &in);
 	};
 	
 	
@@ -1197,6 +1205,32 @@ namespace asm_lsw {
 				return;
 			}
 		}
+	}
+	
+	
+	template <typename t_cst>
+	auto k1_matcher <t_cst>::serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const -> size_type
+	{
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		size_type written_bytes(0);
+
+		written_bytes += m_gamma.serialize(out, child, name);
+		written_bytes += m_ce.serialize(out, child, name);
+		written_bytes += m_lcp_rmq.serialize(out, child, name);
+		written_bytes += m_h.serialize(out, child, name);
+		
+		sdsl::structure_tree::add_size(child, written_bytes);
+		return written_bytes;
+	}
+	
+	
+	template <typename t_cst>
+	void k1_matcher <t_cst>::load(std::istream &in)
+	{
+		m_gamma.load(in);
+		m_ce.load(in);
+		m_lcp_rmq.load(in);
+		m_h.load(in);
 	}
 }
 

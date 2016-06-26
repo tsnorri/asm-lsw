@@ -38,8 +38,28 @@ namespace asm_lsw {
 
 		struct h_pair
 		{
+			typedef std::size_t size_type;
+			
 			fast_trie_as_ptr <h_u_type> l;
 			fast_trie_as_ptr <h_u_type> r;
+			
+			size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const
+			{
+				auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+				size_type written_bytes(0);
+				
+				written_bytes += l.serialize(out, child, name);
+				written_bytes += r.serialize(out, child, name);
+				
+				sdsl::structure_tree::add_size(child, written_bytes);
+				return written_bytes;
+			}
+			
+			void load(std::istream &in)
+			{
+				l.load(in);
+				r.load(in);
+			}
 		};
 
 	protected:
@@ -196,6 +216,26 @@ namespace asm_lsw {
 			typename h_map::template builder_type <h_map_intermediate> builder(maps_i);
 			h_map maps_tmp(builder);
 			m_maps = std::move(maps_tmp);
+		}
+		
+		
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const
+		{
+			auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+			size_type written_bytes(0);
+			
+			written_bytes += m_maps.serialize(out, child, name);
+			written_bytes += sdsl::write_member(m_diff, out, child, "diff");
+		
+			sdsl::structure_tree::add_size(child, written_bytes);
+			return written_bytes;
+		}
+		
+		
+		void load(std::istream &in)
+		{
+			m_maps.load(in);
+			sdsl::read_member(m_diff, in);
 		}
 	};
 
