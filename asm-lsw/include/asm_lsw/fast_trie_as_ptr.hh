@@ -51,7 +51,8 @@ namespace asm_lsw {
 			auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
 			size_type written_bytes(0);
 			
-			bool is_nullptr(nullptr == m_ptr.get());
+			// Only bool is needed but at least std::ptrdiff_t space is required for the pointer at runtime.
+			std::ptrdiff_t is_nullptr(nullptr == m_ptr.get());
 			written_bytes += sdsl::write_member(is_nullptr, out, child, "is_nullptr");
 			
 			if (!is_nullptr)
@@ -63,7 +64,7 @@ namespace asm_lsw {
 		
 		void load(std::istream &in)
 		{
-			bool is_nullptr(false);
+			std::ptrdiff_t is_nullptr(false);
 			sdsl::read_member(is_nullptr, in);
 			if (!is_nullptr)
 				m_ptr.reset(trie_type::load(in));
