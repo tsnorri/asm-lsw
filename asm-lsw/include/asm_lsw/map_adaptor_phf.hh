@@ -212,7 +212,6 @@ namespace asm_lsw {
 
 	protected:
 		typedef map_adaptor_phf_base <t_spec>	base_class;
-		typedef detail::map_adaptor_phf_tag		map_adaptor_phf_tag;
 		
 	public:
 		typedef	typename base_class::trait_type							trait_type;
@@ -243,6 +242,8 @@ namespace asm_lsw {
 		template <template <typename ...> class t_map, typename t_hash, typename t_key_equal>
 		using mutable_map_adaptor_type = map_adaptor <t_map, key_type, value_type, access_key_fn_type, t_hash, t_key_equal>;
 		
+		typedef detail::map_adaptor_phf_tag		map_adaptor_phf_tag;
+
 		static_assert(
 			std::is_same <typename access_key_fn_type::key_type, key_type>::value,
 			"access_key_fn's operator() should take key_type as parameter"
