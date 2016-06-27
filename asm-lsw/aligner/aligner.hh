@@ -45,5 +45,6 @@ extern "C" void align(
 );
 extern "C" void create_index(std::istream &source_stream);
 extern "C" void handle_error();
+extern "C" void loading_complete();
 
 #endif

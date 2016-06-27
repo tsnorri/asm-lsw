@@ -31,7 +31,15 @@ namespace chrono = std::chrono;
 namespace ios = boost::iostreams;
 
 
+static bool s_in_align_mode{false};
 static chrono::milliseconds s_start_timestamp{};
+static chrono::milliseconds s_loading_complete_timestamp{};
+
+
+chrono::milliseconds timestamp_ms_now()
+{
+	return chrono::duration_cast <chrono::milliseconds>(chrono::system_clock::now().time_since_epoch());
+}
 
 
 void handle_error()
@@ -42,18 +50,34 @@ void handle_error()
 }
 
 
+void loading_complete()
+{
+	s_loading_complete_timestamp = timestamp_ms_now();
+}
+
+
 void handle_atexit()
 {
-	chrono::milliseconds end_timestamp(
-		chrono::duration_cast <chrono::milliseconds>(chrono::system_clock::now().time_since_epoch())
-	);
-	std::cerr << "Milliseconds elapsed: " << (end_timestamp - s_start_timestamp).count() << std::endl;
+	chrono::milliseconds end_timestamp(timestamp_ms_now());
+	if (s_in_align_mode)
+	{
+		std::cerr
+			<< "Milliseconds elapsed: "
+			<< (end_timestamp - s_start_timestamp).count()
+			<< " (loading: " << (s_loading_complete_timestamp - s_start_timestamp).count()
+			<< " aligning: " << (end_timestamp - s_loading_complete_timestamp).count()
+			<< ")" << std::endl;
+	}
+	else
+	{
+		std::cerr << "Milliseconds elapsed: " << (end_timestamp - s_start_timestamp).count() << std::endl;
+	}
 }
 
 
 int main(int argc, char **argv)
 {
-	s_start_timestamp = chrono::duration_cast <chrono::milliseconds>(chrono::system_clock::now().time_since_epoch());
+	s_start_timestamp = timestamp_ms_now();
 	std::atexit(handle_atexit);
 	
 	std::cerr << "Warning: --mismatches has not been implemented." << std::endl;
@@ -79,6 +103,7 @@ int main(int argc, char **argv)
 	}
 	else if (args_info.align_given)
 	{
+		s_in_align_mode = true;
 		align(
 			args_info.source_file_given ? args_info.source_file_arg : nullptr,
 			args_info.index_file_arg,

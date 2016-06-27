@@ -112,6 +112,7 @@ public:
 			m_matcher = std::move(tmp_matcher);
 			
 			std::cerr << "Loading complete." << std::endl;
+			loading_complete();
 		};
 		
 		auto read_sequences_fn = [this, source_fname_c, source_fname = std::move(source_fname)](){
