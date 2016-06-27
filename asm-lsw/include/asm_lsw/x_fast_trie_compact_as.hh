@@ -208,6 +208,8 @@ namespace asm_lsw {
 		static x_fast_trie_compact_as *construct_from_size(std::size_t const key_size);
 		
 	public:
+		virtual ~x_fast_trie_compact_as() {}
+		
 		template <typename t_key>
 		static x_fast_trie_compact_as *construct(x_fast_trie <t_key, t_value> &);
 
