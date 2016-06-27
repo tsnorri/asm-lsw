@@ -83,6 +83,7 @@ int main(int argc, char **argv)
 			args_info.source_file_given ? args_info.source_file_arg : nullptr,
 			args_info.index_file_arg,
 			args_info.error_count_arg,
+			(args_info.report_csa_ranges_given ? reporting_style::csa_ranges : reporting_style::text_positions),
 			args_info.report_all_given,
 			args_info.no_mt_given
 		);

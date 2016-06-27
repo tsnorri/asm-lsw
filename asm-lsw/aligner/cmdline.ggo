@@ -15,20 +15,21 @@ version "0.1"
 purpose "Perform semi-local alignment."
 usage "asm-lsw-aligner [ -c | -a ] < input > output"
 
-defmode		"Create index"	modedesc = "Prepare the index for performing semi-local alignment."
-defmode		"Align"			modedesc = "Perform semi-local alignment."
+defmode		"Create index"		modedesc = "Prepare the index for performing semi-local alignment."
+defmode		"Align"				modedesc = "Perform semi-local alignment."
 
-modeoption	"create-index"	c	"Create the index"																mode = "Create index"	required
+modeoption	"create-index"		c	"Create the index"																mode = "Create index"	required
 
-modeoption	"align"			a	"Perform alignment"																mode = "Align"			required
-modeoption	"index-file"	i	"Specify the location of the index file"							string		mode = "Align"			required
-modeoption	"error-count"	k	"Set the error count"												short		mode = "Align"			required
+modeoption	"align"				a	"Perform alignment"																mode = "Align"			required
+modeoption	"index-file"		i	"Specify the location of the index file"							string		mode = "Align"			required
+modeoption	"error-count"		k	"Set the error count"												short		mode = "Align"			required
 
 text "  Optional arguments:"
-modeoption	"report-all"	r	"Report all matches (not just the first one)"									mode = "Align"			optional
-modeoption	"mismatches"	m	"Align with mismatches instead of differences (no indels allowed)"				mode = "Align"			optional
-modeoption	"no-mt"			-	"Use only one thread"															mode = "Align"			optional
+modeoption	"report-all"		r	"Report all matches (not just the first one)"									mode = "Align"			optional
+modeoption	"report-csa-ranges"	R	"Report CSA ranges instead of text positions"									mode = "Align"			optional
+modeoption	"mismatches"		m	"Align with mismatches instead of differences (no indels allowed)"				mode = "Align"			optional
+modeoption	"no-mt"				-	"Use only one thread"															mode = "Align"			optional
 
 text "\n"
 text " Common options:"
-option		"source-file"	s	"Specify the location of the source file (default: stdin)"			string								optional
+option		"source-file"		s	"Specify the location of the source file (default: stdin)"			string								optional

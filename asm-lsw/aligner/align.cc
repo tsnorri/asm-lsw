@@ -50,6 +50,7 @@ protected:
 	dispatch_queue_t							m_aligning_queue;
 	asm_lsw::vector_source						m_vs;
 	unsigned short								m_k;
+	reporting_style								m_reporting_style;
 	
 protected:
 	static int open_file(char const *fname)
@@ -68,12 +69,14 @@ public:
 		dispatch_queue_t loading_queue,
 		dispatch_queue_t aligning_queue,
 		unsigned short const k,
+		reporting_style const rs,
 		bool single_thread
 	):
 		m_loading_queue(loading_queue),
 		m_aligning_queue(aligning_queue),
 		m_vs(single_thread ? 1 : std::thread::hardware_concurrency(), true),
-		m_k(k)
+		m_k(k),
+		m_reporting_style(rs)
 	{
 		dispatch_retain(m_loading_queue);
 		dispatch_retain(m_aligning_queue);
@@ -149,9 +152,36 @@ public:
 			
 			std::stringstream output;
 			output << "Sequence identifier: " << identifier << "\n";
-			output << "Ranges:" << "\n";
-			for (auto const &k : ranges)
-				output << "\t(" << +k.first << ", " << +k.second << ")\n";
+			
+			switch (m_reporting_style)
+			{
+				case reporting_style::csa_ranges:
+				{
+					output << "Ranges:" << '\n';
+					for (auto const &k : ranges)
+						output << "\t(" << +k.first << ", " << +k.second << ")\n";
+					
+					break;
+				}
+					
+				case reporting_style::text_positions:
+				{
+					auto const &isa(m_cst.csa.isa);
+					
+					output << "Text positions:" << '\n';
+					for (auto const &k : ranges)
+					{
+						for (cst_type::csa_type::size_type i(k.first); i <= k.second; ++i)
+							output << '\t' << +isa[i] << '\n';
+					}
+					
+					break;
+				}
+					
+				default:
+					assert(0);
+					break;
+			}
 			
 			std::lock_guard <std::mutex> guard(m_cout_mutex);
 			std::cout << output.str();
@@ -186,6 +216,7 @@ void align(
 	char const *source_fname,
 	char const *cst_fname,
 	short const k,
+	reporting_style const rs,
 	bool const report_all,
 	bool const single_thread
 )
@@ -204,9 +235,9 @@ void align(
 	align_context *ctx(nullptr);
 	
 	if (report_all)
-		ctx = new align_context_tpl <true>(loading_queue, aligning_queue, k, single_thread);
+		ctx = new align_context_tpl <true>(loading_queue, aligning_queue, k, rs, single_thread);
 	else
-		ctx = new align_context_tpl <false>(loading_queue, aligning_queue, k, single_thread);
+		ctx = new align_context_tpl <false>(loading_queue, aligning_queue, k, rs, single_thread);
 	
 	if (!single_thread)
 		dispatch_release(aligning_queue);

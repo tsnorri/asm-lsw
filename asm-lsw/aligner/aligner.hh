@@ -24,6 +24,13 @@
 #include <sdsl/cst_sada.hpp>
 
 
+enum class reporting_style : uint8_t
+{
+	csa_ranges,
+	text_positions
+};
+
+
 typedef sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <0, 0>>, sdsl::lcp_support_sada <>> cst_type;
 typedef asm_lsw::kn_matcher <cst_type> kn_matcher_type;
 
@@ -32,6 +39,7 @@ extern "C" void align(
 	char const *source_fname,
 	char const *cst_fname,
 	short const k,
+	reporting_style const rs,
 	bool const report_all,
 	bool const single_thread
 );
