@@ -44,7 +44,7 @@ namespace asm_lsw {
 		);
 		
 	protected:
-		template <typename t_pattern>
+		template <typename t_pattern, bool t_find_all_matches>
 		class match_cb
 		{
 		protected:
@@ -70,13 +70,13 @@ namespace asm_lsw {
 			}
 			
 			template <typename t_size>
-			void partial_match(typename cst_type::node_type const &node, t_size match_length, t_size pattern_start)
+			bool partial_match(typename cst_type::node_type const &node, t_size match_length, t_size pattern_start)
 			{
 				// Concatenate the matched edge with the end of the pattern and try the k = 1 matcher.
 				cst_edge_pattern_pair <cst_type, t_pattern> new_pattern(
 					*m_cst, node, match_length, *m_pattern, pattern_start
 				);
-
+				
 #if 0
 				auto vec(new_pattern.operator std::vector <typename decltype(new_pattern)::value_type>());
 				std::cout << "Trying pattern: ";
@@ -84,11 +84,15 @@ namespace asm_lsw {
 				std::cout << std::endl;
 #endif
 				
-				m_matcher->find_1_approximate(new_pattern, *m_ranges);
+				bool found(m_matcher->template find_1_approximate <t_find_all_matches>(new_pattern, *m_ranges));
+				if (!t_find_all_matches && found)
+					return false;
+				
+				return true;
 			}
 			
 			template <typename t_cost>
-			void complete_match(
+			bool complete_match(
 				typename cst_type::node_type const &node,
 				typename cst_type::size_type match_length,
 				t_cost edit_distance
@@ -103,12 +107,13 @@ namespace asm_lsw {
 				
 				// Check if the path label (with k - 1 differences) may be used
 				// to find additional matches with one difference.
-				if (edit_distance == m_k - 1)
+				if (t_find_all_matches && edit_distance == m_k - 1)
 				{
 					cst_edge_adaptor <t_cst> edge_adaptor(*m_cst, node, match_length);
-					m_matcher->find_1_approximate(edge_adaptor, *m_ranges);
+					m_matcher->template find_1_approximate <t_find_all_matches>(edge_adaptor, *m_ranges);
 				}
-
+				
+				return t_find_all_matches;
 			}
 		};
 		
@@ -127,7 +132,7 @@ namespace asm_lsw {
 		
 		cst_type const &cst() { return *m_cst; }
 
-		template <typename t_pattern>
+		template <bool t_find_all_matches, typename t_pattern>
 		void find_approximate(t_pattern const &pattern, uint8_t k, csa_ranges &ranges) const;
 		
 		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
@@ -136,7 +141,7 @@ namespace asm_lsw {
 	
 	
 	template <typename t_cst>
-	template <typename t_pattern>
+	template <bool t_find_all_matches, typename t_pattern>
 	void kn_matcher <t_cst>::find_approximate(
 		t_pattern const &pattern, uint8_t k, csa_ranges &ranges
 	) const
@@ -148,12 +153,12 @@ namespace asm_lsw {
 		if (1 == k)
 		{
 			// The k = 1 matcher may be used directly.
-			m_matcher.find_1_approximate(pattern, ranges);
+			m_matcher.template find_1_approximate <t_find_all_matches>(pattern, ranges);
 		}
 		else
 		{
 			// Pass each of the matched paths to the k = 1 matcher (Theorem 3).
-			typedef match_cb <t_pattern> match_cb_type;
+			typedef match_cb <t_pattern, t_find_all_matches> match_cb_type;
 			typedef kn_path_label_matcher <cst_type, t_pattern, match_cb_type> pl_matcher_type;
 			pl_matcher_type path_label_matcher(*m_cst, pattern, k - 1);
 			match_cb_type cb(m_matcher, pattern, ranges, k);

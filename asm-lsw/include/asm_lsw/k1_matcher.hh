@@ -237,7 +237,7 @@ namespace asm_lsw {
 			typename csa_type::size_type &i
 		) const;
 
-		template <typename t_pattern>
+		template <bool t_find_all_matches, typename t_pattern>
 		bool tree_search(
 			t_pattern const &pattern,
 			f_type const &f,
@@ -251,8 +251,8 @@ namespace asm_lsw {
 			typename csa_type::size_type &right
 		) const;
 		
-		template <typename t_pattern>
-		void find_1_approximate_at_i(
+		template <bool t_find_all_matches, typename t_pattern>
+		bool find_1_approximate_at_i(
 			t_pattern const &pattern,
 			f_type const &f,
 			typename cst_type::node_type const u,
@@ -263,7 +263,7 @@ namespace asm_lsw {
 		) const;
 		
 		template <typename t_pattern>
-		void find_1_approximate_continue_exact(
+		bool find_1_approximate_continue_exact(
 			t_pattern const &pattern,
 			typename cst_type::node_type v,
 			typename t_pattern::size_type eidx,
@@ -273,8 +273,8 @@ namespace asm_lsw {
 		
 	public:
 		// Section 3.3.
-		template <typename t_pattern>
-		void find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const;
+		template <bool t_find_all_matches, typename t_pattern>
+		bool find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const;
 		
 		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
 		void load(std::istream &in);
@@ -851,7 +851,7 @@ namespace asm_lsw {
 	
 	// Lemma 19.
 	template <typename t_cst>
-	template <typename t_pattern>
+	template <bool t_find_all_matches, typename t_pattern>
 	bool k1_matcher <t_cst>::tree_search(
 		t_pattern const &pattern,
 		f_type const &f,
@@ -914,7 +914,8 @@ namespace asm_lsw {
 
 				left = i;
 				right = i;
-				extend_range(pat1_len, st, ed, v_le, v_ri, left, right);
+				if (t_find_all_matches)
+					extend_range(pat1_len, st, ed, v_le, v_ri, left, right);
 				return true;
 			}
 			else
@@ -941,7 +942,8 @@ namespace asm_lsw {
 					// x corresponds to a suffix with P as its prefix.
 					left = k;
 					right = k;
-					extend_range(pat1_len, st, ed, v_le, v_ri, left, right);
+					if (t_find_all_matches)
+						extend_range(pat1_len, st, ed, v_le, v_ri, left, right);
 					return true;
 				}
 				else
@@ -964,7 +966,8 @@ namespace asm_lsw {
 					{
 						left = m_cst->lb(r);
 						right = m_cst->rb(r);
-						extend_range(pat1_len, st, ed, v_le, v_ri, left, right); // FIXME: not sure if needed.
+						if (t_find_all_matches)
+							extend_range(pat1_len, st, ed, v_le, v_ri, left, right); // FIXME: not sure if needed.
 						return true;
 					}
 					else
@@ -985,7 +988,7 @@ namespace asm_lsw {
 #endif
 						auto const r_st(f.st(*m_cst, 1 + next_idx));
 						auto const r_ed(f.ed(*m_cst, 1 + next_idx));
-						return tree_search(pattern, f, r, r, 1 + next_idx, next_cc, r_st, r_ed, left, right);
+						return tree_search <t_find_all_matches>(pattern, f, r, r, 1 + next_idx, next_cc, r_st, r_ed, left, right);
 					}
 
 					return false;
@@ -996,7 +999,8 @@ namespace asm_lsw {
 		{
 			left = i;
 			right = i;
-			extend_range(pat1_len, st, ed, v_le, v_ri, left, right);
+			if (t_find_all_matches)
+				extend_range(pat1_len, st, ed, v_le, v_ri, left, right);
 			return true;
 		}
 		else
@@ -1008,8 +1012,8 @@ namespace asm_lsw {
 	
 	// Section 3.3.
 	template <typename t_cst>
-	template <typename t_pattern>
-	void k1_matcher <t_cst>::find_1_approximate_at_i(
+	template <bool t_find_all_matches, typename t_pattern>
+	bool k1_matcher <t_cst>::find_1_approximate_at_i(
 		t_pattern const &pattern,
 		f_type const &f,
 		typename cst_type::node_type const u,
@@ -1019,6 +1023,7 @@ namespace asm_lsw {
 		csa_ranges &ranges
 	) const
 	{
+		bool retval(false);
 		typename csa_type::size_type left{0}, right{0};
 		auto const st(f.st(*m_cst, i));
 		auto const ed(f.ed(*m_cst, i));
@@ -1029,22 +1034,25 @@ namespace asm_lsw {
 		if (st != f_type::not_found)
 		{
 			assert(ed != f_type::not_found);
-			if (tree_search(pattern, f, u, core_path_beginning, i, cc, st, ed, left, right))
+			if (tree_search <t_find_all_matches>(pattern, f, u, core_path_beginning, i, cc, st, ed, left, right))
 			{
 				csa_range range(left, right);
 				ranges.emplace_back(std::move(range));
+				retval = true;
 			}
 		}
 		else
 		{
 			assert(ed == f_type::not_found);
 		}
+		
+		return retval;
 	}
 	
 	
 	template <typename t_cst>
 	template <typename t_pattern>
-	void k1_matcher <t_cst>::find_1_approximate_continue_exact(
+	bool k1_matcher <t_cst>::find_1_approximate_continue_exact(
 		t_pattern const &pattern,
 		typename cst_type::node_type v,
 		typename t_pattern::size_type eidx,
@@ -1066,7 +1074,7 @@ namespace asm_lsw {
 				auto const ec(m_cst->edge(v, 1 + eidx));
 				auto const pc(pattern[pidx]);
 				if (ec != pc)
-					return;
+					return false;
 				
 				++eidx;
 				++pidx;
@@ -1080,7 +1088,7 @@ namespace asm_lsw {
 			v = m_cst->child(v, pattern[pidx], char_pos);
 			
 			if (m_cst->root() == v)
-				return;
+				return false;
 			
 			// The first character is known to match since an edge was found.
 			++eidx;
@@ -1090,19 +1098,24 @@ namespace asm_lsw {
 	end:
 		csa_range range(m_cst->lb(v), m_cst->rb(v));
 		ranges.emplace_back(std::move(range));
+		return true;
 	}
 	
 	
 	// Section 3.3.
 	template <typename t_cst>
-	template <typename t_pattern>
-	void k1_matcher <t_cst>::find_1_approximate(t_pattern const &pattern, csa_ranges &ranges) const
+	template <bool t_find_all_matches, typename t_pattern>
+	bool k1_matcher <t_cst>::find_1_approximate(
+		t_pattern const &pattern,
+		csa_ranges &ranges
+	) const
 	{
+		bool found(false);
 		f_type const f(*this, pattern);
 		typename cst_type::node_type u(m_cst->root());
 		typename cst_type::node_type core_path_beginning(u);
 		auto const patlen(pattern.size());
-		util::remove_c_t<decltype(patlen)> i(0);
+		util::remove_c_t <decltype(patlen)> i(0);
 
 		while (i < patlen)
 		{
@@ -1111,7 +1124,9 @@ namespace asm_lsw {
 			if (! (i == patlen - 1 || pattern[i] == pattern[1 + i]))
 			{
 				auto const cc(pattern[1 + i]);
-				find_1_approximate_at_i(pattern, f, u, core_path_beginning, 2 + i, cc, ranges);
+				found |= find_1_approximate_at_i <t_find_all_matches>(pattern, f, u, core_path_beginning, 2 + i, cc, ranges);
+				if (!t_find_all_matches && found)
+					return true;
 			}
 			
 			// 2. Substitution.
@@ -1120,7 +1135,11 @@ namespace asm_lsw {
 			{
 				auto const cc(m_cst->csa.comp2char[c]);
 				if (pattern[i] != cc)
-					find_1_approximate_at_i(pattern, f, u, core_path_beginning, 1 + i, cc, ranges);
+				{
+					found |= find_1_approximate_at_i <t_find_all_matches>(pattern, f, u, core_path_beginning, 1 + i, cc, ranges);
+					if (!t_find_all_matches && found)
+						return true;
+				}
 			}
 			
 			// 3. Insertion.
@@ -1129,7 +1148,11 @@ namespace asm_lsw {
 			{
 				auto const cc(m_cst->csa.comp2char[c]);
 				if (1 + i == pattern.size() || pattern[i] != cc)
-					find_1_approximate_at_i(pattern, f, u, core_path_beginning, i, cc, ranges);
+				{
+					found |= find_1_approximate_at_i <t_find_all_matches>(pattern, f, u, core_path_beginning, i, cc, ranges);
+					if (!t_find_all_matches && found)
+						return true;
+				}
 			}
 
 			// 4. Exact match.
@@ -1140,7 +1163,7 @@ namespace asm_lsw {
 			// Character at i doesn't match; there won't be more
 			// matches since k = 1.
 			if (m_cst->root() == v)
-				return;
+				return found;
 			
 			assert(i == m_cst->depth(u));
 			auto k(i);
@@ -1153,7 +1176,7 @@ namespace asm_lsw {
 				{
 					csa_range range(m_cst->lb(v), m_cst->rb(v));
 					ranges.emplace_back(std::move(range));
-					return;
+					return true;
 				}
 				
 				// If the end of the edge was reached, stop.
@@ -1169,19 +1192,25 @@ namespace asm_lsw {
 					// for which mismatches need to be considered.
 					
 					// 1. Deletion. Remove character at pattern[k].
-					find_1_approximate_continue_exact(pattern, v, k, k + 1, ranges);
+					found |= find_1_approximate_continue_exact(pattern, v, k, k + 1, ranges);
+					if (!t_find_all_matches && found)
+						return true;
 					
 					// Skip if ec is the zero character.
 					if (ec)
 					{
 						// 2. Insertion. Suppose ec was inserted into pattern before k.
-						find_1_approximate_continue_exact(pattern, v, k + 1, k, ranges);
+						found |= find_1_approximate_continue_exact(pattern, v, k + 1, k, ranges);
+						if (!t_find_all_matches && found)
+							return true;
 						
 						// 3. Substitution. Suppose pattern[k] was replaced with ec.
-						find_1_approximate_continue_exact(pattern, v, k + 1, k + 1, ranges);
+						found |= find_1_approximate_continue_exact(pattern, v, k + 1, k + 1, ranges);
+						if (!t_find_all_matches && found)
+							return true;
 					}
 					
-					return;
+					return found;
 				}
 				
 				++k;
@@ -1202,9 +1231,11 @@ namespace asm_lsw {
 			if (m_cst->is_leaf(u))
 			{
 				assert(0 == pattern[i - 1]);
-				return;
+				return found;
 			}
 		}
+		
+		return found;
 	}
 	
 	

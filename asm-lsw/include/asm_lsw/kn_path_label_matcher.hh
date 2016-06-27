@@ -29,11 +29,13 @@
 namespace asm_lsw { namespace detail {
 	struct kn_path_label_matcher_cb {
 		
+		// Return false if only one match is needed, true if all matches are expected.
+		
 		template <typename t_node, typename t_size>
-		void partial_match(t_node const &node, t_size match_length, t_size pattern_start) {}
+		bool partial_match(t_node const &node, t_size match_length, t_size pattern_start) { return true; }
 		
 		template <typename t_node, typename t_size, typename t_cost>
-		void complete_match(t_node const &node, t_size match_length, t_cost cost) {}
+		bool complete_match(t_node const &node, t_size match_length, t_cost cost) { return true; }
 	};
 }}
 
@@ -313,7 +315,7 @@ namespace asm_lsw {
 		}
 		
 		
-		void report_partial_matches(
+		bool report_partial_matches(
 			typename cst_type::node_type const &node,
 			size_type const j,
 			t_match_callback &cb
@@ -332,11 +334,14 @@ namespace asm_lsw {
 					auto p(m_p(i - pad, j));
 					if (0x1 == p)
 					{
-						cb.partial_match(node, j, i); // j: match_length, i: pattern_start
 						p = 0x3; // Don't report again.
+						if (!cb.partial_match(node, j, i)) // j: match_length, i: pattern_start
+							return false;
 					}
 				}
 			}
+			
+			return true;
 		}
 
 
@@ -394,6 +399,8 @@ namespace asm_lsw {
 					// Check column zero if it wasn't handled earlier.
 					report_partial_matches(m_node, 0, cb);
 					
+					// No need to check the return value of report_partial_matches
+					// as this is the last iteration anyway.
 					return false;
 				}
 				
@@ -422,7 +429,10 @@ namespace asm_lsw {
 						
 						// Report partial matches in the filled range.
 						for (decltype(j) js(j_begin); js <= j; ++js)
-							report_partial_matches(m_node, js, cb);
+						{
+							if (!report_partial_matches(m_node, js, cb))
+								return false;
+						}
 						
 						if (compare_path_label(patlen, k0, cb))
 							return true;
@@ -439,7 +449,10 @@ namespace asm_lsw {
 							// If the current node is a leaf, continue in the outer loop.
 							// Report partial matches in the filled range.
 							for (decltype(j) js(j_begin); js <= j; ++js)
-								report_partial_matches(m_node, js, cb);
+							{
+								if (!report_partial_matches(m_node, js, cb))
+									return false;
+							}
 
 							break;
 						}
