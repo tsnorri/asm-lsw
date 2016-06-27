@@ -29,18 +29,27 @@ namespace ios = boost::iostreams;
 
 class align_context
 {
+public:
+	virtual ~align_context() {}
+	virtual void load_and_align(char const *source_fname_c, char const *cst_fname_c) = 0;
+};
+
+
+template <bool t_report_all>
+class align_context_tpl : public align_context
+{
 protected:
 	typedef ios::stream <ios::file_descriptor_source> source_stream_type;
 
 protected:
-	cst_type								m_cst{};
-	kn_matcher_type							m_matcher{};
-	asm_lsw::fasta_reader <align_context>	m_reader{};
-	std::mutex								m_cout_mutex{};
-	dispatch_queue_t						m_loading_queue;
-	dispatch_queue_t						m_aligning_queue;
-	asm_lsw::vector_source					m_vs;
-	unsigned short							m_k;
+	cst_type									m_cst{};
+	kn_matcher_type								m_matcher{};
+	asm_lsw::fasta_reader <align_context_tpl>	m_reader{};
+	std::mutex									m_cout_mutex{};
+	dispatch_queue_t							m_loading_queue;
+	dispatch_queue_t							m_aligning_queue;
+	asm_lsw::vector_source						m_vs;
+	unsigned short								m_k;
 	
 protected:
 	static int open_file(char const *fname)
@@ -55,7 +64,7 @@ protected:
 
 public:
 	// hardware_concurrency could be a good hint for the number or required buffers.
-	align_context(
+	align_context_tpl(
 		dispatch_queue_t loading_queue,
 		dispatch_queue_t aligning_queue,
 		unsigned short const k,
@@ -70,13 +79,13 @@ public:
 		dispatch_retain(m_aligning_queue);
 	}
 	
-	~align_context()
+	~align_context_tpl()
 	{
 		dispatch_release(m_loading_queue);
 		dispatch_release(m_aligning_queue);
 	}
 	
-	void load_and_align(char const *source_fname_c, char const *cst_fname_c)
+	virtual void load_and_align(char const *source_fname_c, char const *cst_fname_c) override
 	{
 		assert(cst_fname_c);
 		
@@ -133,7 +142,7 @@ public:
 			std::unique_ptr <std::vector <char>> seq(seq_ptr);
 			
 			kn_matcher_type::csa_ranges ranges;
-			m_matcher.find_approximate(*seq, m_k, ranges);
+			m_matcher.find_approximate <t_report_all>(*seq, m_k, ranges);
 			m_vs.put_vector(seq);
 			
 			asm_lsw::util::post_process_ranges(ranges);
@@ -173,7 +182,13 @@ public:
 };
 
 
-void align(char const *source_fname, char const *cst_fname, short const k, bool const single_thread)
+void align(
+	char const *source_fname,
+	char const *cst_fname,
+	short const k,
+	bool const report_all,
+	bool const single_thread
+)
 {
 	// dispatch_main calls pthread_exit, so the supporting data structures need to be
 	// stored somewhere else than the stack.
@@ -185,7 +200,14 @@ void align(char const *source_fname, char const *cst_fname, short const k, bool 
 	if (!single_thread)
 		aligning_queue = dispatch_queue_create("fi.iki.tsnorri.asm_lsw_aligning_queue", DISPATCH_QUEUE_CONCURRENT);
 	
-	align_context *ctx = new align_context(loading_queue, aligning_queue, k, single_thread);
+	// align_context(_tpl) is deallocated by itself by calling cleanup() (in finish()).
+	align_context *ctx(nullptr);
+	
+	if (report_all)
+		ctx = new align_context_tpl <true>(loading_queue, aligning_queue, k, single_thread);
+	else
+		ctx = new align_context_tpl <false>(loading_queue, aligning_queue, k, single_thread);
+	
 	if (!single_thread)
 		dispatch_release(aligning_queue);
 	

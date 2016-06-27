@@ -28,7 +28,13 @@ typedef sdsl::cst_sada <sdsl::csa_rao <sdsl::csa_rao_spec <0, 0>>, sdsl::lcp_sup
 typedef asm_lsw::kn_matcher <cst_type> kn_matcher_type;
 
 
-extern "C" void align(char const *source_fname, char const *cst_fname, short const k, bool const single_thread);
+extern "C" void align(
+	char const *source_fname,
+	char const *cst_fname,
+	short const k,
+	bool const report_all,
+	bool const single_thread
+);
 extern "C" void create_index(std::istream &source_stream);
 extern "C" void handle_error();
 

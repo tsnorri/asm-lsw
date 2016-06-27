@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 	s_start_timestamp = chrono::duration_cast <chrono::milliseconds>(chrono::system_clock::now().time_since_epoch());
 	std::atexit(handle_atexit);
 	
-	std::cerr << "Warning: --report-all and --mismatches have not been implemented." << std::endl;
+	std::cerr << "Warning: --mismatches has not been implemented." << std::endl;
 	
 	gengetopt_args_info args_info;
 	if (0 != cmdline_parser(argc, argv, &args_info))
@@ -83,6 +83,7 @@ int main(int argc, char **argv)
 			args_info.source_file_given ? args_info.source_file_arg : nullptr,
 			args_info.index_file_arg,
 			args_info.error_count_arg,
+			args_info.report_all_given,
 			args_info.no_mt_given
 		);
 	}
