@@ -36,6 +36,7 @@ namespace asm_lsw {
 		typedef k1_matcher <cst_type>					k1_matcher_type;
 		typedef cst_edge_adaptor <cst_type>				k1_pattern_type;
 		typedef typename k1_matcher_type::csa_ranges	csa_ranges;
+		typedef std::size_t								size_type;
 		
 		static_assert(
 			std::is_unsigned <typename cst_type::node_type>::value,
@@ -118,9 +119,9 @@ namespace asm_lsw {
 	public:
 		kn_matcher() {}
 		
-		kn_matcher(cst_type const &cst):
+		kn_matcher(cst_type const &cst, bool construct_matcher_ivars = true):
 			m_cst(&cst),
-			m_matcher(cst)
+			m_matcher(cst, construct_matcher_ivars)
 		{
 		}
 		
@@ -128,6 +129,9 @@ namespace asm_lsw {
 
 		template <typename t_pattern>
 		void find_approximate(t_pattern const &pattern, uint8_t k, csa_ranges &ranges) const;
+		
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+		void load(std::istream &in);
 	};
 	
 	
@@ -156,6 +160,26 @@ namespace asm_lsw {
 			
 			path_label_matcher.find_approximate(cb);
 		}
+	}
+	
+	
+	template <typename t_cst>
+	auto kn_matcher <t_cst>::serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const -> size_type
+	{
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		size_type written_bytes(0);
+
+		written_bytes += m_matcher.serialize(out, child, name);
+		
+		sdsl::structure_tree::add_size(child, written_bytes);
+		return written_bytes;
+	}
+	
+	
+	template <typename t_cst>
+	void kn_matcher <t_cst>::load(std::istream &in)
+	{
+		m_matcher.load(in);
 	}
 }
 
