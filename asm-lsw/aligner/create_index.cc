@@ -58,10 +58,20 @@ public:
 		m_output_stream->flush();
 		vs.put_vector(seq);
 		
-		// Read the sequence from the file and serialize.
-		cst_type tmp_cst;
-		sdsl::construct(tmp_cst, m_source_fname, 1);
-		sdsl::serialize(tmp_cst, std::cout);
+		// Read the sequence from the file.
+		std::cerr << "Creating the CST…" << std::endl;
+		cst_type cst;
+		sdsl::construct(cst, m_source_fname, 1);
+		
+		// Other data structures.
+		std::cerr << "Creating other data structures…" << std::endl;
+		kn_matcher_type matcher(cst);
+		
+		// Serialize.
+		std::cerr << "Serializing…" << std::endl;
+		sdsl::serialize(cst, std::cout);
+		sdsl::serialize(matcher, std::cout);
+		
 		m_handled_seq = true;
 	}
 	

@@ -86,14 +86,17 @@ public:
 			source_fname = std::string(source_fname_c);
 		
 		auto load_ds_fn = [this, cst_fname = std::move(cst_fname)](){
-			std::cerr << "Loading CST…" << std::endl;
-
 			int const fd(open_file(cst_fname.c_str()));
-			source_stream_type cst_stream(fd, ios::close_handle);
-			m_cst.load(cst_stream);
+			source_stream_type ds_stream(fd, ios::close_handle);
 			
-			// Prepare the required data structures.
-			kn_matcher_type tmp_matcher(m_cst);
+			// Load the CST.
+			std::cerr << "Loading the CST…" << std::endl;
+			m_cst.load(ds_stream);
+			
+			// Load the other data structures.
+			std::cerr << "Loading other data structures…" << std::endl;
+			kn_matcher_type tmp_matcher(m_cst, false);
+			tmp_matcher.load(ds_stream);
 			m_matcher = std::move(tmp_matcher);
 			
 			std::cerr << "Loading complete." << std::endl;
@@ -146,25 +149,25 @@ public:
 			std::cout.flush();
 		};
 		
-		std::cerr << "Dispatching align block" << std::endl;
+		//std::cerr << "Dispatching align block" << std::endl;
 		asm_lsw::dispatch_async_fn(m_aligning_queue, find_approximate_fn);
 	}
 	
 	void finish()
 	{
-		std::cerr << "Finish called" << std::endl;
+		//std::cerr << "Finish called" << std::endl;
 		
 		// All sequence handling blocks have been executed since m_loading_queue
 		// is (supposed to be) serial.
 		// Make sure that all aligning blocks have been executed before calling exit.
 		auto exit_fn = [this](){
-			std::cerr << "Calling cleanup" << std::endl;
+			//std::cerr << "Calling cleanup" << std::endl;
 			cleanup();
-			std::cerr << "Calling exit" << std::endl;
+			//std::cerr << "Calling exit" << std::endl;
 			exit(EXIT_SUCCESS);
 		};
 		
-		std::cerr << "Dispatching finish block" << std::endl;
+		//std::cerr << "Dispatching finish block" << std::endl;
 		asm_lsw::dispatch_barrier_async_fn(m_aligning_queue, std::move(exit_fn));
 	}
 };
