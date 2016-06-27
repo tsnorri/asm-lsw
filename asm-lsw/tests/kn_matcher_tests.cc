@@ -48,12 +48,16 @@ public:
 	}
 	
 	template <typename t_size>
-	void partial_match(typename t_cst::node_type const &node, t_size match_length, t_size pattern_start) {}
+	bool partial_match(typename t_cst::node_type const &node, t_size match_length, t_size pattern_start)
+	{
+		return true;
+	}
 	
 	template <typename t_size, typename t_cost>
-	void complete_match(typename t_cst::node_type const &node, t_size match_length, t_cost cost)
+	bool complete_match(typename t_cst::node_type const &node, t_size match_length, t_cost cost)
 	{
 		m_ranges->emplace_back(m_cst->lb(node), m_cst->rb(node));
+		return true;
 	}
 };
 
@@ -196,7 +200,7 @@ void typed_tests()
 					
 					{
 						// The former should be equal to the result of the k = n matcher.
-						matcher.find_approximate(pattern, k, ranges);
+						matcher.template find_approximate <true>(pattern, k, ranges);
 					}
 					
 					asm_lsw::util::post_process_ranges(ranges);
