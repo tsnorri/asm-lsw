@@ -65,7 +65,7 @@ void handle_atexit()
 			<< "Milliseconds elapsed: "
 			<< (end_timestamp - s_start_timestamp).count()
 			<< " (loading: " << (s_loading_complete_timestamp - s_start_timestamp).count()
-			<< " aligning: " << (end_timestamp - s_loading_complete_timestamp).count()
+			<< " aligning and post-processing: " << (end_timestamp - s_loading_complete_timestamp).count()
 			<< ")" << std::endl;
 	}
 	else
