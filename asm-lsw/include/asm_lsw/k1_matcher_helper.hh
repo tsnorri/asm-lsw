@@ -26,27 +26,49 @@ namespace asm_lsw {
 	class k1_matcher <t_cst>::h_type
 	{
 	public:
-		typedef std::map<
+		typedef std::map <
 			typename csa_type::size_type,
 			typename csa_type::size_type
-		>															h_u_intermediate_type;
-		typedef y_fast_trie_compact_as<
+		>														h_u_intermediate_type;
+		typedef y_fast_trie_compact_as <
 			typename csa_type::size_type,
-			typename csa_type::size_type
-		>															h_u_type;
+			typename csa_type::size_type,
+			true
+		>														h_u_type;
 
 		struct h_pair
 		{
-			std::unique_ptr <h_u_type> l;
-			std::unique_ptr <h_u_type> r;
+			typedef std::size_t size_type;
+			
+			fast_trie_as_ptr <h_u_type> l;
+			fast_trie_as_ptr <h_u_type> r;
+			
+			size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const
+			{
+				auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+				size_type written_bytes(0);
+				
+				written_bytes += l.serialize(out, child, name);
+				written_bytes += r.serialize(out, child, name);
+				
+				sdsl::structure_tree::add_size(child, written_bytes);
+				return written_bytes;
+			}
+			
+			void load(std::istream &in)
+			{
+				l.load(in);
+				r.load(in);
+			}
 		};
 
 	protected:
-		typedef k1_matcher <t_cst> k1_matcher;
-		
 		// Indexed by identifiers from node_id().
-		typedef unordered_map <typename cst_type::size_type, h_pair> h_map;
-		typedef std::map <typename cst_type::size_type, h_pair> h_map_intermediate;
+		typedef unordered_map <
+			typename cst_type::size_type,
+			h_pair
+		>														h_map;
+		typedef std::map <typename cst_type::size_type, h_pair>	h_map_intermediate;
 
 	protected:
 		h_map m_maps;
@@ -71,47 +93,82 @@ namespace asm_lsw {
 			typename cst_type::size_type i(0), j(0);
 			h_u_intermediate_type hl_tmp, hr_tmp;
 			
-			while ((i = 1 + j * log2n) < leaf_count)
+			// i is an SA index s.t.
+			//  i ∈  {i | i ≡ 1 (mod log₂²n)}
+			//     = {i | i - 1 divisible by log₂²n}
+			//     = {1 + j log₂²n | j ∈ ℕ}
+			//
+			// Find SA indices from the sample that are slightly lower and higher than k.
+			// Suppose k is in the sample. Then it holds that
+			//   1 + j log₂²n = k
+			// ⇔     j log₂²n = k - 1
+			// ⇔            j = (k - 1) / log₂²n
+			//
+			// Continue by checking LCP lengths for values of i that are lower and higher than
+			// the initial value since they are sorted by LCP length s.t. the greatest length is
+			// at index k.
+			
 			{
-				// Now i is an SA index s.t.
-				//  i ∈  {i | i ≡ 1 (mod log₂²n)}
-				//     = {i | i - 1 divisible by log₂²n}
-				//     = {1 + j log₂²n | j ∈ ℕ}
-				
-				// Check |lcp(k, i)| ≥ plen(v).
-				auto const lcp_len(i == k ? plen_u : matcher.lcp_length(std::min(k, i), std::max(k, i)));
-				
-				// Check that LCP returns csa_type::size_type (for key).
+				typename cst_type::size_type j_low(0), j_high(0);
+				if (k <= 1)
 				{
-					typedef typename h_u_intermediate_type::key_type hu_key_type;
-					static_assert(
-						std::numeric_limits <decltype(lcp_len)>::max() <= std::numeric_limits <hu_key_type>::max(),
-						""
-					);
+					j_high = 1;
+				}
+				else
+				{
+					auto j_initial((k - 1) / double(log2n));
+					j_low = std::floor(j_initial);
+					j_high = std::ceil(j_initial);
+					
+					while (true)
+					{
+						typename cst_type::size_type i(1 + j_low * log2n);
+						if (i != k)
+						{
+							assert(i < k);
+							auto const lcp_len(matcher.lcp_length(i, k));
+							
+							// Diverges from the paper (section 3.1), the case where i = k is handled in Lemma 19 Case 2 (CP).
+							if (plen_v <= lcp_len)
+								hl_tmp.insert(std::make_pair(lcp_len, i));
+							else
+								break;
+						}
+						
+						if (0 == j_low)
+							break;
+						
+						--j_low;
+					}
 				}
 				
-				if (lcp_len >= plen_v)
+				while (true)
 				{
-					if (i <= k)
-						hl_tmp.insert(std::make_pair(lcp_len, i));
-					else if (i > k)
-						hr_tmp.insert(std::make_pair(lcp_len, i));
+					typename cst_type::size_type i(1 + j_high * log2n);
+					if (! (i < leaf_count))
+						break;
+
+					if (i != k)
+					{
+						assert(k < i);
+						auto const lcp_len(matcher.lcp_length(k, i));
+						if (plen_v <= lcp_len)
+							hr_tmp.insert(std::make_pair(lcp_len, i));
+						else
+							break;
+					}
+					
+					++j_high;
 				}
-				
-				++j;
 			}
 			
 			// Compress hl and hr.
 			// Another option would be using a value transformer similar to transform_gamma_v.
 			if (hl_tmp.size())
 				h.l.reset(h_u_type::construct(hl_tmp, hl_tmp.cbegin()->first, hl_tmp.crbegin()->first));
-			else
-				h.l.reset(h_u_type::construct(hl_tmp, 0, 0));
 			
 			if (hr_tmp.size())
 				h.r.reset(h_u_type::construct(hr_tmp, hr_tmp.cbegin()->first, hr_tmp.crbegin()->first));
-			else
-				h.r.reset(h_u_type::construct(hr_tmp, 0, 0));
 		}
 
 	public:
@@ -137,6 +194,7 @@ namespace asm_lsw {
 			auto const count(ce_bps.rank(ce_bps.size() - 1));
 			
 			h_map_intermediate maps_i;
+			
 			for (util::remove_c_t<decltype(count)> i{0}; i < count; ++i)
 			{
 				// Find the index of each opening parenthesis and its counterpart,
@@ -159,6 +217,26 @@ namespace asm_lsw {
 			h_map maps_tmp(builder);
 			m_maps = std::move(maps_tmp);
 		}
+		
+		
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v, std::string name) const
+		{
+			auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+			size_type written_bytes(0);
+			
+			written_bytes += m_maps.serialize(out, child, name);
+			written_bytes += sdsl::write_member(m_diff, out, child, "diff");
+		
+			sdsl::structure_tree::add_size(child, written_bytes);
+			return written_bytes;
+		}
+		
+		
+		void load(std::istream &in)
+		{
+			m_maps.load(in);
+			sdsl::read_member(m_diff, in);
+		}
 	};
 
 
@@ -170,9 +248,6 @@ namespace asm_lsw {
 		typedef f_vector_type::size_type size_type;
 		static f_vector_type::value_type const not_found{std::numeric_limits<f_vector_type::value_type>::max()};
 		
-	protected:
-		typedef k1_matcher <t_cst> k1_matcher;
-
 	protected:
 		f_vector_type m_st;
 		f_vector_type m_ed;
@@ -269,17 +344,20 @@ namespace asm_lsw {
 		{
 			if (kv.second.size())
 			{
-				typename gamma_type::mapped_type value(gamma_v_type::construct(
+				auto value(gamma_v_type::construct(
 					kv.second,
 					*kv.second.cbegin(),
 					*kv.second.crbegin()
 				));
-				return std::make_pair(kv.first, std::move(value));
+					
+				fast_trie_as_ptr <gamma_v_type> ptr(value);
+				return std::make_pair(kv.first, std::move(ptr));
 			}
 			else
 			{
-				typename gamma_type::mapped_type value(gamma_v_type::construct(kv.second, 0, 0));
-				return std::make_pair(kv.first, std::move(value));
+				fast_trie_as_ptr <gamma_v_type> ptr;
+				assert(ptr.get() == nullptr);
+				return std::make_pair(kv.first, std::move(ptr));
 			}
 		}
 	};

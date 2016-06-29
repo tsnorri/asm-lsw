@@ -1,11 +1,12 @@
 # Ignore Xcode's setting since the SDK may contain older versions of Clang and libc++.
 unexport SDKROOT
 
-CC		?= gcc
-CXX		?= g++
-GCOVR	?= gcovr
-MKDIR	?= mkdir
-CLOC	?= cloc
+CC			?= gcc
+CXX			?= g++
+GCOVR		?= gcovr
+MKDIR		?= mkdir
+CLOC		?= cloc
+GENGETOPT	?= gengetopt
 
 WARNING_FLAGS	?=
 WARNING_FLAGS	+= \
@@ -17,11 +18,14 @@ OPT_FLAGS			?=
 OPT_FLAGS			+= -fstrict-aliasing -fstrict-overflow
 OPT_FLAGS_DEBUG		?= -ggdb -O0
 OPT_FLAGS_RELEASE	?= -march=native -O2 -ftree-vectorize -foptimize-sibling-calls
+CPP_FLAGS_DEBUG		= -DSDSL_DEBUG
 
 CFLAGS		= -c -std=c99 $(OPT_FLAGS) $(WARNING_FLAGS)
 CXXFLAGS	= -c $(OPT_FLAGS) $(LOCAL_CXXFLAGS) $(WARNING_FLAGS)
 CPPFLAGS	=	-DMODE_TI \
 				-DHAVE_ATTRIBUTE_HOT \
+				-DHAVE_ATTRIBUTE_PURE \
+				-DHAVE_ATTRIBUTE_CONST \
 				-I../include \
 				-I../../lib/bandit \
 				-I../../lib/sdsl/build/include \
@@ -35,8 +39,10 @@ LDFLAGS		=	-L../../lib/sdsl/build/lib \
 
 ifeq ($(BUILD_STYLE),release)
 	OPT_FLAGS	+= $(OPT_FLAGS_RELEASE)
+	CPP_FLAGS	+= $(CPP_FLAGS_RELEASE)
 else
 	OPT_FLAGS	+= $(OPT_FLAGS_DEBUG)
+	CPP_FLAGS	+= $(CPP_FLAGS_DEBUG)
 endif
 
 ifeq ($(EXTRA_WARNINGS),1)

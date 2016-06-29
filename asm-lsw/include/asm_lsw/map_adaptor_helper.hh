@@ -20,6 +20,7 @@
 
 #include <array>
 #include <functional>
+#include <sdsl/io.hpp>
 
 
 namespace asm_lsw {
@@ -27,9 +28,15 @@ namespace asm_lsw {
 	template <typename t_key>
 	struct map_adaptor_access_key
 	{
+		typedef std::size_t size_type; // Needed for has_serialize.
+		
 		typedef t_key key_type;
 		typedef t_key accessed_type;
 		accessed_type operator()(key_type const &key) const { return key; }
+		
+		// Nothing to serialize.
+		size_type serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const { return 0; }
+		void load(std::istream& in) {}
 	};
 }
 
@@ -88,6 +95,7 @@ namespace asm_lsw { namespace detail {
 	struct map_adaptor_trait
 	{
 		typedef t_map <t_key, t_value, t_hash, t_key_equal> map_type;
+		typedef typename map_type::mapped_type mapped_type;
 	};
 
 
@@ -102,6 +110,7 @@ namespace asm_lsw { namespace detail {
 	struct map_adaptor_trait <t_set, t_key, void, t_access_key, t_hash, t_key_equal>
 	{
 		typedef t_set <t_key, t_hash, t_key_equal> map_type;
+		typedef t_key mapped_type;
 	};
 }}
 

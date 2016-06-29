@@ -18,23 +18,50 @@
 #ifndef ASM_LSW_MAP_ADAPTOR_PHF_HELPER_HH
 #define ASM_LSW_MAP_ADAPTOR_PHF_HELPER_HH
 
+#include <asm_lsw/util.hh>
+#include <sdsl/io.hpp>
 #include <utility>
 
 
 namespace asm_lsw { namespace detail {
 
+	template <typename t_spec>
+	class map_adaptor_phf_base;
+	
+	
+	struct map_adaptor_phf_tag {};
+	
+	
+	// Using the idea from http://stackoverflow.com/a/9644512/856976
+	template <typename T, typename t_enable = void>
+	struct is_map_adaptor_phf
+	{
+		enum { value = false };
+	};
+
+	template <typename T>
+	struct is_map_adaptor_phf <T, typename util::enable_if_type <typename T::map_adaptor_phf_tag>::type>
+	{
+		enum { value = std::is_same <typename T::map_adaptor_phf_tag, map_adaptor_phf_tag>::value };
+	};
+	
+	
 	// Specialize when t_value = void.
 	template <typename t_spec, bool t_value_is_void = std::is_void <typename t_spec::value_type>::value>
 	struct map_adaptor_phf_trait
 	{
 	};
 
+
 	template <typename t_spec>
 	struct map_adaptor_phf_trait <t_spec, true>
 	{
-		typedef typename t_spec::access_key_fn_type::key_type	key_type;
-		typedef typename t_spec::value_type						value_type;
-		typedef key_type										kv_type;
+		typedef typename t_spec::access_key_fn_type::key_type				key_type;
+		typedef typename t_spec::value_type									value_type;	// FIXME: mapped_type?
+		typedef key_type													kv_type;	// FIXME: value_type?
+		typedef key_type const &											const_iterator_return_type;
+		
+		enum { is_map_type = 0 };
 
 		template <typename t_kv>
 		static key_type key(t_kv &kv)
@@ -47,14 +74,101 @@ namespace asm_lsw { namespace detail {
 		{
 			return kv;
 		}
+		
+		template <typename t_kv>
+		static const_iterator_return_type &dereference(t_kv &kv)
+		{
+			return kv;
+		}
+		
+		template <typename t_map, typename t_other>
+		static bool contains(t_map const &map, t_other const &other)
+		{
+			auto const cend(map.cend());
+			for (auto const &k : other)
+			{
+				auto const it(map.find(k));
+				if (cend == it)
+					return false;
+			}
+			
+			return true;
+		}
+		
+		template <typename t_vector, typename t_used_indices>
+		static std::size_t serialize(
+			t_vector const &vector,
+			t_used_indices const &used_indices,
+			std::ostream &out,
+			sdsl::structure_tree_node *v
+		)
+		{
+			std::size_t written_bytes(0);
+			
+			sdsl::structure_tree_node* node(sdsl::structure_tree::add_child(v, "keys", ""));
+			for (typename t_used_indices::size_type i(0), count(used_indices.size() - 1); i < count; ++i)
+			{
+				if (used_indices[i])
+					written_bytes += sdsl::write_member_nn(vector[i], out);
+			}
+			
+			sdsl::structure_tree::add_size(node, written_bytes);
+			
+			return written_bytes;
+		}
+		
+		template <typename t_vector, typename t_used_indices, typename Fn>
+		static std::size_t serialize_keys(
+			t_vector const &vector,
+			t_used_indices const &used_indices,
+			Fn value_callback,
+			std::ostream &out,
+			sdsl::structure_tree_node *v
+		)
+		{
+			return serialize(vector, used_indices, out, v);
+		}
+		
+		template <typename t_vector, typename t_used_indices>
+		static void load(
+			t_vector const &vector,
+			t_used_indices const &used_indices,
+			std::istream &in
+		)
+		{
+			for (typename t_used_indices::size_type i(0), count(used_indices.size() - 1); i < count; ++i)
+			{
+				assert(i < used_indices.size());
+				if (used_indices[i])
+				{
+					assert(i < vector.size());
+					sdsl::read_member(vector[i], in);
+				}
+			}
+		}
+		
+		template <typename t_vector, typename t_used_indices, typename Fn>
+		static void load_keys(
+			t_vector &vector,
+			t_used_indices const &used_indices,
+			Fn value_callback,
+			std::istream &in
+		)
+		{
+			load(vector, used_indices, in);
+		}
 	};
+
 
 	template <typename t_spec>
 	struct map_adaptor_phf_trait <t_spec, false>
 	{
-		typedef typename t_spec::access_key_fn_type::key_type	key_type;
-		typedef typename t_spec::value_type						value_type;
-		typedef std::pair <key_type, value_type>				kv_type;
+		typedef typename t_spec::access_key_fn_type::key_type				key_type;
+		typedef typename t_spec::value_type									value_type;	// FIXME: mapped_type?
+		typedef std::pair <key_type, value_type>							kv_type;	// FIXME: value_type?
+		typedef std::pair <key_type const, value_type const &>				const_iterator_return_type;
+
+		enum { is_map_type = 1 };
 
 		template <typename t_kv>
 		static key_type key(t_kv &kv)
@@ -65,7 +179,127 @@ namespace asm_lsw { namespace detail {
 		template <typename t_kv>
 		static kv_type kv(t_kv &kv)
 		{
-			return std::make_pair(kv.first, std::move(kv.second));
+			value_type val(std::move(kv.second));
+			return std::make_pair(kv.first, std::move(val));
+		}
+		
+		template <typename t_kv>
+		static const_iterator_return_type dereference(t_kv &kv)
+		{
+			const_iterator_return_type retval(kv.first, kv.second);
+			return retval;
+		}
+		
+		template <typename t_map, typename t_other>
+		static bool contains(t_map const &map, t_other const &other)
+		{
+			auto const cend(map.cend());
+			for (auto const &kv : other)
+			{
+				auto const it(map.find(kv.first));
+				if (cend == it)
+					return false;
+				
+				if (! (kv.second == it->second))
+					return false;
+			}
+			
+			return true;
+		}
+		
+		// Only serialize the keys and call value_callback on values.
+		template <typename t_vector, typename t_used_indices, typename Fn>
+		static std::size_t serialize_keys(
+			t_vector const &vector,
+			t_used_indices const &used_indices,
+			Fn value_callback,
+			std::ostream &out,
+			sdsl::structure_tree_node *v
+		)
+		{
+			std::size_t size_keys(0);
+			std::size_t size_values(0);
+			
+			sdsl::structure_tree_node *node_keys(sdsl::structure_tree::add_child(v, "keys", ""));
+			sdsl::structure_tree_node *node_values(sdsl::structure_tree::add_child(v, "values", ""));
+			
+			for (typename t_used_indices::size_type i(0), count(used_indices.size() - 1); i < count; ++i)
+			{
+				if (used_indices[i])
+					size_keys += sdsl::write_member_nn(vector[i].first, out);
+			}
+			
+			for (typename t_used_indices::size_type i(0), count(used_indices.size() - 1); i < count; ++i)
+			{
+				if (used_indices[i])
+					size_values += value_callback(vector[i].second, out, node_values);
+			}
+			
+			sdsl::structure_tree::add_size(node_keys, size_keys);
+			sdsl::structure_tree::add_size(node_values, size_values);
+			
+			return size_keys + size_values;
+		}
+		
+		// Serialize also the values.
+		template <typename t_vector, typename t_used_indices>
+		static std::size_t serialize(
+			t_vector const &vector,
+			t_used_indices const &used_indices,
+			std::ostream &out,
+			sdsl::structure_tree_node *v
+		)
+		{
+			util::serialize_value_fn <value_type> serialize_value;
+			auto cb = [&](value_type const &value, std::ostream &out, sdsl::structure_tree_node *node) {
+				return serialize_value(value, out, node);
+			};
+			
+			return serialize_keys(vector, used_indices, cb, out, v);
+		}
+		
+		template <typename t_vector, typename t_used_indices, typename Fn>
+		static void load_keys(
+			t_vector &vector,
+			t_used_indices const &used_indices,
+			Fn value_callback,
+			std::istream &in
+		)
+		{
+			for (typename t_used_indices::size_type i(0), count(used_indices.size() - 1); i < count; ++i)
+			{
+				assert(i < used_indices.size());
+				if (used_indices[i])
+				{
+					assert(i < vector.size());
+					sdsl::read_member(vector[i].first, in);
+				}
+			}
+			
+			for (typename t_used_indices::size_type i(0), count(used_indices.size() - 1); i < count; ++i)
+			{
+				assert(i < used_indices.size());
+				if (used_indices[i])
+				{
+					assert(i < vector.size());
+					value_callback(vector[i].second, in);
+				}
+			}
+		}
+		
+		template <typename t_vector, typename t_used_indices>
+		static void load(
+			t_vector &vector,
+			t_used_indices const &used_indices,
+			std::istream &in
+		)
+		{
+			util::load_value_fn <value_type> load_value;
+			auto cb = [&](value_type &value, std::istream &in) {
+				return load_value(value, in);
+			};
+			
+			return load_keys(vector, used_indices, cb, in);
 		}
 	};
 	

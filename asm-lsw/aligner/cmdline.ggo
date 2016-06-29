@@ -1,0 +1,34 @@
+#  Copyright (C) 2016 Tuukka Norri
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses/ .
+
+package "asm-lsw-aligner"
+version "0.1"
+purpose "Perform semi-local alignment."
+usage "asm-lsw-aligner [ -c | -a ] < input > output"
+
+defmode		"Create index"	modedesc = "Prepare the index for performing semi-local alignment."
+defmode		"Align"			modedesc = "Perform semi-local alignment."
+
+modeoption	"create-index"	c	"Create the index"																mode = "Create index"	required
+
+modeoption	"align"			a	"Perform alignment"																mode = "Align"			required
+modeoption	"index-file"	i	"Specify the location of the index file"							string		mode = "Align"			required
+modeoption	"error-count"	k	"Set the error count"												short		mode = "Align"			required
+
+text "  Optional arguments:"
+modeoption	"report-all"	r	"Report all matches (not just the first one)"									mode = "Align"			optional
+modeoption	"mismatches"	m	"Align with mismatches instead of differences (no indels allowed)"				mode = "Align"			optional
+modeoption	"no-mt"			-	"Use only one thread"															mode = "Align"			optional
+
+text "\n"
+text " Common options:"
+option		"source-file"	s	"Specify the location of the source file (default: stdin)"			string								optional

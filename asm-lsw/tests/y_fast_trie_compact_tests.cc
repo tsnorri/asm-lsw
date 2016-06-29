@@ -22,28 +22,32 @@ go_bandit([](){
 	// Compact Y-fast tries
 	describe("compact Y-fast trie <uint8_t>:", [](){
 		typedef asm_lsw::y_fast_trie <uint8_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact <uint8_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact <uint8_t, void, true> ct_type;
 		common_any_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 		common_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
+		compact_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
+		y_fast_set_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint32_t>:", [](){
 		typedef asm_lsw::y_fast_trie <uint32_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact <uint32_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact <uint32_t, void, true> ct_type;
 		common_any_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 		common_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
+		compact_set_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
+		y_fast_set_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint8_t, uint8_t>:", [](){
 		typedef asm_lsw::y_fast_trie <uint8_t, uint8_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact <uint8_t, uint8_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact <uint8_t, uint8_t, true> ct_type;
 		common_any_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint32_t, uint32_t>:", [](){
 		typedef asm_lsw::y_fast_trie <uint32_t, uint32_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact <uint32_t, uint32_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact <uint32_t, uint32_t, true> ct_type;
 		common_any_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 		common_map_type_tests <trie_type, compact_trie_adaptor <trie_type, ct_type>>();
 	});

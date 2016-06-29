@@ -19,6 +19,7 @@
 #define ASM_LSW_MAP_ADAPTOR_HH
 
 #include <asm_lsw/map_adaptor_helper.hh>
+#include <asm_lsw/util.hh>
 #include <utility>
 
 
@@ -42,9 +43,17 @@ namespace asm_lsw {
 		typedef detail::map_adaptor_trait <t_map, key_type, value_type, access_key_fn_type, hash, key_equal> trait_type;
 		typedef typename trait_type::map_type map_type;
 		typedef typename map_type::size_type size_type;
+		typedef typename trait_type::mapped_type mapped_type;
+		typedef typename map_type::value_type kv_type; // FIXME: change to value_type and value_type to mapped_type.
 		typedef typename map_type::iterator iterator;
 		typedef typename map_type::const_iterator const_iterator;
 		typedef typename access_key_fn_type::accessed_type accessed_type;
+
+		// For compatibility with map_adaptor_phf.
+		template <template <typename> class t_new_allocator>
+		using rebind_allocator = map_adaptor;
+
+		enum { can_serialize = false };
 		
 	protected:
 		access_key_fn_type m_access_key_fn;
@@ -73,6 +82,24 @@ namespace asm_lsw {
 			m_map(std::move(map))
 		{
 		}
+		
+		template <
+			template <typename ...> class t_other_map,
+			typename t_other_key,
+			typename t_other_val,
+			typename t_other_access_key,
+			typename t_other_hash,
+			typename t_other_key_equal
+		>
+		auto operator==(
+			map_adaptor <t_other_map, t_other_key, t_other_val, t_other_access_key, t_other_hash, t_other_key_equal> const &other
+		) const -> typename std::enable_if <
+			std::is_same <
+				mapped_type,
+				typename util::remove_ref_t <decltype(other)>::mapped_type
+			>::value, bool
+		>::type
+		{ /* FIXME: what about access_key? */ return m_map == other.m_map; }
 
 		map_type const &map() const						{ return m_map; }
 		map_type &map()									{ return m_map; }

@@ -23,4 +23,4 @@ done
 
 echo " all.o" >> "${target}"
 
-printf "\nclean:\n\t\$(RM) *.cc *.o ${target}" >> "${target}"
+printf "\nclean:\n\t\$(RM) *.cc *.o *.gcno ${target}" >> "${target}"

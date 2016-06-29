@@ -20,6 +20,9 @@
 #include <asm_lsw/util.hh>
 #include <bandit/bandit.h>
 #include <boost/format.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <sdsl/io.hpp>
 #include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
@@ -49,6 +52,10 @@ struct pair_access_key
 	typedef pair key_type;
 	
 	accessed_type operator()(key_type const &pair) const { return pair.a; }
+	
+	// Nothing to serialize.
+	std::size_t serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const { return 0; }
+	void load(std::istream& in) {};
 };
 
 
@@ -211,6 +218,17 @@ void common_tests(t_adaptor const &adaptor, t_map const &test_values, t_test_spe
 	it("can iterate objects", [&](){
 		test_spec.test_iterate(adaptor, test_values);
 	});
+	
+	it("has a working equality comparison operator", [&](){
+		typedef typename t_adaptor::template rebind_allocator <std::allocator> other_adaptor_type;
+		other_adaptor_type const same_adaptor(adaptor);
+		t_adaptor const empty_adaptor{};
+		other_adaptor_type const empty_adaptor_2{};
+		
+		AssertThat(adaptor, Equals(same_adaptor));
+		AssertThat(adaptor, Is().Not().EqualTo(empty_adaptor));
+		AssertThat(adaptor, Is().Not().EqualTo(empty_adaptor_2));
+	});
 }
 
 
@@ -219,6 +237,24 @@ void phf_tests(t_adaptor const &adaptor, t_map const &test_values, t_test_specia
 {
 	it("can find objects with access_key", [&](){
 		test_spec.test_access_key(adaptor, test_values);
+	});
+	
+	it("can serialize", [&](){
+		std::size_t const buffer_size(4096);
+		char buffer[buffer_size];
+
+		boost::iostreams::basic_array <char> array(buffer, buffer_size);
+		boost::iostreams::stream <boost::iostreams::basic_array <char>> iostream(array);
+		
+		auto const size(adaptor.size());
+		adaptor.serialize(iostream);
+		AssertThat(adaptor.size(), Equals(size));
+		
+		typedef typename t_adaptor::template rebind_allocator <std::allocator> other_adaptor_type;
+		other_adaptor_type adaptor_2;
+		iostream.seekp(0);
+		adaptor_2.load(iostream);
+		AssertThat(adaptor, Equals(adaptor_2));
 	});
 }
 
@@ -243,7 +279,7 @@ void test_adaptors(t_map <t_args ...> const &test_values)
 
 	{
 		typedef asm_lsw::map_adaptor_phf_spec <
-			std::vector, asm_lsw::pool_allocator, key_type, value_type, typename test_traits <key_type>::access_key
+			std::vector, asm_lsw::pool_allocator, key_type, value_type, true, typename test_traits <key_type>::access_key
 		> adaptor_spec;
 		auto tv_copy(test_values);
 		asm_lsw::map_adaptor_phf_builder <adaptor_spec, decltype(test_values)> builder(tv_copy);
@@ -306,7 +342,7 @@ go_bandit([](){
 
 			it("should propagate and use access_key_fn", [&](){
 				asm_lsw::map_adaptor_phf_builder <
-					asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, access_key>,
+					asm_lsw::map_adaptor_phf_spec <std::vector, asm_lsw::pool_allocator, uint8_t, void, true, access_key>,
 					decltype(adaptor)
 				> builder(adaptor, acc);
 				decltype(builder)::adaptor_type adaptor_phf(builder);

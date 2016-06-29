@@ -18,6 +18,7 @@
 #ifndef ASM_LSW_X_FAST_TRIE_BASE_HH
 #define ASM_LSW_X_FAST_TRIE_BASE_HH
 
+#include <asm_lsw/fast_trie_common.hh>
 #include <asm_lsw/map_adaptors.hh>
 #include <asm_lsw/util.hh>
 #include <asm_lsw/x_fast_trie_base_helper.hh>
@@ -39,7 +40,11 @@ namespace asm_lsw {
 		static_assert(std::is_integral <typename t_spec::key_type>::value, "Unsigned integer required.");
 		static_assert(!std::is_signed <typename t_spec::key_type>::value, "Unsigned integer required.");
 		
-		template <typename, typename> friend class x_fast_trie_compact;
+		template <typename, typename, bool>
+		friend class x_fast_trie_compact;
+		
+		template <typename t_other_spec>
+		friend class x_fast_trie_base;
 
 	protected:
 		class lss_access;
@@ -53,22 +58,26 @@ namespace asm_lsw {
 	protected:
 		typedef detail::x_fast_trie_edge <key_type> edge;
 		typedef detail::x_fast_trie_node <key_type> node;
-		typedef detail::x_fast_trie_leaf_link <key_type, value_type> leaf_link;
+	public:
+		typedef detail::x_fast_trie_leaf_link <key_type, value_type> leaf_link_type;
+	protected:
 		typedef detail::x_fast_trie_trait<key_type, value_type> trait;
-		typedef typename t_spec::template map_adaptor_trait <node, void, typename node::access_key> level_map_trait;
-		typedef typename t_spec::template map_adaptor_trait <key_type, leaf_link> leaf_link_map_trait;
+		typedef typename t_spec::template map_adaptor_trait <node, void, true, typename node::access_key> level_map_trait;
+		typedef typename t_spec::template map_adaptor_trait <key_type, leaf_link_type> leaf_link_map_trait;
 		typedef typename level_map_trait::type level_map;
-		typedef typename leaf_link_map_trait::type leaf_link_map;
 		typedef typename t_spec::lss_find_fn lss_find_fn;
 
 	public:
+		typedef typename leaf_link_map_trait::type leaf_link_map;
 		typedef typename lss_access::level_idx_type level_idx_type;
 		typedef typename leaf_link_map::iterator leaf_iterator;
 		typedef typename leaf_link_map::const_iterator const_leaf_iterator;
 		typedef typename leaf_link_map::size_type size_type;
 		typedef leaf_iterator iterator;
 		typedef const_leaf_iterator const_iterator;
-
+		
+		typedef detail::x_fast_trie_tag x_fast_trie_tag;
+		
 	protected:
 		// Conditionally use iterator or const_iterator.
 		template <typename t_container, typename t_check, typename t_enable = void>
@@ -140,12 +149,20 @@ namespace asm_lsw {
 
 			void update_levels(key_type const key);
 			void erase_key(key_type const key, key_type const prev, key_type const next);
+			
+			template <bool t_dummy = true>
+			auto serialize(
+				std::ostream &out, sdsl::structure_tree_node *v, std::string name
+			) const -> typename std::enable_if <level_map::can_serialize && t_dummy, std::size_t>::type;
+					
+			template <bool t_dummy = true>
+			auto load(std::istream &in) -> typename std::enable_if <level_map::can_serialize && t_dummy>::type;
 		};
 
 	protected:
 		lss_access m_lss;
 		leaf_link_map m_leaf_links;
-		key_type m_min;
+		key_type m_min{};
 
 	protected:
 		// Moving functionality to the static member functions is needed for avoiding code duplication
@@ -184,6 +201,9 @@ namespace asm_lsw {
 		x_fast_trie_base(x_fast_trie_base &&) = default;
 		x_fast_trie_base &operator=(x_fast_trie_base const &) & = default;
 		x_fast_trie_base &operator=(x_fast_trie_base &&) & = default;
+		
+		template <typename t_other_spec>
+		bool operator==(x_fast_trie_base <t_other_spec> const &other) const { return m_leaf_links == other.m_leaf_links; }
 
 		std::size_t constexpr key_size() const { return sizeof(key_type); }
 		size_type size() const { return m_leaf_links.size(); }
@@ -208,8 +228,8 @@ namespace asm_lsw {
 
 		void print() const;
 	};
-
-
+	
+	
 	template <typename t_spec>
 	auto x_fast_trie_base <t_spec>::lss_access::level_size(level_idx_type const idx) const -> typename level_map::size_type
 	{
@@ -234,6 +254,36 @@ namespace asm_lsw {
 		assert(0 <= idx);
 		assert(idx < s_levels);
 		return m_lss[idx];
+	}
+	
+	
+	template <typename t_spec>
+	template <bool t_dummy>
+	auto x_fast_trie_base <t_spec>::lss_access::serialize(
+		std::ostream &out, sdsl::structure_tree_node *v, std::string name
+	) const -> typename std::enable_if <level_map::can_serialize && t_dummy, std::size_t>::type
+	{
+		auto *child(sdsl::structure_tree::add_child(v, name, sdsl::util::class_name(*this)));
+		size_type written_bytes(0);
+		
+		size_type i(0);
+		for (auto const &level : m_lss)
+			written_bytes += level.serialize(out, v, "level_" + std::to_string(i++));
+		
+		sdsl::structure_tree::add_size(child, written_bytes);
+		return written_bytes;
+	}
+	
+	
+	template <typename t_spec>
+	template <bool t_dummy>
+	auto x_fast_trie_base <t_spec>::lss_access::load(
+		std::istream &in
+	) -> typename std::enable_if <level_map::can_serialize && t_dummy>::type
+	{
+		// m_lss is an array, hence a constant number of levels.
+		for (auto &level : m_lss)
+			level.load(in);
 	}
 
 
@@ -326,21 +376,32 @@ namespace asm_lsw {
 	template <typename t_spec>
 	void x_fast_trie_base <t_spec>::lss_access::erase_key(key_type const key, key_type const prev, key_type const next)
 	{
+		// Walk from the leaf to the root and remove all nodes the other (not current)
+		// edge of which is a descendant pointer.
 		level_idx_type i(0);
+		bool is_minmax[2]{false, false};	// Whether the left or the right branch contains a min/max.
+		bool origin_branch{0};				// The branch at the end of which the deleted node was the other branch not being a descendant pointer.
 		while (i < s_levels)
 		{
 			typename level_map::iterator node_it;
-			find_node(key, i, node_it);
+			bool const status(find_node(key, i, node_it));
+			assert(status);
 			node node(*node_it);
 
 			key_type const nlk(level_key(key, i));
-			key_type const target_branch(0x1 & nlk);
-			key_type const other_branch(!target_branch);
+			bool const target_branch(0x1 & nlk);
+			bool const other_branch(!target_branch);
 
 			if (node.edge_is_descendant_ptr(i, other_branch))
 				m_lss[i].map().erase(node_it);
 			else
 			{
+				// If the other branch is not a descendant pointer, there must be a min/max in that branch.
+				is_minmax[other_branch] = true;
+				
+				origin_branch = target_branch;
+				
+				// Create a descendant pointer in place of the erased branch.
 				auto &level_map(level(i));
 				node[target_branch] = edge(target_branch ? prev : next);
 				auto pos(level_map.map().erase(node_it));
@@ -351,22 +412,36 @@ namespace asm_lsw {
 			++i;
 		}
 		
+		++i;
 		while (i < s_levels)
 		{
 			typename level_map::iterator node_it;
-			auto &level_map(level(i));
-			find_node(key, i, node_it);
+			bool const status(find_node(key, i, node_it));
+			assert(status);
 			node node(*node_it);
+			auto &level_map(level(i));
 
 			key_type const nlk(level_key(key, i));
-			key_type const target_branch(0x1 & nlk);
-			key_type const other_branch(!target_branch);
+			bool const target_branch(0x1 & nlk);
+			bool const other_branch(!target_branch);
 
-			if (node.edge_is_descendant_ptr(i, other_branch))
+			// The not-origin branch will point to the other side (min / max)
+			// of the subtree and hence needn't be updated.
+			if (other_branch == origin_branch)
 			{
-				node[other_branch] = edge(other_branch ? prev : next);
-				auto pos(level_map.map().erase(node_it));
-				level_map.map().emplace_hint(pos, std::move(node));
+				if (node.edge_is_descendant_ptr(i, other_branch))
+				{
+					node[other_branch] = edge(other_branch ? prev : next);
+					auto pos(level_map.map().erase(node_it));
+					level_map.map().emplace_hint(pos, std::move(node));
+				}
+				else
+				{
+					// If the other branch is not a descendant pointer, there must be a min/max in that branch.
+					is_minmax[other_branch] = true;
+					if (is_minmax[0] && is_minmax[1])
+						break;
+				}
 			}
 			
 			++i;
@@ -513,10 +588,11 @@ namespace asm_lsw {
 		bool const status(find_lowest_ancestor(trie, key, it, level));
 		assert(status);
 		key_type const next_branch(0x1 & (key >> level));
+		auto const &node(*it);
 		
-		assert(1 == level || it->edge_is_descendant_ptr(level, next_branch));
+		assert(1 == level || node.edge_is_descendant_ptr(level, next_branch));
 
-		edge const &edge((*it)[next_branch]);
+		edge const &edge(node[next_branch]);
 		nearest = trie.m_leaf_links.find(edge.key());
 		assert(trie.m_leaf_links.cend() != nearest);
 		assert(edge.key() == nearest->first);

@@ -20,22 +20,27 @@
 
 #include <cstring>
 #include <phf.h>
+#include <sdsl/int_vector.hpp>
+
 
 namespace asm_lsw {
 
 	// Wrapper for struct phf since it needs a custom destructor.
 	class phf_wrapper
 	{
+	public:
+		typedef std::size_t size_type; // Needed for has_serialize.
+		
 	protected:
 		struct phf m_phf{};
 		
 	public:
 		phf_wrapper() {}
-                
+
 		~phf_wrapper() { if (is_valid()) PHF::destroy(&m_phf); }
 		
-		phf_wrapper(phf_wrapper const &) = delete;
-		phf_wrapper &operator=(phf_wrapper const &) & = delete;
+		phf_wrapper(phf_wrapper const &);
+		phf_wrapper &operator=(phf_wrapper const &) &;
 		
 		phf_wrapper(phf_wrapper &&other):
 			m_phf(other.m_phf)
@@ -45,8 +50,11 @@ namespace asm_lsw {
 		
 		phf_wrapper &operator=(phf_wrapper &&other) &
 		{
-			m_phf = other.m_phf;
-			memset(&other.m_phf, 0, sizeof(struct phf));
+			if (&other != this)
+			{
+				m_phf = other.m_phf;
+				memset(&other.m_phf, 0, sizeof(struct phf));
+			}
 			return *this;
 		}
 
@@ -55,7 +63,57 @@ namespace asm_lsw {
 		
 		struct phf &get()				{ return m_phf; }
 		struct phf const &get() const	{ return m_phf; }
+		
+		void load(std::istream &in);
+		size_type serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+		
+	protected:
+		template <typename T>
+		void load_g(std::istream &in);
+		
+		template <typename T>
+		size_type serialize_g(std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "") const;
+
+		template <typename T>
+		void copy_g(phf_wrapper const &other);
 	};
+	
+	
+	template <typename T>
+	void phf_wrapper::copy_g(phf_wrapper const &other)
+	{
+		// Allocate g with malloc and copy the values.
+		assert(m_phf.r);
+		m_phf.g = reinterpret_cast <uint32_t *>(malloc(m_phf.r * sizeof(T)));
+		std::copy_n(reinterpret_cast <T const *>(other.m_phf.g), m_phf.r, reinterpret_cast <T *>(m_phf.g));
+	}
+	
+	
+	template <typename T>
+	void phf_wrapper::load_g(std::istream &in)
+	{
+		sdsl::int_vector <0> g_vec;
+		g_vec.load(in);
+		
+		// Allocate g with malloc and copy the values.
+		m_phf.g = reinterpret_cast <uint32_t *>(malloc(m_phf.r * sizeof(T)));
+		assert(m_phf.r);
+		assert(m_phf.r == g_vec.size());
+		std::copy_n(g_vec.cbegin(), m_phf.r, reinterpret_cast <T *>(m_phf.g));
+	}
+	
+	
+	template <typename T>
+	std::size_t phf_wrapper::serialize_g(std::ostream &out, sdsl::structure_tree_node *child, std::string name) const
+	{
+		// There are m_phf.r items in m_phf.g. Copy them to an int_vector and serialize.
+		assert(m_phf.r);
+		std::size_t const size(sizeof(T));
+		sdsl::int_vector <0> g_vec(m_phf.r, 0, 8 * size);
+		std::copy_n(reinterpret_cast <T const *>(m_phf.g), m_phf.r, g_vec.begin());
+		
+		return g_vec.serialize(out, child, "g");
+	}
 }
 
 #endif

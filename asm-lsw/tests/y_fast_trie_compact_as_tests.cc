@@ -24,7 +24,7 @@ go_bandit([](){
 		common_as_type_tests <asm_lsw::y_fast_trie <uint32_t>, asm_lsw::y_fast_trie_compact_as <uint32_t>>();
 
 		it("can be constructed with a vector", [](){
-			typedef asm_lsw::y_fast_trie_compact_as <uint32_t> trie_type;
+			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, void, true> trie_type;
 			std::vector <uint32_t> vec{5, 18, 22, 35, 108};
 
 			std::unique_ptr <trie_type> trie_ptr(trie_type::construct(vec, 5, 108));
@@ -36,7 +36,7 @@ go_bandit([](){
 		});
 
 		it("can be constructed with a map", [](){
-			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t> trie_type;
+			typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t, true> trie_type;
 			std::map <uint32_t, uint32_t> map{{5, 8}, {18, 21}, {22, 3}, {35, 7}, {108, 99}};
 
 			std::unique_ptr <trie_type> trie_ptr(trie_type::construct(map, 5, 108));
@@ -56,28 +56,34 @@ go_bandit([](){
 	
 	describe("compact Y-fast trie <uint8_t> (AS):", [](){
 		typedef asm_lsw::y_fast_trie <uint8_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact_as <uint8_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint8_t, void, true> ct_type;
 		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 		common_set_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		// FIXME: enable
+		//compact_set_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		y_fast_set_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint32_t> (AS):", [](){
 		typedef asm_lsw::y_fast_trie <uint32_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact_as <uint32_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint32_t, void, true> ct_type;
 		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 		common_set_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		// FIXME: enable
+		//compact_set_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
+		y_fast_set_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint8_t, uint8_t> (AS):", [](){
 		typedef asm_lsw::y_fast_trie <uint8_t, uint8_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact_as <uint8_t, uint8_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint8_t, uint8_t, true> ct_type;
 		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 		common_map_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 	});
 
 	describe("compact Y-fast trie <uint32_t, uint32_t> (AS):", [](){
 		typedef asm_lsw::y_fast_trie <uint32_t, uint32_t> trie_type;
-		typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t> ct_type;
+		typedef asm_lsw::y_fast_trie_compact_as <uint32_t, uint32_t, true> ct_type;
 		common_any_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 		common_map_type_tests <trie_type, compact_as_trie_adaptor <trie_type, ct_type>>();
 	});
