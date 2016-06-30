@@ -14,7 +14,6 @@
  along with this program.  If not, see http://www.gnu.org/licenses/ .
  */
 
-
 #include <asm_lsw/map_adaptors.hh>
 #include <asm_lsw/pool_allocator.hh>
 #include <asm_lsw/util.hh>
@@ -111,6 +110,10 @@ struct test_specialization <t_map, collection_kind::set>
 {
 	typedef void value_type;
 
+	// FIXME: I don't know how to forward the variadic arguments after the listed two in t_map.
+	template <typename t_map_key, typename t_map_hash, typename t_map_key_eq>
+	using map_template = std::unordered_set <t_map_key, t_map_hash, t_map_key_eq>;
+
 	template <typename t_adaptor, typename t_set>
 	void test_find(t_adaptor const &adaptor, t_set const &test_values)
 	{
@@ -164,6 +167,10 @@ template <typename t_tv_map>
 struct test_specialization <t_tv_map, collection_kind::map>
 {
 	typedef typename t_tv_map::mapped_type value_type;
+
+	// FIXME: I don't know how to forward the variadic arguments after the listed two in t_map.
+	template <typename t_map_key, typename t_map_val, typename t_map_hash, typename t_map_key_eq>
+	using map_template = std::unordered_map <t_map_key, t_map_val, t_map_hash, t_map_key_eq>;
 
 	template <typename t_adaptor, typename t_map>
 	void test_find(t_adaptor const &adaptor, t_map const &test_values)
@@ -269,7 +276,7 @@ void test_adaptors(t_map <t_args ...> const &test_values)
 	typedef typename test_traits <key_type>::access_key access_key_fn_type;
 
 	{
-		asm_lsw::map_adaptor <t_map, key_type, value_type, access_key_fn_type> adaptor;
+		asm_lsw::map_adaptor <decltype(test_spec)::template map_template, key_type, value_type, access_key_fn_type> adaptor;
 		auto tv_copy(test_values);
 		describe(boost::str(boost::format("%s:") % typeid(adaptor).name()).c_str(), [&](){
 			adaptor = std::move(decltype(adaptor)(tv_copy));
