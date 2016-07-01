@@ -25,6 +25,21 @@
 
 namespace asm_lsw { namespace detail {
 
+	struct static_binary_tree_tag {};
+
+	template <typename T, typename t_enable = void>
+	struct is_static_binary_tree
+	{
+		enum { value = false };
+	};
+
+	template <typename T>
+	struct is_static_binary_tree <T, typename util::enable_if_type <typename T::static_binary_tree_tag>::type>
+	{
+		enum { value = std::is_same <typename T::static_binary_tree_tag, static_binary_tree_tag>::value };
+	};
+
+
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
 	class static_binary_tree_helper
 	{

@@ -102,6 +102,8 @@ namespace asm_lsw
 		typedef boost::reverse_iterator <const_iterator>								const_reverse_iterator;
 		typedef const_iterator															iterator;
 		typedef const_reverse_iterator													reverse_iterator;
+
+		typedef detail::static_binary_tree_tag											static_binary_tree_tag;
 		
 		enum { is_map_type = helper_type::is_map_type };
 		
@@ -143,13 +145,19 @@ namespace asm_lsw
 		// Check that the passed collection satisfies SequenceContainer (for operator[]).
 		template <
 			typename t_vector,
-			typename std::enable_if <util::is_sequence_container <t_vector>::value>::type * = nullptr
+			typename std::enable_if <
+				!detail::is_static_binary_tree <util::remove_ref_t <t_vector>>::value &&
+				util::is_sequence_container <t_vector>::value
+			>::type * = nullptr
 		>
 		explicit static_binary_tree(t_vector &input_vec);
 		
 		template <
 			typename t_vector,
-			typename std::enable_if <util::is_sequence_container <t_vector>::value>::type * = nullptr
+			typename std::enable_if <
+				!detail::is_static_binary_tree <util::remove_ref_t <t_vector>>::value &&
+				util::is_sequence_container <t_vector>::value
+			>::type * = nullptr
 		>
 		explicit static_binary_tree(t_vector &&input_vec):
 			static_binary_tree(input_vec) // Convert to lvalue, constructor moves contents anyway.
@@ -159,7 +167,10 @@ namespace asm_lsw
 		// Not SequenceContainer, move the contents to a vector first.
 		template <
 			typename t_collection,
-			typename std::enable_if <!util::is_sequence_container <t_collection>::value>::type * = nullptr
+			typename std::enable_if <
+				!detail::is_static_binary_tree <util::remove_ref_t <t_collection>>::value &&
+				!util::is_sequence_container <t_collection>::value
+			>::type * = nullptr
 		>
 		explicit static_binary_tree(t_collection &collection):
 			static_binary_tree(move_to_vector(collection))
@@ -168,10 +179,13 @@ namespace asm_lsw
 		
 		template <
 			typename t_collection,
-			typename std::enable_if <!util::is_sequence_container <t_collection>::value>::type * = nullptr
+			typename std::enable_if <
+				!detail::is_static_binary_tree <util::remove_ref_t <t_collection>>::value &&
+				!util::is_sequence_container <t_collection>::value
+			>::type * = nullptr
 		>
 		explicit static_binary_tree(t_collection &&collection):
-			static_binary_tree(collection) // Convert to lvalue.
+			static_binary_tree(move_to_vector(collection))
 		{
 		}
 		
@@ -347,7 +361,10 @@ namespace asm_lsw
 	template <typename t_key, typename t_mapped, bool t_enable_serialize>
 	template <
 		typename t_vector,
-		typename std::enable_if <util::is_sequence_container <t_vector>::value>::type *
+		typename std::enable_if <
+			!detail::is_static_binary_tree <util::remove_ref_t <t_vector>>::value &&
+			util::is_sequence_container <t_vector>::value
+		>::type *
 	>
 	static_binary_tree <t_key, t_mapped, t_enable_serialize>::static_binary_tree(
 		t_vector &input_vec
